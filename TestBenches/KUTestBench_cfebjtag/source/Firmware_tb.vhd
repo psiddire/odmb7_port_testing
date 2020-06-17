@@ -262,5 +262,28 @@ begin
     CMDDEV         => cmddev,
     CACK           => cack
     );
+    
+  --add DCFEB
+  dcfeb_i: entity work.dcfeb_v6
+  port map (
+    clk             => '0',
+    dcfebclk        => '0',
+    rst             => '0',
+    l1a             => '0',
+    l1a_match       => '0',
+    tx_ack          => '0',
+    nwords_dummy    => x"0000",
+    dcfeb_dv        => open,
+    dcfeb_data      => open,
+    adc_mask        => open,
+    dcfeb_fsel      => open,
+    dcfeb_jtag_ir   => open,
+    trst            => dcfeb_initjtag,
+    tck             => dl_jtag_tck(2),
+    tms             => dl_jtag_tms,
+    tdi             => dl_jtag_tdi,
+    tdo             => dl_jtag_tdo(2),
+    rtn_shft_en     => open
+  );
 
 end Behavioral;
