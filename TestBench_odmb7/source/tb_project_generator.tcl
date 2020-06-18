@@ -15,9 +15,11 @@ set_property target_language VHDL [current_project]
 set_property target_simulator XSim [current_project]
 
 # Add files
-add_files -norecurse "Firmware.vhd Firmware_pkg.vhd Firmware_tb.vhd ../ip/$FPGA_TYPE/clockManager/clockManager.xci ../ip/$FPGA_TYPE/ila/ila.xci ../ip/$FPGA_TYPE/lut_input1/lut_input1.xci ../ip/$FPGA_TYPE/lut_input2/lut_input2.xci"
-add_files -norecurse "odmb_vme/cfebjtag.vhd odmb_vme/command.vhd odmb_vme/package_latches_flipflops.vhd vme_master.vhd ../tb_project/cfebjtag_tb_behav.wcfg"
-add_files "utils/"
+add_files -norecurse "Firmware_pkg.vhd Firmware_tb.vhd ../ip/$FPGA_TYPE/clockManager/clockManager.xci ../ip/$FPGA_TYPE/ila/ila.xci ../ip/$FPGA_TYPE/lut_input1/lut_input1.xci ../ip/$FPGA_TYPE/lut_input2/lut_input2.xci"
+add_files "odmb/"
+add_files "vme/"
+add_files "dcfeb/"
+add_files -norecurse "../tb_project/cfebjtag_tb_behav.wcfg"
 add_files -fileset constrs_1 -norecurse "Firmware_tb.xdc"
 
 # Add tcl for simulation

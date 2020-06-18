@@ -22,6 +22,9 @@ entity Firmware is
     CLK10       : in std_logic;  -- NEW (midclk -> fastclk/4 -> 10MHz)
     -- VME signals <-- relevant ones only
     VME_DATA_IN    : in std_logic_vector (15 downto 0);  -- data(15 downto 0)
+    VME_DATA_OUT   : out std_logic_vector (15 downto 0);
+    --for debugging
+    DIAGOUT        : out std_logic_vector (17 downto 0);
     -- JTAG Signals To/From DCFEBs
     DL_JTAG_TCK    : out std_logic_vector (6 downto 0);
     DL_JTAG_TMS    : out std_logic;
@@ -195,6 +198,7 @@ begin
   -- device(1) <= '1' when CMDDEV(15 downto 12) = x"1" else '0';
   -- cmd <= CMDDEV(11 downto 2);
   dcfeb_initjtag_i <= DCFEB_INITJTAG;
+  DIAGOUT <= diagout_cfebjtag;
 
   -- To mimic the command module.. to 
   -- asynstrb <= '1' when device(1) = '1' else '0';  -- hack for test
@@ -212,11 +216,13 @@ begin
   DL_JTAG_TCK <= dl_jtag_tck_inner;
   DL_JTAG_TDI <= dl_jtag_tdi_inner;
   DL_JTAG_TMS <= dl_jtag_tms_inner;
+  VME_DATA_OUT <= vme_outdata;
 
   -- Generate readable addr
   addr_i <= vme_addr & '0';
 
-  vme_dtack <= 'H'; -- resolution 'H'+'1'='1', 'H'+'0'='0'
+  PULLUP_vme_dtack : PULLUP port map (O => vme_dtack);
+  --vme_dtack <= 'H'; -- resolution 'H'+'1'='1', 'H'+'0'='0'
   vme_dtack <= not or_reduce(dtack_dev);
 
   i_cmd_ack : process (vc_cmd, vc_cmd_rd) is

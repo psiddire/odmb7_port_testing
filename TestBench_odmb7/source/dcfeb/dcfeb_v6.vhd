@@ -34,21 +34,21 @@ end dcfeb_v6;
 
 architecture dcfeb_v6_arch of dcfeb_v6 is
 
-  component dcfeb_data_gen is
-    port(
-      clk          : in std_logic;
-      dcfebclk     : in std_logic;
-      rst          : in std_logic;
-      l1a          : in std_logic;
-      l1a_match    : in std_logic;
-      tx_ack       : in std_logic;
-      dcfeb_addr   : in std_logic_vector(3 downto 0);
-      nwords_dummy : in std_logic_vector(15 downto 0);
+--  component dcfeb_data_gen is
+--    port(
+--      clk          : in std_logic;
+--      dcfebclk     : in std_logic;
+--      rst          : in std_logic;
+--      l1a          : in std_logic;
+--      l1a_match    : in std_logic;
+--      tx_ack       : in std_logic;
+--      dcfeb_addr   : in std_logic_vector(3 downto 0);
+--      nwords_dummy : in std_logic_vector(15 downto 0);
 
-      dcfeb_dv   : out std_logic;
-      dcfeb_data : out std_logic_vector(15 downto 0)
-      );
-  end component;
+--      dcfeb_dv   : out std_logic;
+--      dcfeb_data : out std_logic_vector(15 downto 0)
+--      );
+--  end component;
 
   component tdo_mux
     port(
@@ -164,20 +164,20 @@ begin
 
   dcfeb_fsel <= fsel;
 
-  PMAP_dcfeb_data_gen : dcfeb_data_gen
-    port map(
-      clk          => clk,
-      dcfebclk     => dcfebclk,
-      rst          => rst,
-      l1a          => l1a,
-      l1a_match    => l1a_match,
-      tx_ack       => tx_ack,
-      dcfeb_addr   => dcfeb_addr,
-      nwords_dummy => nwords_dummy,
+--  PMAP_dcfeb_data_gen : dcfeb_data_gen
+--    port map(
+--      clk          => clk,
+--      dcfebclk     => dcfebclk,
+--      rst          => rst,
+--      l1a          => l1a,
+--      l1a_match    => l1a_match,
+--      tx_ack       => tx_ack,
+--      dcfeb_addr   => dcfeb_addr,
+--      nwords_dummy => nwords_dummy,
 
-      dcfeb_dv   => dcfeb_dv,
-      dcfeb_data => dcfeb_data
-      );
+--      dcfeb_dv   => dcfeb_dv,
+--      dcfeb_data => dcfeb_data
+--      );
 
   PMAP_BSCAN : BGB_BSCAN_emulator
     port map (
