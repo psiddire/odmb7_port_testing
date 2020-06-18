@@ -94,7 +94,7 @@ architecture Behavioral of Firmware is
       TOVME_B : out std_logic;
       DOE_B   : out std_logic;
 
-      DIAGOUT : out std_logic_vector(19 downto 0);
+      DIAGOUT : out std_logic_vector(17 downto 0);
       LED     : out std_logic_vector(2 downto 0)
       );
   end component;
@@ -222,7 +222,7 @@ begin
   addr_i <= vme_addr & '0';
 
   PULLUP_vme_dtack : PULLUP port map (O => vme_dtack);
-  --vme_dtack <= 'H'; -- resolution 'H'+'1'='1', 'H'+'0'='0'
+  --vme_dtack <= 'H'; -- resolution 'H'+'1'='1', 'H'+'0'='0' vivado issuing multiple driver warnings...
   vme_dtack <= not or_reduce(dtack_dev);
 
   i_cmd_ack : process (vc_cmd, vc_cmd_rd) is
@@ -285,7 +285,7 @@ begin
       STROBE  => strobe,
       COMMAND => cmd,
       ADRS    => cmd_adrs_inner,
-      DIAGOUT => diagout_command,      -- temp
+      DIAGOUT => open,      -- temp
       LED     => led_command           -- temp
       );
 

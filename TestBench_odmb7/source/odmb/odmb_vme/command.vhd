@@ -32,7 +32,7 @@ entity COMMAND_MODULE is
     TOVME_B : out std_logic;
     DOE_B   : out std_logic;
 
-    DIAGOUT : out std_logic_vector(19 downto 0);
+    DIAGOUT : out std_logic_vector(17 downto 0);
     LED     : out std_logic_vector(2 downto 0)
 
     );
@@ -152,7 +152,7 @@ begin  --Architecture
   DIAGOUT(2)  <= ADRS_INNER(20);
   DIAGOUT(3)  <= ADRS_INNER(21);
   DIAGOUT(4)  <= ADRS_INNER(22);
-  DIAGOUT(5)  <= ADRS_INNER(23);
+  DIAGOUT(5)  <= IACK;
   DIAGOUT(6)  <= AMS(0);
   DIAGOUT(7)  <= AMS(1);
   DIAGOUT(8)  <= AMS(2);
@@ -161,12 +161,12 @@ begin  --Architecture
   DIAGOUT(11) <= AMS(5);
   DIAGOUT(12) <= SYSOK;
   DIAGOUT(13) <= VALIDAM;
-  DIAGOUT(14) <= BOARD_SEL_NEW;
+  DIAGOUT(14) <= DS1;
   DIAGOUT(15) <= DS0;
   DIAGOUT(16) <= ASYNSTRB;
   DIAGOUT(17) <= STROBE_TEMP1;
-  DIAGOUT(18) <= STROBE_TEMP2;
-  DIAGOUT(19) <= VALIDGA;
+  --DIAGOUT(18) <= STROBE_TEMP2;
+  --DIAGOUT(19) <= VALIDGA;
 
   -- Generate COMMAND
   COMMAND(9 downto 0) <= ADRS_INNER(11 downto 2);

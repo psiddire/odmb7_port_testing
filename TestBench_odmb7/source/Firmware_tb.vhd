@@ -143,6 +143,7 @@ begin
     probe0 => trig0,
     probe1 => data
   );
+  trig0(63 downto 48) <= cmddev;
   trig0(34) <= dl_jtag_tms;
   trig0(33) <= dl_jtag_tdi;
   trig0(32) <= dl_jtag_tdo(2);

@@ -3,6 +3,7 @@
 library ieee ;
 use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
+use ieee.Numeric_std.all;
 
 package Latches_Flipflops is
 
@@ -12,79 +13,79 @@ package Latches_Flipflops is
 
 -----------------------------------------------------------------------------
 
-  procedure FD (
-    signal D : in std_logic;
-    signal C : in std_logic;
-    signal Q : out std_logic);
-  -----------------------------------------------------------------------------
-  procedure FD_1 (
-    signal D : in std_logic;
-    signal C : in std_logic;
-    signal Q : out std_logic);
-  -----------------------------------------------------------------------------
-  procedure FDE (
-    signal D : in std_logic;
-    signal C : in std_logic;
-    signal CE : in std_logic;
-    signal Q : out std_logic);
-  -----------------------------------------------------------------------------
-  procedure FDC (
-    signal D: in std_logic;
-    signal C: in std_logic;
-    signal CLR: in std_logic;
-    signal Q: out std_logic);
-  -----------------------------------------------------------------------------
-  procedure FDC_1 (
-    signal D: in std_logic;
-    signal C: in std_logic;
-    signal CLR: in std_logic;
-    signal Q: out std_logic);
-  -----------------------------------------------------------------------------
-  procedure FDCE (
-    signal D: in std_logic;
-    signal C: in std_logic;
-    signal CE: in std_logic;
-    signal CLR: in std_logic;
-    signal Q: out std_logic);
-  -----------------------------------------------------------------------------
-  procedure FDCE_1 (
-    signal D: in std_logic;
-    signal C: in std_logic;
-    signal CE: in std_logic;
-    signal CLR: in std_logic;
-    signal Q: out std_logic);
-  -----------------------------------------------------------------------------
-   procedure FDP (
-    signal D: in std_logic;
-    signal C: in std_logic;
-    signal PRE: in std_logic;
-    signal Q: out std_logic);
-  -----------------------------------------------------------------------------
-   procedure FDP_1 (
-    signal D: in std_logic;
-    signal C: in std_logic;
-    signal PRE: in std_logic;
-    signal Q: out std_logic);
-  -----------------------------------------------------------------------------
-   procedure FDPE (
-    signal D: in std_logic;
-    signal C: in std_logic;
-    signal CE: in std_logic;
-    signal PRE: in std_logic;
-    signal Q: out std_logic);
-  -----------------------------------------------------------------------------
-   procedure FDPE_1 (
-    signal D: in std_logic;
-    signal C: in std_logic;
-    signal CE: in std_logic;
-    signal PRE: in std_logic;
-    signal Q: out std_logic);
-  -----------------------------------------------------------------------------
-   procedure FDR (
-    signal D: in std_logic;
-    signal C: in std_logic;
-    signal R: in std_logic;
-    signal Q: out std_logic);
+--  procedure FD (
+--    signal D : in std_logic;
+--    signal C : in std_logic;
+--    signal Q : out std_logic);
+--  -----------------------------------------------------------------------------
+--  procedure FD_1 (
+--    signal D : in std_logic;
+--    signal C : in std_logic;
+--    signal Q : out std_logic);
+--  -----------------------------------------------------------------------------
+--  procedure FDE (
+--    signal D : in std_logic;
+--    signal C : in std_logic;
+--    signal CE : in std_logic;
+--    signal Q : out std_logic);
+--  -----------------------------------------------------------------------------
+--  procedure FDC (
+--    signal D: in std_logic;
+--    signal C: in std_logic;
+--    signal CLR: in std_logic;
+--    signal Q: out std_logic);
+--  -----------------------------------------------------------------------------
+--  procedure FDC_1 (
+--    signal D: in std_logic;
+--    signal C: in std_logic;
+--    signal CLR: in std_logic;
+--    signal Q: out std_logic);
+--  -----------------------------------------------------------------------------
+--  procedure FDCE (
+--    signal D: in std_logic;
+--    signal C: in std_logic;
+--    signal CE: in std_logic;
+--    signal CLR: in std_logic;
+--    signal Q: out std_logic);
+--  -----------------------------------------------------------------------------
+--  procedure FDCE_1 (
+--    signal D: in std_logic;
+--    signal C: in std_logic;
+--    signal CE: in std_logic;
+--    signal CLR: in std_logic;
+--    signal Q: out std_logic);
+--  -----------------------------------------------------------------------------
+--   procedure FDP (
+--    signal D: in std_logic;
+--    signal C: in std_logic;
+--    signal PRE: in std_logic;
+--    signal Q: out std_logic);
+--  -----------------------------------------------------------------------------
+--   procedure FDP_1 (
+--    signal D: in std_logic;
+--    signal C: in std_logic;
+--    signal PRE: in std_logic;
+--    signal Q: out std_logic);
+--  -----------------------------------------------------------------------------
+--   procedure FDPE (
+--    signal D: in std_logic;
+--    signal C: in std_logic;
+--    signal CE: in std_logic;
+--    signal PRE: in std_logic;
+--    signal Q: out std_logic);
+--  -----------------------------------------------------------------------------
+--   procedure FDPE_1 (
+--    signal D: in std_logic;
+--    signal C: in std_logic;
+--    signal CE: in std_logic;
+--    signal PRE: in std_logic;
+--    signal Q: out std_logic);
+--  -----------------------------------------------------------------------------
+--   procedure FDR (
+--    signal D: in std_logic;
+--    signal C: in std_logic;
+--    signal R: in std_logic;
+--    signal Q: out std_logic);
 
   -----------------------------------------------------------------------------
 
@@ -92,20 +93,20 @@ package Latches_Flipflops is
 
   -----------------------------------------------------------------------------
 
-  procedure IFD (
-    signal D : in std_logic;
-    signal C : in std_logic;
-    signal Q : out std_logic);
-  -----------------------------------------------------------------------------
-  procedure IFD_1 (
-    signal D : in std_logic;
-    signal C : in std_logic;
-    signal Q : out std_logic);
-  -----------------------------------------------------------------------------
-  procedure IFDI (
-    signal D : in std_logic;
-    signal C : in std_logic;
-    signal Q : out std_logic);
+--  procedure IFD (
+--    signal D : in std_logic;
+--    signal C : in std_logic;
+--    signal Q : out std_logic);
+--  -----------------------------------------------------------------------------
+--  procedure IFD_1 (
+--    signal D : in std_logic;
+--    signal C : in std_logic;
+--    signal Q : out std_logic);
+--  -----------------------------------------------------------------------------
+--  procedure IFDI (
+--    signal D : in std_logic;
+--    signal C : in std_logic;
+--    signal Q : out std_logic);
 
 -----------------------------------------------------------------------------
 
@@ -305,286 +306,286 @@ package body Latches_Flipflops is
 
 -----------------------------------------------------------------------------
 
-  procedure FD (
-    signal D : in std_logic;
-    signal C : in std_logic;
-    signal Q : out std_logic) is
+--  procedure FD (
+--    signal D : in std_logic;
+--    signal C : in std_logic;
+--    signal Q : out std_logic) is
     
-  begin 
+--  begin 
 
-    if (C='1' and C'event) then
-      Q <= D after 100 ps;
-    end if;
+--    if (C='1' and C'event) then
+--      Q <= D after 100 ps;
+--    end if;
 
-  end FD;
+--  end FD;
 
--------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
 
-  procedure FD_1 (
-    signal D : in std_logic;
-    signal C : in std_logic;
-    signal Q : out std_logic) is
+--  procedure FD_1 (
+--    signal D : in std_logic;
+--    signal C : in std_logic;
+--    signal Q : out std_logic) is
     
-  begin
-    if (C='0' and C'event) then
-      Q <= D after 100 ps;
-    end if;
+--  begin
+--    if (C='0' and C'event) then
+--      Q <= D after 100 ps;
+--    end if;
 
-  end FD_1;
+--  end FD_1;
 
--------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
 
-  procedure FDE (
-    signal D : in std_logic;
-    signal C : in std_logic;
-    signal CE : in std_logic;
-    signal Q : out std_logic) is
+--  procedure FDE (
+--    signal D : in std_logic;
+--    signal C : in std_logic;
+--    signal CE : in std_logic;
+--    signal Q : out std_logic) is
     
-  begin
+--  begin
 
-    if (CE='1' and C='1' and C'event) then
-      Q <= D after 100 ps;
-    end if;
+--    if (CE='1' and C='1' and C'event) then
+--      Q <= D after 100 ps;
+--    end if;
 
-  end FDE;
+--  end FDE;
 
--------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
 
-  procedure FDC (
-      signal D: in std_logic;
-      signal C: in std_logic;
-      signal CLR: in std_logic;
-      signal Q: out std_logic) is
+--  procedure FDC (
+--      signal D: in std_logic;
+--      signal C: in std_logic;
+--      signal CLR: in std_logic;
+--      signal Q: out std_logic) is
       
-    begin
+--    begin
 
-      if (CLR='1') then
-        Q <= '0' after 100 ps;
-      else
-        if (C='1' and C'event) then
-          Q <= D after 100 ps;
-        end if;
-      end if;
+--      if (CLR='1') then
+--        Q <= '0' after 100 ps;
+--      else
+--        if (C='1' and C'event) then
+--          Q <= D after 100 ps;
+--        end if;
+--      end if;
 
-    end FDC;
+--    end FDC;
 
--------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
 
-  procedure FDC_1 (
-      signal D: in std_logic;
-      signal C: in std_logic;
-      signal CLR: in std_logic;
-      signal Q: out std_logic) is
+--  procedure FDC_1 (
+--      signal D: in std_logic;
+--      signal C: in std_logic;
+--      signal CLR: in std_logic;
+--      signal Q: out std_logic) is
       
-    begin
+--    begin
 
-      if (CLR='1') then
-        Q <= '0' after 100 ps;
-      else
-        if (C='0' and C'event) then
-          Q <= D after 100 ps;
-        end if;
-      end if;
+--      if (CLR='1') then
+--        Q <= '0' after 100 ps;
+--      else
+--        if (C='0' and C'event) then
+--          Q <= D after 100 ps;
+--        end if;
+--      end if;
 
-    end FDC_1;
+--    end FDC_1;
 
- ------------------------------------------------------------------------------
+-- ------------------------------------------------------------------------------
 
-  procedure FDCE (
-    signal D: in std_logic;
-    signal C: in std_logic;
-    signal CE: in std_logic;
-    signal CLR: in std_logic;
-    signal Q: out std_logic) is
+--  procedure FDCE (
+--    signal D: in std_logic;
+--    signal C: in std_logic;
+--    signal CE: in std_logic;
+--    signal CLR: in std_logic;
+--    signal Q: out std_logic) is
 
-  begin
+--  begin
 
-    if (CLR='1') then
-      Q <= '0' after 100 ps;
-    else
-      if (CE='1' and C='1' and C'event) then
-        Q <= D after 100 ps;            
-      end if;
-    end if;
+--    if (CLR='1') then
+--      Q <= '0' after 100 ps;
+--    else
+--      if (CE='1' and C='1' and C'event) then
+--        Q <= D after 100 ps;            
+--      end if;
+--    end if;
 
-  end FDCE;
+--  end FDCE;
 
--------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
 
-  procedure FDCE_1 (
-    signal D: in std_logic;
-    signal C: in std_logic;
-    signal CE: in std_logic;
-    signal CLR: in std_logic;
-    signal Q: out std_logic) is
+--  procedure FDCE_1 (
+--    signal D: in std_logic;
+--    signal C: in std_logic;
+--    signal CE: in std_logic;
+--    signal CLR: in std_logic;
+--    signal Q: out std_logic) is
 
-  begin
+--  begin
 
-    if (CLR='1') then
-      Q <= '0' after 100 ps;
-    else
-      if (CE='1' and C='0' and C'event) then
-        Q <= D after 100 ps;            
-      end if;
-    end if;
+--    if (CLR='1') then
+--      Q <= '0' after 100 ps;
+--    else
+--      if (CE='1' and C='0' and C'event) then
+--        Q <= D after 100 ps;            
+--      end if;
+--    end if;
 
-  end FDCE_1;
+--  end FDCE_1;
 
--------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
 
-  procedure FDP (
-      signal D: in std_logic;
-      signal C: in std_logic;
-      signal PRE: in std_logic;
-      signal Q: out std_logic) is
+--  procedure FDP (
+--      signal D: in std_logic;
+--      signal C: in std_logic;
+--      signal PRE: in std_logic;
+--      signal Q: out std_logic) is
       
-    begin
+--    begin
 
-      if (PRE='1') then
-        Q <= '1' after 100 ps;
-      else
-        if (C='1' and C'event) then
-          Q <= D after 100 ps;
-        end if;
-      end if;
+--      if (PRE='1') then
+--        Q <= '1' after 100 ps;
+--      else
+--        if (C='1' and C'event) then
+--          Q <= D after 100 ps;
+--        end if;
+--      end if;
 
-    end FDP;
+--    end FDP;
 
--------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
 
-  procedure FDP_1 (
-      signal D: in std_logic;
-      signal C: in std_logic;
-      signal PRE: in std_logic;
-      signal Q: out std_logic) is
+--  procedure FDP_1 (
+--      signal D: in std_logic;
+--      signal C: in std_logic;
+--      signal PRE: in std_logic;
+--      signal Q: out std_logic) is
       
-    begin
+--    begin
 
-      if (PRE='1') then
-        Q <= '1' after 100 ps;
-      else
-        if (C='0' and C'event) then
-          Q <= D after 100 ps;
-        end if;
-      end if;
+--      if (PRE='1') then
+--        Q <= '1' after 100 ps;
+--      else
+--        if (C='0' and C'event) then
+--          Q <= D after 100 ps;
+--        end if;
+--      end if;
 
-    end FDP_1;
+--    end FDP_1;
 
--------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
 
-  procedure FDPE (
-    signal D: in std_logic;
-    signal C: in std_logic;
-    signal CE: in std_logic;
-    signal PRE: in std_logic;
-    signal Q: out std_logic) is
+--  procedure FDPE (
+--    signal D: in std_logic;
+--    signal C: in std_logic;
+--    signal CE: in std_logic;
+--    signal PRE: in std_logic;
+--    signal Q: out std_logic) is
 
-  begin
+--  begin
 
-    if (PRE='1') then
-      Q <= '1' after 100 ps;
-    else
-      if (CE='1' and C='1' and C'event) then
-        Q <= D after 100 ps;            
-      end if;
-    end if;
-  end FDPE;
+--    if (PRE='1') then
+--      Q <= '1' after 100 ps;
+--    else
+--      if (CE='1' and C='1' and C'event) then
+--        Q <= D after 100 ps;            
+--      end if;
+--    end if;
+--  end FDPE;
 
--------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
 
-  procedure FDPE_1 (
+--  procedure FDPE_1 (
 
-    signal D: in std_logic;
-    signal C: in std_logic;
-    signal CE: in std_logic;
-    signal PRE: in std_logic;
-    signal Q: out std_logic) is
+--    signal D: in std_logic;
+--    signal C: in std_logic;
+--    signal CE: in std_logic;
+--    signal PRE: in std_logic;
+--    signal Q: out std_logic) is
 
-  begin
+--  begin
 
-    if (PRE='1') then
-      Q <= '1' after 100 ps;
-    else
-      if (CE='1' and C='0' and C'event) then
-        Q <= D after 100 ps;            
-      end if;
-    end if;
+--    if (PRE='1') then
+--      Q <= '1' after 100 ps;
+--    else
+--      if (CE='1' and C='0' and C'event) then
+--        Q <= D after 100 ps;            
+--      end if;
+--    end if;
 
-  end FDPE_1;
+--  end FDPE_1;
 
--------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
 
-  procedure FDR (
-      signal D: in std_logic;
-      signal C: in std_logic;
-      signal R: in std_logic;
-      signal Q: out std_logic) is
+--  procedure FDR (
+--      signal D: in std_logic;
+--      signal C: in std_logic;
+--      signal R: in std_logic;
+--      signal Q: out std_logic) is
       
-  begin
+--  begin
 
-    if (C='1' and C'event) then
-			if (R='1') then
-				Q <= '0' after 100 ps;
-      else
-				Q <= D after 100 ps;
-			end if;
-		end if;
+--    if (C='1' and C'event) then
+--			if (R='1') then
+--				Q <= '0' after 100 ps;
+--      else
+--				Q <= D after 100 ps;
+--			end if;
+--		end if;
 
-  end FDR;
+--  end FDR;
 
-  -----------------------------------------------------------------------------
+--  -----------------------------------------------------------------------------
 
--- Modules not in UNISIM, but with equivalent modules in UNISIM 
+---- Modules not in UNISIM, but with equivalent modules in UNISIM 
 
-  -----------------------------------------------------------------------------
+--  -----------------------------------------------------------------------------
 
--- equivalent to FD
+---- equivalent to FD
 
-    procedure IFD (
-    signal D : in std_logic;
-    signal C : in std_logic;
-    signal Q : out std_logic) is
+--    procedure IFD (
+--    signal D : in std_logic;
+--    signal C : in std_logic;
+--    signal Q : out std_logic) is
     
-  begin
+--  begin
 
-    if (C='1' and C'event) then
-      Q <= D after 100 ps;
-    end if;
+--    if (C='1' and C'event) then
+--      Q <= D after 100 ps;
+--    end if;
 
-  end IFD;
+--  end IFD;
 
--------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
 
--- equivalent to FD_1
+---- equivalent to FD_1
 
-    procedure IFD_1 (
-    signal D : in std_logic;
-    signal C : in std_logic;
-    signal Q : out std_logic) is
+--    procedure IFD_1 (
+--    signal D : in std_logic;
+--    signal C : in std_logic;
+--    signal Q : out std_logic) is
     
-  begin
+--  begin
 
-    if (C='0' and C'event) then
-      Q <= D after 100 ps;
-    end if;
+--    if (C='0' and C'event) then
+--      Q <= D after 100 ps;
+--    end if;
 
-  end IFD_1;
+--  end IFD_1;
 
--------------------------------------------------------------------------------
--- equivalent to FD
+---------------------------------------------------------------------------------
+---- equivalent to FD
 
-    procedure IFDI (
-    signal D : in std_logic;
-    signal C : in std_logic;
-    signal Q : out std_logic) is
+--    procedure IFDI (
+--    signal D : in std_logic;
+--    signal C : in std_logic;
+--    signal Q : out std_logic) is
     
-  begin
+--  begin
 
-    if (C='1' and C'event) then
-      Q <= D after 100 ps;
-    end if;
+--    if (C='1' and C'event) then
+--      Q <= D after 100 ps;
+--    end if;
 
-  end IFDI;
+--  end IFDI;
 
 -----------------------------------------------------------------------------
 
@@ -716,20 +717,26 @@ package body Latches_Flipflops is
   
     if (CLR='1') then
 			Q <= "0000" after 100 ps;
-		elsif (CE = '1' and C='1' and C'event) then
-			Q <= Q_in + 1 after 100 ps;
+		elsif (C='1' and C'event) then
+		    if (CE = '1') then
+			    Q <= Q_in + 1 after 100 ps;
+			end if;
 		end if;
 		
 		if (CLR = '1') then
 			TC <= '0' after 100 ps;
-		elsif (CE = '1' and C='1' and C'event and Q_in="1110") then
-			TC <= '1' after 100 ps;
+		elsif (C='1' and C'event) then
+		    if (CE = '1' and Q_in="1110") then
+			    TC <= '1' after 100 ps;
+			end if;
 		end if;
 	 
 		if (CLR = '1') or (CE = '0')then
 			CEO <= '0' after 100 ps;
-		elsif (CE = '1' and C='1' and C'event and Q_in="1110") then
-			CEO <= '1' after 100 ps;
+		elsif (C='1' and C'event) then
+			if (CE = '1' and Q_in="1110") then
+			    CEO <= '1' after 100 ps;
+            end if;
 		end if;
 
   end CB4CE;
@@ -993,7 +1000,8 @@ package body Latches_Flipflops is
 
     if (CLR='1') then
       Q <= "0000000000000000" after 100 ps;
-    elsif (CE='1' and C='1' and C'event) then
+    elsif (C='1' and C'event) then
+      if (CE='1') then
 		  Q(15) <= SLI after 100 ps;
 		  Q(14) <= Q_in(15) after 100 ps;
 		  Q(13) <= Q_in(14) after 100 ps;
@@ -1010,6 +1018,7 @@ package body Latches_Flipflops is
 		  Q(2) <= Q_in(3) after 100 ps;
 		  Q(1) <= Q_in(2) after 100 ps;
 		  Q(0) <= Q_in(1) after 100 ps;
+		end if;
 	 end if;
     
   end SR16LCE;

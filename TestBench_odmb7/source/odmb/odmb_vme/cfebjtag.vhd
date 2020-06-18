@@ -150,20 +150,20 @@ begin
 -- Write SELFEB when SELCFEB=1 (The JTAG initialization should be broadcast)
   rst_init <= RST or initjtags;
   FDPE_selfeb1 : FDPE port map(D => INDATA(0), C => STROBE, CE => SELCFEB, PRE => rst_init, Q => SELFEB(1));
-  FDPE(INDATA(1), STROBE, SELCFEB, rst_init, SELFEB(2));
-  FDPE(INDATA(2), STROBE, SELCFEB, rst_init, SELFEB(3));
-  FDPE(INDATA(3), STROBE, SELCFEB, rst_init, SELFEB(4));
-  FDPE(INDATA(4), STROBE, SELCFEB, rst_init, SELFEB(5));
-  FDPE(INDATA(5), STROBE, SELCFEB, rst_init, SELFEB(6));
-  FDPE(INDATA(6), STROBE, SELCFEB, rst_init, SELFEB(7));
+  FDPE_selfeb2 : FDPE port map(D => INDATA(1), C => STROBE, CE => SELCFEB, PRE => rst_init, Q => SELFEB(2));
+  FDPE_selfeb3 : FDPE port map(D => INDATA(2), C => STROBE, CE => SELCFEB, PRE => rst_init, Q => SELFEB(3));
+  FDPE_selfeb4 : FDPE port map(D => INDATA(3), C => STROBE, CE => SELCFEB, PRE => rst_init, Q => SELFEB(4));
+  FDPE_selfeb5 : FDPE port map(D => INDATA(4), C => STROBE, CE => SELCFEB, PRE => rst_init, Q => SELFEB(5));
+  FDPE_selfeb6 : FDPE port map(D => INDATA(5), C => STROBE, CE => SELCFEB, PRE => rst_init, Q => SELFEB(6));
+  FDPE_selfeb7 : FDPE port map(D => INDATA(6), C => STROBE, CE => SELCFEB, PRE => rst_init, Q => SELFEB(7));
 
 -- Syncing STROBE to SLOWCLK
-  STROBE_PULSE  : PULSE2SLOW port map(strobe_slow, SLOWCLK, FASTCLK, RST, STROBE);
+  STROBE_PULSE  : PULSE2SLOW port map(DOUT => strobe_slow, CLK_DOUT => SLOWCLK, CLK_DIN => FASTCLK, RST => RST, DIN => STROBE);
 
 
 -- Generate DTACK when SELCFEB=1
   D_DTACK_SELCFEB <= '1' when (STROBE = '1' and SELCFEB = '1') else '0';
-  FD(D_DTACK_SELCFEB, FASTCLK, Q_DTACK_SELCFEB);
+  FD_selcfebdtack : FD port map(D => D_DTACK_SELCFEB, C => FASTCLK, Q => Q_DTACK_SELCFEB);
 --    DTACK_INNER <= '0' when (Q_DTACK_SELCFEB='1') else 'Z'; -- BGB commented
 
 -- Write SELFEB to OUTDATA when READCFEB=1
@@ -172,23 +172,23 @@ begin
 
 -- Generate DTACK when READCFEB=1
   D_DTACK_READCFEB <= '1' when (STROBE = '1' and READCFEB = '1') else '0';
-  FD(D_DTACK_READCFEB, FASTCLK, Q_DTACK_READCFEB);
+  FD_readcfebdtack : FD port map(D => D_DTACK_READCFEB, C => FASTCLK, Q => Q_DTACK_READCFEB);
 --    DTACK_INNER <= '0' when (Q_DTACK_READCFEB='1') else 'Z'; -- BGB commented
 
 -- Generate LOAD
   D1_LOAD  <= DATASHFT or INSTSHFT;
   CLR_LOAD <= LOAD or RST;
-  FDC(D1_LOAD, STROBE, CLR_LOAD, Q_LOAD);
+  FDC_qload : FDC port map(D => D1_LOAD, C => STROBE, CLR => CLR_LOAD, Q => Q_LOAD);
   D2_LOAD  <= '1' when (Q_LOAD = '1' and BUSY = '0') else '0';
-  FDC(D2_LOAD, SLOWCLK, RST, LOAD);
+  FDC_load : FDC port map(D => D2_LOAD, C => SLOWCLK, CLR => RST, Q => LOAD);
 
 
 -- Generate BUSY and BUSYP1
-  FDC(LOAD, SLOWCLK, RST, Q_BUSY);
+  FDC_qbusy : FDC port map(D => LOAD, C => SLOWCLK, CLR => RST, Q => Q_BUSY);
   CLR_BUSY <= '1' when ((DONEDATA(1) = '1' and (TAILEN = '0')) or RST = '1' or DONETAIL = '1') else '0';
   D_BUSY   <= '1' when (Q_BUSY = '1' or BUSY = '1')                                            else '0';
-  FDC(D_BUSY, SLOWCLK, CLR_BUSY, BUSY);
-  FDC(BUSY, SLOWCLK, RST, BUSYP1);
+  FDC_busy : FDC port map(D => D_BUSY, C => SLOWCLK, CLR => CLR_BUSY, Q => BUSY);
+  FDC_busyp1 : FDC port map(D => BUSY, C => SLOWCLK, CLR => RST, Q => BUSYP1);
 
 
 -- Generate IHEADEN
@@ -199,7 +199,7 @@ begin
 -- This is new code.
   C_IHEADEN   <= '1' when (STROBE = '1' and BUSY = '0')  else '0';  -- BGB uncommented
   CLR_IHEADEN <= '1' when (RST = '1' or DONEIHEAD = '1') else '0';
-  FDCE(COMMAND(0), C_IHEADEN, INSTSHFT, CLR_IHEADEN, IHEADEN);
+  FDCE_iheaden : FDCE port map(D => COMMAND(0), C => C_IHEADEN, CE => INSTSHFT, CLR => CLR_IHEADEN, Q => IHEADEN);
 
 -- Generate SHIHEAD
   SHIHEAD <= '1' when (BUSY = '1' and IHEADEN = '1') else '0';
@@ -209,17 +209,17 @@ begin
   R_DONEIHEAD <= '1' when (LOAD = '1' or RST = '1' or Q_DONEIHEAD = '1')        else '0';  -- Bug in FG Version (missing else '0')
   CB4RE(SLOWCLK, SHIHEAD, R_DONEIHEAD, QV_DONEIHEAD, QV_DONEIHEAD, CEO_DONEIHEAD, TC_DONEIHEAD);
   DONEIHEAD   <= '1' when ((QV_DONEIHEAD(1) = '1') and (QV_DONEIHEAD(3) = '1')) else '0';
-  FD(DONEIHEAD, SLOWCLK, Q_DONEIHEAD);
+  FD_qdoneihead : FD port map(D => DONEIHEAD, C => SLOWCLK, Q => Q_DONEIHEAD);
 
 
 -- Generate TMS when SHIHEAD=1
   TMS <= tms_inner;
   CE_SHIHEAD_TMS <= '1'            when ((SHIHEAD = '1') and (TCK_GLOBAL = '1')) else '0';
-  FDCE(Q5_SHIHEAD_TMS, SLOWCLK, CE_SHIHEAD_TMS, RST, Q1_SHIHEAD_TMS);
-  FDCE(Q1_SHIHEAD_TMS, SLOWCLK, CE_SHIHEAD_TMS, RST, Q2_SHIHEAD_TMS);
-  FDPE(Q2_SHIHEAD_TMS, SLOWCLK, CE_SHIHEAD_TMS, RST, Q3_SHIHEAD_TMS);
-  FDPE(Q3_SHIHEAD_TMS, SLOWCLK, CE_SHIHEAD_TMS, RST, Q4_SHIHEAD_TMS);
-  FDCE(Q4_SHIHEAD_TMS, SLOWCLK, CE_SHIHEAD_TMS, RST, Q5_SHIHEAD_TMS);  -- Bug in FG Version (FDCE replaces FDPE)
+  FDCE_q1shiheadtms : FDCE port map(D => Q5_SHIHEAD_TMS, C => SLOWCLK, CE => CE_SHIHEAD_TMS, CLR => RST, Q => Q1_SHIHEAD_TMS);
+  FDCE_q2shiheadtms : FDCE port map(D => Q1_SHIHEAD_TMS, C => SLOWCLK, CE => CE_SHIHEAD_TMS, CLR => RST, Q => Q2_SHIHEAD_TMS);
+  FDPE_q3shiheadtms : FDPE port map(D => Q2_SHIHEAD_TMS, C => SLOWCLK, CE => CE_SHIHEAD_TMS, PRE => RST, Q => Q3_SHIHEAD_TMS);
+  FDPE_q4shiheadtms : FDPE port map(D => Q3_SHIHEAD_TMS, C => SLOWCLK, CE => CE_SHIHEAD_TMS, PRE => RST, Q => Q4_SHIHEAD_TMS);
+  FDCE_q5shiheadtms : FDCE port map(D => Q4_SHIHEAD_TMS, C => SLOWCLK, CE => CE_SHIHEAD_TMS, CLR => RST, Q => Q5_SHIHEAD_TMS);  -- Bug in FG Version (FDCE replaces FDPE)
   tms_inner            <= Q5_SHIHEAD_TMS when (SHIHEAD = '1')                      else 'Z';  -- Bug in FG Version (Q5_SHDHEAD_TMS replaces '1')
 
 -- generate DHEADEN
@@ -230,7 +230,7 @@ begin
 -- This is new code.
   C_DHEADEN   <= '1' when (STROBE = '1' and BUSY = '0')  else '0';  -- BGB uncommented
   CLR_DHEADEN <= '1' when (RST = '1' or DONEDHEAD = '1') else '0';
-  FDCE(COMMAND(0), C_DHEADEN, DATASHFT, CLR_DHEADEN, DHEADEN);  -- Bug in FG Version (DATASHFT replaces INSTSHFT)
+  FDCE_dheaden : FDCE port map(D => COMMAND(0), C => C_DHEADEN, CE => DATASHFT, CLR => CLR_DHEADEN, Q => DHEADEN);  -- Bug in FG Version (DATASHFT replaces INSTSHFT)
 
 
 -- Generate SHDHEAD
@@ -243,17 +243,19 @@ begin
   CB4RE(SLOWCLK, CE_DONEDHEAD, R_DONEDHEAD, QV_DONEDHEAD, QV_DONEDHEAD, CEO_DONEDHEAD, TC_DONEDHEAD);
   DONEDHEAD   <= '1' when ((QV_DONEDHEAD(0) = '1') and (QV_DONEDHEAD(1) = '1')) else '0';
   C_DONEDHEAD <= SLOWCLK;
-  FD(DONEDHEAD, C_DONEDHEAD, Q_DONEDHEAD);
+  FD_qdonedhead : FD port map(D => DONEDHEAD, C => C_DONEDHEAD, Q => Q_DONEDHEAD);
 
 
 -- Generate TMS when SHDHEAD=1
   CE_SHDHEAD_TMS <= '1' when ((SHDHEAD = '1') and (TCK_GLOBAL = '1') ) else '0';
-  SET_DHEAD_RST : PULSE2SAME port map(RST_DHEAD, FASTCLK, RST, DONEDHEAD); -- TRY reset using fastCLT
+  SET_DHEAD_RST : PULSE2SAME port map(DOUT => RST_DHEAD, CLK_DOUT => FASTCLK, RST => RST, DIN => DONEDHEAD); -- TRY reset using fastCLT
 
   RST_HEAD <= RST or RST_DHEAD;
-  FDCE(Q2_SHDHEAD_TMS, SLOWCLK, CE_SHDHEAD_TMS, RST, Q1_SHDHEAD_TMS);
-  FDCE(Q1_SHDHEAD_TMS, SLOWCLK, CE_SHDHEAD_TMS, RST, Q2_SHDHEAD_TMS);
-  FDPE(Q2_SHDHEAD_TMS, SLOWCLK, CE_SHDHEAD_TMS, RST_HEAD, Q3_SHDHEAD_TMS);
+  FDCE_q1shdheadtms : FDCE port map(D => Q4_SHDHEAD_TMS, C => SLOWCLK, CE => CE_SHDHEAD_TMS, CLR => RST_HEAD, Q => Q1_SHDHEAD_TMS); --Q2 to Q3
+  FDCE_q2shdheadtms : FDCE port map(D => Q1_SHDHEAD_TMS, C => SLOWCLK, CE => CE_SHDHEAD_TMS, CLR => RST_HEAD, Q => Q2_SHDHEAD_TMS);
+  FDPE_q3shdheadtms : FDPE port map(D => Q2_SHDHEAD_TMS, C => SLOWCLK, CE => CE_SHDHEAD_TMS, PRE => RST_HEAD, Q => Q3_SHDHEAD_TMS);
+  FDCE_q4shdheadtms : FDCE port map(D => Q3_SHDHEAD_TMS, C => SLOWCLK, CE => CE_SHDHEAD_TMS, CLR => RST_HEAD, Q => Q4_SHDHEAD_TMS); --Q2 to Q3
+
 --  FDCE(Q3_SHDHEAD_TMS, SLOWCLK, CE_SHDHEAD_TMS, RST_HEAD, Q4_SHDHEAD_TMS);
   tms_inner            <= Q3_SHDHEAD_TMS when (SHDHEAD = '1')                      else 'Z';  -- Bug in FG Version (Q5_SHDHEAD_TMS replaces '1')
 
@@ -269,8 +271,8 @@ begin
   UP_DONEDATA  <= '0';                  -- connected to GND
   CB4CLED(SLOWCLK, CE_DONEDATA, CLR_DONEDATA, LOAD, UP_DONEDATA, DV_DONEDATA, QV_DONEDATA, QV_DONEDATA, CEO_DONEDATA, TC_DONEDATA);  -- Bug in FG Version (DV_DONEDATA vs D_DONEDATA)
   D_DONEDATA   <= '1' when (QV_DONEDATA = "0000" and LOAD = '0')                 else '0';  -- Bug in FG Version (D_DONEDATA vs (DONEDATA(1))
-  FDCE(D_DONEDATA, SLOWCLK, SHDATA, LOAD, DONEDATA(0));  -- Bug in FG Version (D_DONEDATA vs (DONEDATA(1))
-  FDC(DONEDATA(0), SLOWCLK, LOAD, DONEDATA(1));
+  FDCE_donedata0 : FDCE port map(D => D_DONEDATA, C => SLOWCLK, CE => SHDATA, CLR => LOAD, Q => DONEDATA(0));  -- Bug in FG Version (D_DONEDATA vs (DONEDATA(1))
+  FDC_donedata1 : FDC port map(D => DONEDATA(0), C => SLOWCLK, CLR => LOAD, Q => DONEDATA(1));
   --FDC(DONEDATA(1), SLOWCLK, LOAD, DONEDATA(2));
 
 
@@ -280,14 +282,14 @@ begin
 -- Generate TAILEN
   CE_TAILEN  <= '1' when (INSTSHFT = '1' or DATASHFT = '1') else '0';
   CLR_TAILEN <= '1' when (RST = '1' or DONETAIL = '1')      else '0';
-  FD(CLR_TAILEN, SLOWCLK, CLR_TAILEN_Q);
-  FDCE(COMMAND(1), LOAD, CE_TAILEN, CLR_TAILEN, TAILEN);
+  FD_clrtailenq : FD port map(D => CLR_TAILEN, C => SLOWCLK, Q => CLR_TAILEN_Q);
+  FDCE_tailen : FDCE port map(D => COMMAND(1), C => LOAD, CE => CE_TAILEN, CLR => CLR_TAILEN, Q => TAILEN);
 
 -- Generate SHTAIL
   SHTAIL <= '1' when (BUSY = '1' and DONEDATA(1) = '1' and TAILEN = '1') else '0';
-  FDCE(INSTSHFT_SP, LOAD, CE_TAILEN, RST_ITAIL, TAILSP);
+  FDCE_tailsp : FDCE port map(D => INSTSHFT_SP, C => LOAD, CE => CE_TAILEN, CLR => RST_ITAIL, Q => TAILSP);
   TAILSP_B <= not TAILSP;
-  SET_ITAIL_RST : PULSE2SAME port map(RST_ITAIL, SLOWCLK, RST, TAILSP_B);
+  SET_ITAIL_RST : PULSE2SAME port map(DOUT => RST_ITAIL, CLK_DOUT => SLOWCLK, RST => RST, DIN => TAILSP_B);
 
 -- Generate DONETAIL
 -- NOTE: I think there was a bug in the old FW.  SLOWCLK was passed to FD_1, it
@@ -300,14 +302,14 @@ begin
   C_DONETAIL   <= SLOWCLK;              -- Bug in FG Version (old code was ok)
 -- This is new code;
 --  C_DONETAIL <= not SLOWCLK;    
-  FD_1(DONETAIL, C_DONETAIL, Q_DONETAIL);
+  FD_1_qdonetail : FD_1 port map(D => DONETAIL, C => C_DONETAIL, Q => Q_DONETAIL);
 
 
 -- Generate TMS when SHTAIL=1
   CE_SHTAIL_TMS <= '1'           when ((SHTAIL = '1') and (TCK_GLOBAL = '1')) else '0';
   RST_TAIL <=  RST or RST_ITAIL; --'1'               when (RST = '1' or RST_ITAIL = '1') else '0';
-  FDCE(Q2_SHTAIL_TMS, SLOWCLK, CE_SHTAIL_TMS, RST_TAIL, Q1_SHTAIL_TMS);
-  FDPE(Q1_SHTAIL_TMS, SLOWCLK, CE_SHTAIL_TMS, RST_TAIL, Q2_SHTAIL_TMS);
+  FDCE_q1shtailtms : FDCE port map(D => Q2_SHTAIL_TMS, C => SLOWCLK, CE => CE_SHTAIL_TMS, CLR => RST_TAIL, Q => Q1_SHTAIL_TMS);
+  FDPE_q2shtailtms : FDPE port map(D => Q1_SHTAIL_TMS, C => SLOWCLK, CE => CE_SHTAIL_TMS, PRE => RST_TAIL, Q => Q2_SHTAIL_TMS);
 -- This code from Frank.
 --  tms_inner <= '1' when (SHTAIL = '1') else 'Z';
 -- This code from Guido.
@@ -317,27 +319,27 @@ begin
 -- Generate ENABLE
   CE_TCK_GLOBAL <= '1' when (RESETJTAG = '1' or BUSY = '1') else '0';
   D_TCK_GLOBAL  <= not TCK_GLOBAL;
-  FDCE(D_TCK_GLOBAL, SLOWCLK, CE_TCK_GLOBAL, RST, TCK_GLOBAL);
+  FDCE_tckglobal : FDCE port map(D => D_TCK_GLOBAL, C => SLOWCLK, CE => CE_TCK_GLOBAL, CLR => RST, Q => TCK_GLOBAL);
 
 
 -- Generate RESETJTAG and OKRST 
   -- INITJTAGS comes from odmb_ucsb_v2 when the DCFEBs DONE bits go high
-  FDC(INITJTAGS, SLOWCLK, RST, INITJTAGS_Q);
-  FDC(INITJTAGS_Q, SLOWCLK, RST, INITJTAGS_QQ);
-  FDC(INITJTAGS_QQ, SLOWCLK, RST, INITJTAGS_QQQ);
+  FDC_initjtagsq : FDC port map(D => INITJTAGS, C => SLOWCLK, CLR => RST, Q => INITJTAGS_Q);
+  FDC_initjtagsqq : FDC port map(D => INITJTAGS_Q, C => SLOWCLK, CLR => RST, Q => INITJTAGS_QQ);
+  FDC_initjtagsqqq : FDC port map(D => INITJTAGS_QQ, C => SLOWCLK, CLR => RST, Q => INITJTAGS_QQQ);
   D1_RESETJTAG  <= '1' when ((STROBE = '1' and RSTJTAG = '1') or INITJTAGS = '1') else '0';
-  FDC(D1_RESETJTAG, SLOWCLK, RST, Q1_RESETJTAG);
-  FDC(Q1_RESETJTAG, SLOWCLK, RST, Q2_RESETJTAG);
+  FDC_q1resetjtag : FDC port map(D => D1_RESETJTAG, C => SLOWCLK, CLR => RST, Q => Q1_RESETJTAG);
+  FDC_q2resetjtag : FDC port map(D => Q1_RESETJTAG, C => SLOWCLK, CLR => RST, Q => Q2_RESETJTAG);
   OKRST         <= '1' when (Q1_RESETJTAG = '1' and Q2_RESETJTAG = '1')           else '0';
   CLR_RESETJTAG <= '1' when (RESETDONE = '1' or RST = '1')                        else '0';
-  FDC(LOGICH, OKRST, CLR_RESETJTAG, Q3_RESETJTAG);
-  FDC(Q3_RESETJTAG, SLOWCLK, CLR_RESETJTAG, RESETJTAG);
+  FDC_q3resetjtag : FDC port map(D => LOGICH, C => OKRST, CLR => CLR_RESETJTAG, Q => Q3_RESETJTAG);
+  FDC_resetjtag : FDC port map(D => Q3_RESETJTAG, C => SLOWCLK, CLR => CLR_RESETJTAG, Q => RESETJTAG);
 
 
 -- Generate RESETDONE 
   -- PULSE2SLOW only works if the signal is 1 CC long in the original clock domain
-  RESETJTAG_PULSE  : PULSE2FAST port map(CLR_RESETJTAG_PULSE, FASTCLK, '0', CLR_RESETJTAG);
-  RESETDONE_PULSE  : PULSE2SLOW port map(CLR_RESETDONE, SLOWCLK, FASTCLK, '0', CLR_RESETJTAG_PULSE);
+  RESETJTAG_PULSE  : PULSE2FAST port map(DOUT => CLR_RESETJTAG_PULSE, CLK_DOUT => FASTCLK, RST => '0', DIN => CLR_RESETJTAG);
+  RESETDONE_PULSE  : PULSE2SLOW port map(DOUT => CLR_RESETDONE, CLK_DOUT => SLOWCLK, CLK_DIN => FASTCLK, RST => '0', DIN => CLR_RESETJTAG_PULSE);
   CB4CE(SLOWCLK, RESETJTAG, CLR_RESETDONE, QV_RESETDONE, QV_RESETDONE, CEO_RESETDONE, TC_RESETDONE);
   RESETDONE     <= '1' when (QV_RESETDONE(2) = '1' and QV_RESETDONE(3) = '1') else '0';
 
@@ -347,12 +349,12 @@ begin
 
 -- Generate tms_inner when RESETJTAG=1
   CE_RESETJTAG_TMS <= (RESETJTAG and TCK_GLOBAL);
-  FDCE(Q6_RESETJTAG_TMS, SLOWCLK, CE_RESETJTAG_TMS, RST, Q1_RESETJTAG_TMS);
-  FDPE(Q1_RESETJTAG_TMS, SLOWCLK, CE_RESETJTAG_TMS, RST, Q2_RESETJTAG_TMS);
-  FDPE(Q2_RESETJTAG_TMS, SLOWCLK, CE_RESETJTAG_TMS, RST, Q3_RESETJTAG_TMS);
-  FDPE(Q3_RESETJTAG_TMS, SLOWCLK, CE_RESETJTAG_TMS, RST, Q4_RESETJTAG_TMS);
-  FDPE(Q4_RESETJTAG_TMS, SLOWCLK, CE_RESETJTAG_TMS, RST, Q5_RESETJTAG_TMS);
-  FDPE(Q5_RESETJTAG_TMS, SLOWCLK, CE_RESETJTAG_TMS, RST, Q6_RESETJTAG_TMS);
+  FDCE_q1resetjtagtms : FDCE port map(D => Q6_RESETJTAG_TMS, C => SLOWCLK, CE => CE_RESETJTAG_TMS, CLR => RST, Q => Q1_RESETJTAG_TMS);
+  FDPE_q2resetjtagtms : FDPE port map(D => Q1_RESETJTAG_TMS, C => SLOWCLK, CE => CE_RESETJTAG_TMS, PRE => RST, Q => Q2_RESETJTAG_TMS);
+  FPDE_q3resetjtagtms : FDPE port map(D => Q2_RESETJTAG_TMS, C => SLOWCLK, CE => CE_RESETJTAG_TMS, PRE => RST, Q => Q3_RESETJTAG_TMS);
+  FDPE_q4resetjtagtms : FDPE port map(D => Q3_RESETJTAG_TMS, C => SLOWCLK, CE => CE_RESETJTAG_TMS, PRE => RST, Q => Q4_RESETJTAG_TMS);
+  FDPE_q5resetjtagtms : FDPE port map(D => Q4_RESETJTAG_TMS, C => SLOWCLK, CE => CE_RESETJTAG_TMS, PRE => RST, Q => Q5_RESETJTAG_TMS);
+  FDPE_q6resetjtagtms : FDPE port map(D => Q5_RESETJTAG_TMS, C => SLOWCLK, CE => CE_RESETJTAG_TMS, PRE => RST, Q => Q6_RESETJTAG_TMS);
   tms_inner              <= Q6_RESETJTAG_TMS when (RESETJTAG = '1') else 'Z';  -- BGB
 
 -- Generate TCK
@@ -413,10 +415,10 @@ begin
   D_DTACK   <= (DATASHFT or INSTSHFT);
   CE_DTACK  <= not BUSY;
   CLR_DTACK <= not STROBE;
-  FDCE(D_DTACK, SLOWCLK, CE_DTACK, CLR_DTACK, Q1_DTACK);
-  FDC(Q1_DTACK, SLOWCLK, CLR_DTACK, Q2_DTACK);
-  FD(Q2_DTACK, SLOWCLK, Q3_DTACK);
-  FD(Q3_DTACK, SLOWCLK, Q4_DTACK);
+  FDCE_q1dtack : FDCE port map(D => D_DTACK, C => SLOWCLK, CE => CE_DTACK, CLR => CLR_DTACK, Q => Q1_DTACK);
+  FDC_q2dtack : FDC port map(D => Q1_DTACK, C => SLOWCLK, CLR => CLR_DTACK, Q => Q2_DTACK);
+  FD_q3dtack : FD port map(D => Q2_DTACK, C => SLOWCLK, Q => Q3_DTACK);
+  FD_q4dtack : FD port map(D => Q3_DTACK, C => SLOWCLK, Q => Q4_DTACK);
 
 -- BGB
   DTACK_INNER <= '1' when (Q_DTACK_SELCFEB = '1') or
@@ -436,23 +438,24 @@ begin
 
 -- generate DIAGOUT
   DIAGOUT(0)  <= STROBE;
-  DIAGOUT(1)  <= INSTSHFT;
-  DIAGOUT(2)  <= DATASHFT;
-  DIAGOUT(3)  <= Q_LOAD;
-  DIAGOUT(4)  <= D2_LOAD;
-  DIAGOUT(5)  <= LOAD;
-  DIAGOUT(6)  <= Q_BUSY;
-  DIAGOUT(7)  <= CLR_BUSY;
-  DIAGOUT(8)  <= BUSY;
-  DIAGOUT(9)  <= RESETJTAG;
-  DIAGOUT(10) <= CE_TCK_GLOBAL;
-  DIAGOUT(11) <= TCK_GLOBAL;
-  DIAGOUT(12) <= IHEADEN;
-  DIAGOUT(13) <= DONEIHEAD;
-  DIAGOUT(14) <= DHEADEN;
-  DIAGOUT(15) <= DONEDHEAD;
-  DIAGOUT(16)  <= Q1_SHIHEAD_TMS;
-  DIAGOUT(17)  <= READTDO;
+  DIAGOUT(1)  <= Q_LOAD;
+  DIAGOUT(2)  <= LOAD;
+  DIAGOUT(3)  <= CLR_BUSY;
+  DIAGOUT(4)  <= BUSY;
+  DIAGOUT(5)  <= DONETAIL;
+  DIAGOUT(6)  <= DONEDATA(1);
+  DIAGOUT(7)  <= QV_DONEDATA(0);
+  DIAGOUT(8) <= QV_DONETAIL(0);
+  DIAGOUT(9) <= TDO;
+  DIAGOUT(10) <= CE_SHIFT1;
+  DIAGOUT(11) <= Q_OUTDATA(3);
+  DIAGOUT(12) <= Q_OUTDATA(2);
+  DIAGOUT(13) <= Q_OUTDATA(1);
+  DIAGOUT(14)  <= Q_OUTDATA(0);
+  DIAGOUT(15)  <= RDTDODK;
+  DIAGOUT(16)  <= SHDHEAD;
+  DIAGOUT(17)  <= CE_SHDHEAD_TMS;
+  
 
 --  DIAGOUT(0)  <= LOAD;
 --  DIAGOUT(1)  <= TCK_GLOBAL;
