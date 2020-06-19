@@ -34,6 +34,58 @@ architecture Behavioral of Firmware_tb is
     probe1 : in std_logic_vector(4095 downto 0) := (others => '0')
   );
   end component;
+  component dcfeb_v6 is
+  port (
+      clk          : in std_logic;
+      dcfebclk     : in std_logic;
+      rst          : in std_logic;
+      l1a          : in std_logic;
+      l1a_match    : in std_logic;
+      tx_ack       : in std_logic;
+      nwords_dummy : in std_logic_vector(15 downto 0);
+  
+      dcfeb_dv      : out std_logic;
+      dcfeb_data    : out std_logic_vector(15 downto 0);
+      adc_mask      : out std_logic_vector(11 downto 0);
+      dcfeb_fsel    : out std_logic_vector(32 downto 0);
+      dcfeb_jtag_ir : out std_logic_vector(9 downto 0);
+      trst          : in  std_logic;
+      tck           : in  std_logic;
+      tms           : in  std_logic;
+      tdi           : in  std_logic;
+      rtn_shft_en   : out std_logic;
+      tdo           : out std_logic
+   );
+   end component;
+   component vme_master is
+   port (
+       CLK         : in  std_logic;
+       RSTN        : in  std_logic;
+       SW_RESET    : in  std_logic;
+       VME_CMD     : in  std_logic;
+       VME_CMD_RD  : out std_logic;
+       VME_ADDR    : in  std_logic_vector(23 downto 1);
+       VME_WR      : in  std_logic;
+       VME_WR_DATA : in  std_logic_vector(15 downto 0);
+       VME_RD      : in  std_logic;
+       VME_RD_DATA : out std_logic_vector(15 downto 0);
+       GA          : out std_logic_vector(5 downto 0);
+       ADDR        : out std_logic_vector(23 downto 1);
+       AM          : out std_logic_vector(5 downto 0);
+       AS          : out std_logic;
+       DS0         : out std_logic;
+       DS1         : out std_logic;
+       LWORD       : out std_logic;
+       WRITE_B     : out std_logic;
+       IACK        : out std_logic;
+       BERR        : out std_logic;
+       SYSFAIL     : out std_logic;
+       DTACK       : in  std_logic;
+       DATA_IN     : in  std_logic_vector(15 downto 0);
+       DATA_OUT    : out std_logic_vector(15 downto 0);
+       OE_B        : out std_logic
+       );
+   end component;
 
   -- LUT constents
   constant bw_addr   : integer := 3;
@@ -75,15 +127,40 @@ architecture Behavioral of Firmware_tb is
   -- Reset
   signal rst_global : std_logic := '0';
 
-  -- Mimic input/output from/to the VME and discrete logic part
+  --Diagnostic
+  signal diagout          : std_logic_vector (17 downto 0) := (others => '0');
+
+  -- VME signals
+  -- Simulation (PC) -> VME
   signal vme_data_in      : std_logic_vector (15 downto 0) := (others => '0');
   signal vme_data_out     : std_logic_vector (15 downto 0) := (others => '0'); 
+  signal rstn             : std_logic := '1';
+  signal vc_cmd           : std_logic := '0';
+  signal vc_cmd_rd        : std_logic := '0';
+  signal vc_addr          : std_logic_vector(23 downto 1) := (others => '0');
+  signal vc_rd            : std_logic := '0';
+  signal vc_rd_data       : std_logic_vector(15 downto 0) := (others => '0');
+  -- VME -> ODMB
+  signal vme_ga      : std_logic_vector(5 downto 0) := (others => '0');
+  signal vme_addr    : std_logic_vector(23 downto 1) := (others => '0');
+  signal vme_am      : std_logic_vector(5 downto 0) := (others => '0');
+  signal vme_as      : std_logic := '0';
+  signal vme_ds      : std_logic_vector(1 downto 0) := (others => '0');
+  signal vme_lword   : std_logic := '0';
+  signal vme_write_b : std_logic := '0';
+  signal vme_berr    : std_logic := '0';
+  signal vme_iack    : std_logic := '0';
+  signal vme_sysfail : std_logic := '0';
+  signal vme_oe_b    : std_logic := '0';
+  signal vme_indata  : std_logic_vector(15 downto 0) := (others => '0');
+  signal vme_dtack   : std_logic := 'H';
+
+  -- DCFEB signals (ODMB <-> (xD)CFEB)
   signal dl_jtag_tck      : std_logic_vector (6 downto 0)  := (others => '0');
   signal dl_jtag_tms      : std_logic := '0';
   signal dl_jtag_tdi      : std_logic := '0';
   signal dl_jtag_tdo      : std_logic_vector (6 downto 0)  := (others => '0');
   signal dcfeb_initjtag   : std_logic := '0';
-  signal diagout          : std_logic_vector (17 downto 0) := (others => '0');
 
   -- ILA
   signal trig0 : std_logic_vector(255 downto 0) := (others=> '0');
@@ -94,11 +171,13 @@ architecture Behavioral of Firmware_tb is
   signal lut_input1_dout_c : std_logic_vector(bw_input1-1 downto 0) := (others=> '0');
   signal lut_input2_dout_c : std_logic_vector(bw_input2-1 downto 0) := (others=> '0');
 
+  --signals for generating input to VME
   signal input_dav : std_logic := '0';
   signal cmddev    : std_logic_vector(15 downto 0) := (others=> '0');
   signal nextcmd   : std_logic := '1';
   signal cack      : std_logic := 'H';
   signal cack_reg  : std_logic := 'H';
+  signal cack_i  : std_logic := '1';
 
   -- Checker bit
   signal checker  : std_logic := '0';
@@ -172,12 +251,6 @@ begin
             douta=> lut_input2_dout_c
           );
 
-
-
-  -- Test CFEBJTAG functionality
-  -- cfebjtag is used to talk to DCFEBs through JTAG, but we don't have CFEBs
-  -- communication now, so let's test the the code is giving proper behavior
-
   -- Process to generate counter and initialization
   startGenerator_i: process (sysclk) is
   begin
@@ -198,7 +271,7 @@ begin
     end if;
   end process;
 
-  -- Process to read input from LUTs and pass to firmware
+  -- Process to read input from LUTs and give to VME 
   inputGenerator_i: process (sysclk) is
     variable init_input1: unsigned(bw_fifo-3 downto 0):= (others => '0');
     variable init_input2: unsigned(bw_fifo-3 downto 0):= (others => '1');
@@ -218,7 +291,6 @@ begin
             else
               lut_input_addr1_s <= lut_input_addr1_s + 1;
               lut_input_addr2_s <= lut_input_addr2_s + 1;
-              -- The output is PRNS { rnd |= 1; rnd ^= (rnd << (i % 11 + 1)); }
               cmddev <= lut_input1_dout_c;
               vme_data_in <= lut_input2_dout_c;
               input_dav <= '1';
@@ -238,31 +310,57 @@ begin
       end if;
     end if;
   end process;
+  
+  --generate VME acknowledge
+    i_cmd_ack : process (vc_cmd, vc_cmd_rd) is
+  begin
+    if vc_cmd'event and vc_cmd = '1' then
+      cack_i <= '0';
+    end if;
+    if vc_cmd_rd'event and vc_cmd_rd = '1' then
+      cack_i <= '1';
+    end if;
+  end process;
+  cack <= cack_i;
 
+  --VME signal management
+  rstn <= not rst_global;
+  vc_cmd <= '1' when (cmddev(15 downto 12) = x"1" or cmddev(15 downto 12) = x"4") else '0';
+  vc_addr <= x"A8" & cmddev(15 downto 1);
+  vc_rd <=  '1' when vme_data_in = x"2EAD" else '0';
 
   --Firmware process
-  firmware_i: entity work.Firmware
+  firmware_i: entity work.odmb7_ucsb_dev
   port map(
     -- Clock
     CLK160         => sysclkQuad,
-    CLK80          => sysclkDouble,
     CLK40          => sysclk,
     CLK10          => sysclkQuarter,
     RST            => rst_global,
-    VME_DATA_IN    => vme_data_in,
+    VME_DATA_IN    => vme_indata,
     VME_DATA_OUT   => vme_data_out,
+    VME_GA         => vme_ga,
+    VME_ADDR       => vme_addr,
+    VME_AM         => vme_am,
+    VME_AS_B       => vme_as,
+    VME_DS_B       => vme_ds,
+    VME_LWORD_B    => vme_lword,
+    VME_WRITE_B    => vme_write_b,
+    VME_IACK_B     => vme_iack,
+    VME_BERR_B     => vme_berr,
+    VME_SYSFAIL_B  => vme_sysfail,
+    VME_DTACK_V6_B => vme_dtack,
+    VME_DOE_B      => vme_oe_b,
     DIAGOUT        => diagout,
     DL_JTAG_TCK    => dl_jtag_tck,
     DL_JTAG_TMS    => dl_jtag_tms,
     DL_JTAG_TDI    => dl_jtag_tdi,
     DL_JTAG_TDO    => dl_jtag_tdo,
-    DCFEB_INITJTAG => dcfeb_initjtag,
-    CMDDEV         => cmddev,
-    CACK           => cack
+    DCFEB_INITJTAG => dcfeb_initjtag
     );
-    
-  --add DCFEB
-  dcfeb_i: entity work.dcfeb_v6
+   
+  --DCFEB
+  dcfeb_i: dcfeb_v6
   port map (
     clk             => '0',
     dcfebclk        => '0',
@@ -283,5 +381,35 @@ begin
     tdo             => dl_jtag_tdo(2),
     rtn_shft_en     => open
   );
+  
+  vme_i : vme_master
+  port map (
+         clk            => sysclkDouble,    -- VME controller
+         rstn           => rstn,            -- VME controller
+         sw_reset       => rst_global,      -- VME controller
+         vme_cmd        => vc_cmd,          -- VME controller
+         vme_cmd_rd     => vc_cmd_rd,       -- VME controller
+         vme_wr         => vc_cmd,          -- VME controller
+         vme_addr       => vc_addr,         -- VME controller
+         vme_wr_data    => vme_data_in,     -- VME controller
+         vme_rd         => vc_rd,           -- VME controller
+         vme_rd_data    => vc_rd_data,      -- VME controller
+         ga             => vme_ga,          -- between VME and ODMB
+         addr           => vme_addr,        -- between VME and ODMB
+         am             => vme_am,          -- between VME and ODMB
+         as             => vme_as,          -- between VME and ODMB
+         ds0            => vme_ds(0),       -- between VME and ODMB
+         ds1            => vme_ds(1),       -- between VME and ODMB
+         lword          => vme_lword,       -- between VME and ODMB
+         write_b        => vme_write_b,     -- between VME and ODMB
+         iack           => vme_iack,        -- between VME and ODMB
+         berr           => vme_berr,        -- between VME and ODMB
+         sysfail        => vme_sysfail,     -- between VME and ODMB
+         dtack          => vme_dtack,       -- between VME and ODMB
+         oe_b           => vme_oe_b,        -- between VME and ODMB
+         data_in        => vme_data_out,    -- between VME and ODMB
+         data_out       => vme_indata      -- between VME and ODMB
+  );
+  
 
 end Behavioral;
