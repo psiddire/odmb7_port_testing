@@ -67,6 +67,10 @@ architecture vme_master_architecture of vme_master is
   signal reg_addr       : std_logic_vector(23 downto 1);
   signal reg_data       : std_logic_vector(15 downto 0);
   signal reg_wr, reg_rd : std_logic;
+  
+  -- signals for dtack timeout
+  signal dtack_waiting  : std_logic := '0';
+  signal dtack_timeout  : std_logic := '0';
 
 begin
 
@@ -75,6 +79,23 @@ begin
   lword   <= '1';
   ga      <= "101010";
   am      <= "111010";
+
+  proc_dtack_timeout : process (clk, dtack_waiting)
+    variable dtack_timeout_counter  : unsigned(9 downto 0) := (others=> '0');
+  begin
+    if (rising_edge(clk)) then
+      if (dtack_waiting = '0') then
+        dtack_timeout_counter := (others=> '0');
+        dtack_timeout <= '0';
+      else
+        if (dtack_timeout_counter = 1023) then
+          --1023 cycles = 12.8 us
+          dtack_timeout <= '1';
+        end if;
+        dtack_timeout_counter := dtack_timeout_counter + 1;
+      end if;
+    end if;
+  end process;
 
 
   cnt : process (clk, rstn, sw_reset, cnt_en, cnt_res)
@@ -135,7 +156,7 @@ begin
   end process;
 
 
-  fsm_comb_logic : process(vme_cmd, current_state, cnt_out, vme_wr, vme_addr, vme_wr_data, dtack)
+  fsm_comb_logic : process(vme_cmd, current_state, cnt_out, vme_wr, vme_addr, vme_wr_data, dtack, dtack_timeout)
 
   begin
     
@@ -228,6 +249,7 @@ begin
           ds1        <= '0';
           cnt_en     <= '1';
           cnt_res    <= '1';
+          dtack_waiting <= '1';
           next_state <= WR_DS_LOW;
         else
           ds0        <= '1';
@@ -255,6 +277,12 @@ begin
         if (dtack = '0') then
           cnt_en     <= '1';
           cnt_res    <= '1';
+          dtack_waiting <= '0';
+          next_state <= WR_DTACK_LOW;
+        elsif (dtack_timeout = '1') then
+          cnt_en     <= '1';
+          cnt_res    <= '1';
+          dtack_waiting <= '0';
           next_state <= WR_DTACK_LOW;
         else
           cnt_en     <= '1';
