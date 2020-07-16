@@ -25,6 +25,10 @@ add_files -fileset constrs_1 -norecurse "Firmware_tb.xdc"
 # Add tcl for simulation
 set_property -name {xsim.simulate.custom_tcl} -value {../../../../source/Firmware_tb.tcl} -objects [get_filesets sim_1]
 
+#Set test bench as top module
+set_property top Firmware_tb [get_filesets sources_1]
+set_property top Firmware_tb [get_filesets sim_1]
+
 # Set ip as global
 set_property generate_synth_checkpoint false [get_files  ../ip/$FPGA_TYPE/clockManager/clockManager.xci]
 set_property generate_synth_checkpoint false [get_files  ../ip/$FPGA_TYPE/ila/ila.xci]

@@ -8,6 +8,9 @@ use UNISIM.VComponents.all;
 use work.Firmware_pkg.all;
 
 entity Firmware_tb is
+  generic (
+    NCFEB       : integer range 1 to 7 := 7
+  );
   PORT ( 
     -- 300 MHz clk_in
     CLK_IN_P : in std_logic;
@@ -54,7 +57,8 @@ architecture Behavioral of Firmware_tb is
       tms           : in  std_logic;
       tdi           : in  std_logic;
       rtn_shft_en   : out std_logic;
-      tdo           : out std_logic
+      tdo           : out std_logic;
+      done          : out std_logic
    );
    end component;
    component vme_master is
@@ -88,7 +92,8 @@ architecture Behavioral of Firmware_tb is
    end component;
 
   -- LUT constents
-  constant bw_addr   : integer := 3;
+  constant bw_addr   : integer := 4;
+  constant bw_addr_entries : integer := 9;
   constant bw_input1 : integer := 16;
   constant bw_input2 : integer := 16;
   component lut_input1 is
@@ -133,7 +138,6 @@ architecture Behavioral of Firmware_tb is
   -- VME signals
   -- Simulation (PC) -> VME
   signal vme_data_in      : std_logic_vector (15 downto 0) := (others => '0');
-  signal vme_data_out     : std_logic_vector (15 downto 0) := (others => '0'); 
   signal rstn             : std_logic := '1';
   signal vc_cmd           : std_logic := '0';
   signal vc_cmd_rd        : std_logic := '0';
@@ -152,22 +156,25 @@ architecture Behavioral of Firmware_tb is
   signal vme_iack    : std_logic := '0';
   signal vme_sysfail : std_logic := '0';
   signal vme_oe_b    : std_logic := '0';
-  signal vme_indata  : std_logic_vector(15 downto 0) := (others => '0');
+  signal vme_data_io_in   : std_logic_vector(15 downto 0) := (others => '0');
+  signal vme_data_io_out  : std_logic_vector (15 downto 0) := (others => '0');
+  signal vme_data_io      : std_logic_vector(15 downto 0) := (others => '0'); 
   signal vme_dtack   : std_logic := 'H';
 
   -- DCFEB signals (ODMB <-> (xD)CFEB)
-  signal dl_jtag_tck      : std_logic_vector (6 downto 0)  := (others => '0');
+  signal dl_jtag_tck      : std_logic_vector (NCFEB downto 1)  := (others => '0');
   signal dl_jtag_tms      : std_logic := '0';
   signal dl_jtag_tdi      : std_logic := '0';
-  signal dl_jtag_tdo      : std_logic_vector (6 downto 0)  := (others => '0');
+  signal dl_jtag_tdo      : std_logic_vector (NCFEB downto 1)  := (others => '0');
   signal dcfeb_initjtag   : std_logic := '0';
+  signal dcfeb_done       : std_logic_vector (NCFEB downto 1) := (others => '0');
 
   -- ILA
   signal trig0 : std_logic_vector(255 downto 0) := (others=> '0');
   signal data  : std_logic_vector(4095 downto 0) := (others=> '0');
   -- LUT input
-  signal lut_input_addr1_s : unsigned(bw_addr-1 downto 0) := (others=> '1');
-  signal lut_input_addr2_s : unsigned(bw_addr-1 downto 0) := (others=> '1');
+  signal lut_input_addr1_s : unsigned(bw_addr-1 downto 0) := (others=> '0');
+  signal lut_input_addr2_s : unsigned(bw_addr-1 downto 0) := (others=> '0');
   signal lut_input1_dout_c : std_logic_vector(bw_input1-1 downto 0) := (others=> '0');
   signal lut_input2_dout_c : std_logic_vector(bw_input2-1 downto 0) := (others=> '0');
 
@@ -184,6 +191,7 @@ architecture Behavioral of Firmware_tb is
 
 begin
 
+  --generate clock in simulation
   input_clk_simulation_i : if in_simulation generate
     process
       constant clk_period_by_2 : time := 1.666 ns;
@@ -227,7 +235,7 @@ begin
   trig0(33) <= dl_jtag_tdi;
   trig0(32) <= dl_jtag_tdo(2);
   trig0(31 downto 16) <= vme_data_in;
-  trig0(15 downto 0) <= vme_data_out;
+  trig0(15 downto 0) <= vme_data_io_out;
   data(81 downto 64) <= diagout;
   data(63 downto 48) <= vme_data_in;
   data(47 downto 32) <= cmddev;
@@ -235,7 +243,7 @@ begin
   data(18) <= dl_jtag_tms;
   data(17) <= dl_jtag_tdi;
   data(16) <= dl_jtag_tdo(2);
-  data(15 downto 0) <= vme_data_out;
+  data(15 downto 0) <= vme_data_io_out;
 
   -- Input LUTs
   lut_input1_i: lut_input1
@@ -289,8 +297,13 @@ begin
               cmddev <= std_logic_vector(init_input1);
               input_dav <= '0';
             else
-              lut_input_addr1_s <= lut_input_addr1_s + 1;
-              lut_input_addr2_s <= lut_input_addr2_s + 1;
+              if lut_input_addr1_s = bw_addr_entries-1 then
+                lut_input_addr1_s <= x"0";
+                lut_input_addr2_s <= x"0";
+              else 
+                lut_input_addr1_s <= lut_input_addr1_s + 1;
+                lut_input_addr2_s <= lut_input_addr2_s + 1;
+              end if;
               cmddev <= lut_input1_dout_c;
               vme_data_in <= lut_input2_dout_c;
               input_dav <= '1';
@@ -328,17 +341,25 @@ begin
   vc_cmd <= '1' when (cmddev(15 downto 12) = x"1" or cmddev(15 downto 12) = x"4") else '0';
   vc_addr <= x"A8" & cmddev(15 downto 1);
   vc_rd <=  '1' when vme_data_in = x"2EAD" else '0';
+  --manage the VME data lines
+  --can't use IOBUF's internally except in simulation. For KCU we connect vme_data_io_in and _out directly
+  --GEN_15 : for I in 0 to 15 generate
+  --begin
+  --    VME_DATA_BUF : IOBUF port map(O => vme_data_io_out(I), IO => vme_data_io(I), I => vme_data_io_in(I), T => vme_oe_b); 
+  --end generate GEN_15;
+
 
   --Firmware process
-  firmware_i: entity work.odmb7_ucsb_dev
+  odmb_i: entity work.odmb7_ucsb_dev
   port map(
     -- Clock
     CLK160         => sysclkQuad,
     CLK40          => sysclk,
     CLK10          => sysclkQuarter,
     RST            => rst_global,
-    VME_DATA_IN    => vme_indata,
-    VME_DATA_OUT   => vme_data_out,
+    --VME_DATA       => vme_data_io, --for real ODMB there is one line; for KCU we can't use IOBUFs internally
+    VME_DATA_IN    => vme_data_io_in,
+    VME_DATA_OUT   => vme_data_io_out,
     VME_GA         => vme_ga,
     VME_ADDR       => vme_addr,
     VME_AM         => vme_am,
@@ -352,11 +373,11 @@ begin
     VME_DTACK_V6_B => vme_dtack,
     VME_DOE_B      => vme_oe_b,
     DIAGOUT        => diagout,
-    DL_JTAG_TCK    => dl_jtag_tck,
-    DL_JTAG_TMS    => dl_jtag_tms,
-    DL_JTAG_TDI    => dl_jtag_tdi,
-    DL_JTAG_TDO    => dl_jtag_tdo,
-    DCFEB_INITJTAG => dcfeb_initjtag
+    DCFEB_TCK    => dl_jtag_tck,
+    DCFEB_TMS    => dl_jtag_tms,
+    DCFEB_TDI    => dl_jtag_tdi,
+    DCFEB_TDO    => dl_jtag_tdo,
+    DCFEB_DONE   => dcfeb_done
     );
    
   --DCFEB
@@ -379,7 +400,8 @@ begin
     tms             => dl_jtag_tms,
     tdi             => dl_jtag_tdi,
     tdo             => dl_jtag_tdo(2),
-    rtn_shft_en     => open
+    rtn_shft_en     => open,
+    done            => dcfeb_done(2)
   );
   
   vme_i : vme_master
@@ -407,8 +429,8 @@ begin
          sysfail        => vme_sysfail,     -- between VME and ODMB
          dtack          => vme_dtack,       -- between VME and ODMB
          oe_b           => vme_oe_b,        -- between VME and ODMB
-         data_in        => vme_data_out,    -- between VME and ODMB
-         data_out       => vme_indata      -- between VME and ODMB
+         data_in        => vme_data_io_out,    -- between VME and ODMB
+         data_out       => vme_data_io_in      -- between VME and ODMB
   );
   
 
