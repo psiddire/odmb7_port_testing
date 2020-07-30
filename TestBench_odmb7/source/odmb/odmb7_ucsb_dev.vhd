@@ -27,11 +27,11 @@ entity ODMB7_UCSB_DEV is
     CLK10       : in std_logic;  -- NEW (midclk -> fastclk/4 -> 10MHz)
 
     --------------------
-    -- Signals controlled by VME
+    -- Signals controlled by ODMB_VME
     --------------------
-    -- VME_DATA       : inout std_logic_vector (15 downto 0);  -- FIXME: for real ODMB, there is one line, but for KCU, we can't have internal IOBUFs
-    VME_DATA_IN    : in std_logic_vector (15 downto 0);  -- FIXME: inout for real ODMB
-    VME_DATA_OUT   : out std_logic_vector (15 downto 0); -- FIXME: inout for real ODMB
+    VME_DATA       : inout std_logic_vector (15 downto 0);  -- FIXME: for real ODMB, there is one line, but for KCU, we can't have internal IOBUFs
+    -- VME_DATA_IN    : in std_logic_vector (15 downto 0);  -- FIXME: inout for real ODMB
+    -- VME_DATA_OUT   : out std_logic_vector (15 downto 0); -- FIXME: inout for real ODMB
     VME_GA         : in std_logic_vector (5 downto 0); -- gap is ga(5)
     VME_ADDR       : in std_logic_vector (23 downto 1);
     VME_AM         : in std_logic_vector (5 downto 0);
@@ -43,7 +43,8 @@ entity ODMB7_UCSB_DEV is
     VME_BERR_B     : in std_logic;
     VME_SYSFAIL_B  : in std_logic;
     VME_DTACK_V6_B : inout std_logic;
-    VME_DOE_B      : in std_logic;
+    VME_DOE_B      : out std_logic;
+    -- VME_TOVME_B    : out std_logic;
     --for debugging
     DIAGOUT        : out std_logic_vector (17 downto 0);
 
@@ -52,6 +53,25 @@ entity ODMB7_UCSB_DEV is
     DCFEB_TDI    : out std_logic;
     DCFEB_TDO    : in  std_logic_vector (NCFEB downto 1);
     DCFEB_DONE   : in  std_logic_vector (NCFEB downto 1);
+
+    LVMB_PON   : out std_logic_vector(7 downto 0);
+    PON_LOAD   : out std_logic;
+    PON_OE_B   : out std_logic;
+    R_LVMB_PON : in  std_logic_vector(7 downto 0);
+    LVMB_CSB   : out std_logic_vector(6 downto 0);
+    LVMB_SCLK  : out std_logic;
+    LVMB_SDIN  : out std_logic;
+    LVMB_SDOUT : in  std_logic;
+
+    DCFEB_PRBS_FIBER_SEL : out std_logic_vector(3 downto 0);
+    DCFEB_PRBS_EN        : out std_logic;
+    DCFEB_PRBS_RST       : out std_logic;
+    DCFEB_PRBS_RD_EN     : out std_logic;
+    DCFEB_RXPRBSERR      : in  std_logic;
+    DCFEB_PRBS_ERR_CNT   : in  std_logic_vector(15 downto 0);
+
+    OTMB_TX : in  std_logic_vector(48 downto 0);
+    OTMB_RX : out std_logic_vector(5 downto 0);
 
     --------------------
     -- Other
@@ -92,7 +112,7 @@ architecture Behavioral of ODMB7_UCSB_DEV is
       VME_BERR_B     : in std_logic;
       VME_SYSFAIL_B  : in std_logic;
       VME_DTACK_V6_B : inout std_logic;
-      VME_DOE_B      : in std_logic;
+      VME_DOE_B      : out std_logic;
       --for debugging
       DIAGOUT        : out std_logic_vector (17 downto 0);
 
@@ -103,7 +123,39 @@ architecture Behavioral of ODMB7_UCSB_DEV is
       DCFEB_TMS    : out std_logic;
       DCFEB_TDI    : out std_logic;
       DCFEB_TDO    : in  std_logic_vector (NCFEB downto 1);
-      DCFEB_DONE   : in  std_logic_vector (NCFEB downto 1);
+
+      DCFEB_DONE     : in std_logic_vector (NCFEB downto 1);
+      DCFEB_INITJTAG : in std_logic;   -- TODO: where does this fit in
+
+      --------------------
+      -- From/To LVMB: ODMB & ODMB7 design, ODMB5 to be seen
+      --------------------
+      LVMB_PON   : out std_logic_vector(7 downto 0);
+      PON_LOAD   : out std_logic;
+      PON_OE_B   : out std_logic;
+      R_LVMB_PON : in  std_logic_vector(7 downto 0);
+      LVMB_CSB   : out std_logic_vector(6 downto 0);
+      LVMB_SCLK  : out std_logic;
+      LVMB_SDIN  : out std_logic;
+      LVMB_SDOUT : in  std_logic;
+
+      -- DIAGOUT_LVDBMON  : out std_logic_vector(17 downto 0);
+
+      --------------------
+      -- TODO: DCFEB PRBS signals
+      --------------------
+      DCFEB_PRBS_FIBER_SEL : out std_logic_vector(3 downto 0);
+      DCFEB_PRBS_EN        : out std_logic;
+      DCFEB_PRBS_RST       : out std_logic;
+      DCFEB_PRBS_RD_EN     : out std_logic;
+      DCFEB_RXPRBSERR      : in  std_logic;
+      DCFEB_PRBS_ERR_CNT   : in  std_logic_vector(15 downto 0);
+
+      --------------------
+      -- TODO: OTMB PRBS signals
+      --------------------
+      OTMB_TX : in  std_logic_vector(48 downto 0);
+      OTMB_RX : out std_logic_vector(5 downto 0);
 
       --------------------
       -- Other
@@ -111,6 +163,28 @@ architecture Behavioral of ODMB7_UCSB_DEV is
       RST         : in std_logic
       );
   end component;
+
+  -- VME Signals
+
+  -- signal cmd_adrs     : std_logic_vector (15 downto 0);
+  signal vme_data_out : std_logic_vector (15 downto 0);
+  signal vme_data_in  : std_logic_vector (15 downto 0);
+  signal vme_tovme_b  : std_logic;
+  -- signal vme_doe      : std_logic;
+
+  -- signals to generate dcfeb_initjtag when DCFEBs are done programming
+  signal pon_rst_reg : std_logic_vector(31 downto 0) := x"00FFFFFF";
+  signal pon_reset : std_logic := '0';
+  signal done_cnt_en, done_cnt_rst                           : std_logic_vector(NCFEB downto 1);
+  type done_cnt_type is array (NCFEB downto 1) of integer range 0 to 3;
+  signal done_cnt                                            : done_cnt_type;
+  type done_state_type is (DONE_IDLE, DONE_LOW, DONE_COUNTING);
+  type done_state_array_type is array (NCFEB downto 1) of done_state_type;
+  signal done_next_state, done_current_state                 : done_state_array_type;
+  signal dcfeb_done_pulse : std_logic_vector(NCFEB downto 1) := (others => '0');
+  signal dcfeb_initjtag : std_logic := '0';
+  signal dcfeb_initjtag_d : std_logic := '0';
+  signal dcfeb_initjtag_dd : std_logic := '0';
 
 begin
 
@@ -123,8 +197,8 @@ begin
       CLK40          => CLK40,
       CLK10          => CLK10,
 
-      VME_DATA_IN    => VME_DATA_IN,
-      VME_DATA_OUT   => VME_DATA_OUT,
+      VME_DATA_IN    => vme_data_in,
+      VME_DATA_OUT   => vme_data_out,
       VME_GA         => VME_GA,
       VME_ADDR       => VME_ADDR,
       VME_AM         => VME_AM,
@@ -144,9 +218,114 @@ begin
       DCFEB_TDI      => DCFEB_TDI,
       DCFEB_TDO      => DCFEB_TDO,
       DCFEB_DONE     => DCFEB_DONE,
+      DCFEB_INITJTAG => dcfeb_initjtag,
+
+      LVMB_PON    => LVMB_PON,
+      PON_LOAD    => PON_LOAD,
+      PON_OE_B    => PON_OE_B,
+      R_LVMB_PON  => R_LVMB_PON,
+      LVMB_CSB    => LVMB_CSB,
+      LVMB_SCLK   => LVMB_SCLK,
+      LVMB_SDIN   => LVMB_SDIN,
+      LVMB_SDOUT  => LVMB_SDOUT,
+
+      DCFEB_PRBS_FIBER_SEL  => DCFEB_PRBS_FIBER_SEL,
+      DCFEB_PRBS_EN         => DCFEB_PRBS_EN,
+      DCFEB_PRBS_RST        => DCFEB_PRBS_RST,
+      DCFEB_PRBS_RD_EN      => DCFEB_PRBS_RD_EN,
+      DCFEB_RXPRBSERR       => DCFEB_RXPRBSERR,
+      DCFEB_PRBS_ERR_CNT    => DCFEB_PRBS_ERR_CNT,
+
+      OTMB_TX  => OTMB_TX,
+      OTMB_RX  => OTMB_RX,
 
       RST            => RST
       );
+
+
+  -- Handle VME data line
+  -- uncomment for real ODMB; in KCU we can't have internal IOBUFs
+  gen_VMEout_16 : for I in 0 to 15 generate
+  begin
+    VME_BUF : IOBUF port map(O => vme_data_in(I), IO => vme_data(I), I => vme_data_out(I), T => vme_tovme_b);
+  end generate gen_VMEout_16;
+  -- below lines: comment for real ODMB, needed for KCU (?)
+  -- VME_DATA_OUT <= vme_data_out_buf;
+  -- GEN_16 : for I in 0 to 15 generate
+  -- begin
+  --   PULLDOWN_vme_data_out_buf : PULLDOWN port map (O => vme_data_out_buf(I));
+  -- end generate GEN_16;
+
+  -- FSM to handle initialization when DONE received from DCFEBs
+  -- pon used to be generated from pll lock, may have to revert
+  pon_rst_reg    <= pon_rst_reg(30 downto 0) & '0' when rising_edge(clk40) else
+                    pon_rst_reg;
+  pon_reset <= pon_rst_reg(31);
+  -- Generate dcfeb_initjtag
+  done_fsm_regs : process (done_next_state, pon_reset, CLK10)
+  begin
+    for dev in 1 to NCFEB loop
+      if (pon_reset = '1') then
+        done_current_state(dev) <= DONE_LOW;
+      elsif rising_edge(CLK10) then
+        done_current_state(dev) <= done_next_state(dev);
+        if done_cnt_rst(dev) = '1' then
+          done_cnt(dev) <= 0;
+        elsif done_cnt_en(dev) = '1' then
+          done_cnt(dev) <= done_cnt(dev) + 1;
+        end if;
+      end if;
+    end loop;
+  end process;
+  done_fsm_logic : process (done_current_state, DCFEB_DONE, done_cnt)
+  begin
+    for dev in 1 to NCFEB loop
+      case done_current_state(dev) is
+        when DONE_IDLE =>
+          done_cnt_en(dev)      <= '0';
+          dcfeb_done_pulse(dev) <= '0';
+          if (DCFEB_DONE(dev) = '0') then
+            done_next_state(dev) <= DONE_LOW;
+            done_cnt_rst(dev)    <= '1';
+          else
+            done_next_state(dev) <= DONE_IDLE;
+            done_cnt_rst(dev)    <= '0';
+          end if;
+
+        when DONE_LOW =>
+          done_cnt_en(dev)      <= '0';
+          dcfeb_done_pulse(dev) <= '0';
+          done_cnt_rst(dev)     <= '0';
+          if (DCFEB_DONE(dev) = '1') then
+            done_next_state(dev) <= DONE_COUNTING;
+          else
+            done_next_state(dev) <= DONE_LOW;
+          end if;
+
+        when DONE_COUNTING =>
+          if (DCFEB_DONE(dev) = '0') then
+            done_next_state(dev)  <= DONE_LOW;
+            done_cnt_en(dev)      <= '0';
+            dcfeb_done_pulse(dev) <= '0';
+            done_cnt_rst(dev)     <= '1';
+          elsif (done_cnt(dev) = 3) then  -- DONE has to be high at least 400 us to avoid spurious edges
+            done_next_state(dev)  <= DONE_IDLE;
+            done_cnt_en(dev)      <= '0';
+            dcfeb_done_pulse(dev) <= '1';
+            done_cnt_rst(dev)     <= '0';
+          else
+            done_next_state(dev)  <= DONE_COUNTING;
+            done_cnt_en(dev)      <= '1';
+            dcfeb_done_pulse(dev) <= '0';
+            done_cnt_rst(dev)     <= '0';
+          end if;
+      end case;
+    end loop;
+  end process;
+  dcfeb_initjtag_dd <= or_reduce(dcfeb_done_pulse);
+  --temp use clk40 so I don't have to wait an eternity
+  DS_DCFEB_INITJTAG    : DELAY_SIGNAL generic map(240) port map(DOUT => dcfeb_initjtag_d, CLK => CLK40, NCYCLES => 240, DIN => dcfeb_initjtag_dd);
+  PULSE_DCFEB_INITJTAG : NPULSE2FAST port map(DOUT => dcfeb_initjtag, CLK_DOUT => CLK40, RST => '0', NPULSE => 5, DIN => dcfeb_initjtag_d);
 
 
 end Behavioral;
