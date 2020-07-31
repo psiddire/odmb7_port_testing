@@ -166,11 +166,20 @@ architecture Behavioral of Firmware_tb is
   signal vme_dtack   : std_logic := 'H';
 
   -- DCFEB signals (ODMB <-> (xD)CFEB)
-  signal dl_jtag_tck      : std_logic_vector (NCFEB downto 1)  := (others => '0');
-  signal dl_jtag_tms      : std_logic := '0';
-  signal dl_jtag_tdi      : std_logic := '0';
-  signal dl_jtag_tdo      : std_logic_vector (NCFEB downto 1)  := (others => '0');
-  signal dcfeb_initjtag   : std_logic := '0';
+  signal dl_jtag_tck    : std_logic_vector (NCFEB downto 1)  := (others => '0');
+  signal dl_jtag_tms    : std_logic := '0';
+  signal dl_jtag_tdi    : std_logic := '0';
+  signal dl_jtag_tdo    : std_logic_vector (NCFEB downto 1)  := (others => '0');
+  signal dcfeb_initjtag : std_logic := '0';
+  signal dcfeb_tck_p    : std_logic_vector (NCFEB downto 1)  := (others => '0');
+  signal dcfeb_tck_n    : std_logic_vector (NCFEB downto 1)  := (others => '0');
+  signal dcfeb_tms_p    : std_logic := '0';
+  signal dcfeb_tms_n    : std_logic := '0';
+  signal dcfeb_tdi_p    : std_logic := '0';
+  signal dcfeb_tdi_n    : std_logic := '0';
+  signal dcfeb_tdo_p    : std_logic_vector (NCFEB downto 1)  := (others => '0');
+  signal dcfeb_tdo_n    : std_logic_vector (NCFEB downto 1)  := (others => '0');
+
   signal dcfeb_done       : std_logic_vector (NCFEB downto 1) := (others => '0');
 
   signal lvmb_pon   : std_logic_vector(7 downto 0);
@@ -371,6 +380,15 @@ begin
      VME_DATA_BUF : IOBUF port map(O => vme_data_io_out(I), IO => vme_data_io(I), I => vme_data_io_in(I), T => vme_oe_b); 
   end generate GEN_15;
 
+  -- DCFEB simulation
+  -- Handle DCFEB data line
+  IB_DCFEB_TMS: IBUFDS port map (O => dl_jtag_tms, I => dcfeb_tms_p, IB => dcfeb_tms_n);
+  IB_DCFEB_TDI: IBUFDS port map (O => dl_jtag_tdi, I => dcfeb_tdi_p, IB => dcfeb_tdi_n);
+  GEN_DCFEB_7 : for I in 1 to NCFEB generate
+  begin
+    IB_DCFEB_TCK: IBUFDS port map (O => dl_jtag_tck(I), I => dcfeb_tck_p(I), IB => dcfeb_tck_n(I));
+    OB_DCFEB_TDO: OBUFDS port map (I => dl_jtag_tdo(I), O => dcfeb_tdo_p(I), OB => dcfeb_tdo_n(I));
+  end generate GEN_DCFEB_7;
 
   -- Firmware process
   -- odmb_i: entity work.odmb7_ucsb_dev
@@ -401,10 +419,14 @@ begin
     KUS_VME_OE_B    => vme_oe_b,
     KUS_VME_DIR_B   => vme_dir_b,
     DIAGOUT         => diagout,
-    DCFEB_TCK       => dl_jtag_tck,
-    DCFEB_TMS       => dl_jtag_tms,
-    DCFEB_TDI       => dl_jtag_tdi,
-    DCFEB_TDO       => dl_jtag_tdo,
+    DCFEB_TCK_P     => dcfeb_tck_p,
+    DCFEB_TCK_N     => dcfeb_tck_n,
+    DCFEB_TMS_P     => dcfeb_tms_p,
+    DCFEB_TMS_N     => dcfeb_tms_n,
+    DCFEB_TDI_P     => dcfeb_tdi_p,
+    DCFEB_TDI_N     => dcfeb_tdi_n,
+    DCFEB_TDO_P     => dcfeb_tdo_p,
+    DCFEB_TDO_N     => dcfeb_tdo_n,
     DCFEB_DONE      => dcfeb_done,
     LVMB_PON        => lvmb_pon,
     PON_LOAD        => pon_load,
