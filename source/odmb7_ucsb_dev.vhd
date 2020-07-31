@@ -29,30 +29,31 @@ entity ODMB7_UCSB_DEV is
     --------------------
     -- Signals controlled by ODMB_VME
     --------------------
-    VME_DATA       : inout std_logic_vector (15 downto 0);  -- FIXME: for real ODMB, there is one line, but for KCU, we can't have internal IOBUFs
-    -- VME_DATA_IN    : in std_logic_vector (15 downto 0);  -- FIXME: inout for real ODMB
-    -- VME_DATA_OUT   : out std_logic_vector (15 downto 0); -- FIXME: inout for real ODMB
-    VME_GA         : in std_logic_vector (5 downto 0); -- gap is ga(5)
-    VME_ADDR       : in std_logic_vector (23 downto 1);
-    VME_AM         : in std_logic_vector (5 downto 0);
-    VME_AS_B       : in std_logic;
-    VME_DS_B       : in std_logic_vector (1 downto 0);
-    VME_LWORD_B    : in std_logic;
-    VME_WRITE_B    : in std_logic;
-    VME_IACK_B     : in std_logic;
-    VME_BERR_B     : in std_logic;
-    VME_SYSFAIL_B  : in std_logic;
-    VME_DTACK_V6_B : inout std_logic;
-    VME_DOE_B      : out std_logic;
-    -- VME_TOVME_B    : out std_logic;
-    --for debugging
-    DIAGOUT        : out std_logic_vector (17 downto 0);
+    VME_DATA        : inout std_logic_vector(15 downto 0);  -- Bank 48
+    -- VME_DATA_IN     : in std_logic_vector(15 downto 0);  -- FIXME: for real ODMB, there is one line, but for KCU, we can't have internal IOBUFs
+    -- VME_DATA_OUT    : out std_logic_vector(15 downto 0); -- FIXME: for real ODMB, there is one line, but for KCU, we can't have internal IOBUFs
+    VME_GAP_B       : in std_logic;                     -- Bank 48
+    VME_GA_B        : in std_logic_vector(4 downto 0);  -- Bank 48
+    VME_ADDR        : in std_logic_vector(23 downto 1); -- Bank 46
+    VME_AM          : in std_logic_vector(5 downto 0);  -- Bank 46
+    VME_AS_B        : in std_logic;                     -- Bank 46
+    VME_DS_B        : in std_logic_vector(1 downto 0);  -- Bank 46
+    VME_LWORD_B     : in std_logic;                     -- Bank 48
+    VME_WRITE_B     : in std_logic;                     -- Bank 48
+    VME_IACK_B      : in std_logic;                     -- Bank 48
+    VME_BERR_B      : in std_logic;                     -- Bank 48
+    VME_SYSRST_B    : in std_logic;                     -- Bank 48, not used
+    VME_SYSFAIL_B   : in std_logic;                     -- Bank 48
+    VME_CLK_B       : in std_logic;                     -- Bank 48, not used
+    KUS_VME_OE_B    : out std_logic;                    -- Bank 44
+    KUS_VME_DIR_B   : out std_logic;                    -- Bank 44
+    VME_DTACK_KUS_B : inout std_logic;                  -- Bank 44
 
-    DCFEB_TCK    : out std_logic_vector (NCFEB downto 1);
+    DCFEB_TCK    : out std_logic_vector(NCFEB downto 1);
     DCFEB_TMS    : out std_logic;
     DCFEB_TDI    : out std_logic;
-    DCFEB_TDO    : in  std_logic_vector (NCFEB downto 1);
-    DCFEB_DONE   : in  std_logic_vector (NCFEB downto 1);
+    DCFEB_TDO    : in  std_logic_vector(NCFEB downto 1);
+    DCFEB_DONE   : in  std_logic_vector(NCFEB downto 1);
 
     LVMB_PON   : out std_logic_vector(7 downto 0);
     PON_LOAD   : out std_logic;
@@ -76,6 +77,7 @@ entity ODMB7_UCSB_DEV is
     --------------------
     -- Other
     --------------------
+    DIAGOUT     : out std_logic_vector(17 downto 0); --for debugging
     RST         : in std_logic
     );
 end ODMB7_UCSB_DEV;
@@ -99,22 +101,22 @@ architecture Behavioral of ODMB7_UCSB_DEV is
       --------------------
       -- VME signals  <-- relevant ones only
       --------------------
-      VME_DATA_IN    : in std_logic_vector (15 downto 0);
-      VME_DATA_OUT   : out std_logic_vector (15 downto 0);
-      VME_GA         : in std_logic_vector (5 downto 0); -- gap is ga(5)
-      VME_ADDR       : in std_logic_vector (23 downto 1);
-      VME_AM         : in std_logic_vector (5 downto 0);
-      VME_AS_B       : in std_logic;
-      VME_DS_B       : in std_logic_vector (1 downto 0);
-      VME_LWORD_B    : in std_logic;
-      VME_WRITE_B    : in std_logic;
-      VME_IACK_B     : in std_logic;
-      VME_BERR_B     : in std_logic;
-      VME_SYSFAIL_B  : in std_logic;
-      VME_DTACK_V6_B : inout std_logic;
-      VME_DOE_B      : out std_logic;
-      --for debugging
-      DIAGOUT        : out std_logic_vector (17 downto 0);
+      VME_DATA_IN   : in std_logic_vector (15 downto 0);
+      VME_DATA_OUT  : out std_logic_vector (15 downto 0);
+      VME_GAP_B     : in std_logic;
+      VME_GA_B      : in std_logic_vector (4 downto 0); -- VME_GAP is GA(5)
+      VME_ADDR      : in std_logic_vector (23 downto 1);
+      VME_AM        : in std_logic_vector (5 downto 0);
+      VME_AS_B      : in std_logic;
+      VME_DS_B      : in std_logic_vector (1 downto 0);
+      VME_LWORD_B   : in std_logic;
+      VME_WRITE_B   : in std_logic;
+      VME_IACK_B    : in std_logic;
+      VME_BERR_B    : in std_logic;
+      VME_SYSFAIL_B : in std_logic;
+      VME_DTACK_B   : inout std_logic;
+      VME_OE_B      : out std_logic;
+      VME_DIR_B     : out std_logic;
 
       --------------------
       -- JTAG Signals To/From DCFEBs
@@ -160,6 +162,7 @@ architecture Behavioral of ODMB7_UCSB_DEV is
       --------------------
       -- Other
       --------------------
+      DIAGOUT     : out std_logic_vector (17 downto 0); -- for debugging
       RST         : in std_logic
       );
   end component;
@@ -169,8 +172,8 @@ architecture Behavioral of ODMB7_UCSB_DEV is
   -- signal cmd_adrs     : std_logic_vector (15 downto 0);
   signal vme_data_out : std_logic_vector (15 downto 0);
   signal vme_data_in  : std_logic_vector (15 downto 0);
-  signal vme_tovme_b  : std_logic;
-  -- signal vme_doe      : std_logic;
+  signal vme_dir_b    : std_logic;
+  -- signal vme_oe_b   : std_logic;
 
   -- signals to generate dcfeb_initjtag when DCFEBs are done programming
   signal pon_rst_reg : std_logic_vector(31 downto 0) := x"00FFFFFF";
@@ -199,7 +202,8 @@ begin
 
       VME_DATA_IN    => vme_data_in,
       VME_DATA_OUT   => vme_data_out,
-      VME_GA         => VME_GA,
+      VME_GAP_B      => VME_GAP_B,
+      VME_GA_B       => VME_GA_B,
       VME_ADDR       => VME_ADDR,
       VME_AM         => VME_AM,
       VME_AS_B       => VME_AS_B,
@@ -209,9 +213,9 @@ begin
       VME_IACK_B     => VME_IACK_B,
       VME_BERR_B     => VME_BERR_B,
       VME_SYSFAIL_B  => VME_SYSFAIL_B,
-      VME_DTACK_V6_B => VME_DTACK_V6_B,
-      VME_DOE_B      => VME_DOE_B,
-      DIAGOUT        => DIAGOUT,
+      VME_DTACK_B    => VME_DTACK_KUS_B,
+      VME_OE_B       => KUS_VME_OE_B,
+      VME_DIR_B      => vme_dir_b,      -- to be used in IOBUF
 
       DCFEB_TCK      => DCFEB_TCK,
       DCFEB_TMS      => DCFEB_TMS,
@@ -239,15 +243,18 @@ begin
       OTMB_TX  => OTMB_TX,
       OTMB_RX  => OTMB_RX,
 
-      RST            => RST
+      DIAGOUT  => DIAGOUT,
+      RST      => RST
       );
 
 
   -- Handle VME data line
+  KUS_VME_DIR_B <= vme_dir_b;
+
   -- uncomment for real ODMB; in KCU we can't have internal IOBUFs
   gen_VMEout_16 : for I in 0 to 15 generate
   begin
-    VME_BUF : IOBUF port map(O => vme_data_in(I), IO => vme_data(I), I => vme_data_out(I), T => vme_tovme_b);
+    VME_BUF : IOBUF port map(O => vme_data_in(I), IO => vme_data(I), I => vme_data_out(I), T => vme_dir_b);
   end generate gen_VMEout_16;
   -- below lines: comment for real ODMB, needed for KCU (?)
   -- VME_DATA_OUT <= vme_data_out_buf;

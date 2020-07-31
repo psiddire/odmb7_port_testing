@@ -145,6 +145,7 @@ architecture Behavioral of Firmware_tb is
   signal vc_rd            : std_logic := '0';
   signal vc_rd_data       : std_logic_vector(15 downto 0) := (others => '0');
   -- VME -> ODMB
+  -- signal vme_gap     : std_logic := '0';
   signal vme_ga      : std_logic_vector(5 downto 0) := (others => '0');
   signal vme_addr    : std_logic_vector(23 downto 1) := (others => '0');
   signal vme_am      : std_logic_vector(5 downto 0) := (others => '0');
@@ -154,8 +155,11 @@ architecture Behavioral of Firmware_tb is
   signal vme_write_b : std_logic := '0';
   signal vme_berr    : std_logic := '0';
   signal vme_iack    : std_logic := '0';
+  signal vme_sysrst  : std_logic := '0';
   signal vme_sysfail : std_logic := '0';
+  signal vme_clk_b   : std_logic := '0';
   signal vme_oe_b    : std_logic := '0';
+  signal vme_dir_b   : std_logic := '0';
   signal vme_data_io_in   : std_logic_vector(15 downto 0) := (others => '0');
   signal vme_data_io_out  : std_logic_vector (15 downto 0) := (others => '0');
   signal vme_data_io      : std_logic_vector(15 downto 0) := (others => '0'); 
@@ -369,50 +373,55 @@ begin
 
 
   -- Firmware process
+  -- odmb_i: entity work.odmb7_ucsb_dev
   odmb_i: entity work.odmb7_ucsb_dev
   port map(
     -- Clock
-    CLK160         => sysclkQuad,
-    CLK40          => sysclk,
-    CLK10          => sysclkQuarter,
-    RST            => rst_global,
-    VME_DATA       => vme_data_io, --for real ODMB there is one line; for KCU we can't use IOBUFs internally
-    -- VME_DATA_IN    => vme_data_io_in,
-    -- VME_DATA_OUT   => vme_data_io_out,
-    VME_GA         => vme_ga,
-    VME_ADDR       => vme_addr,
-    VME_AM         => vme_am,
-    VME_AS_B       => vme_as,
-    VME_DS_B       => vme_ds,
-    VME_LWORD_B    => vme_lword,
-    VME_WRITE_B    => vme_write_b,
-    VME_IACK_B     => vme_iack,
-    VME_BERR_B     => vme_berr,
-    VME_SYSFAIL_B  => vme_sysfail,
-    VME_DTACK_V6_B => vme_dtack,
-    VME_DOE_B      => vme_oe_b,
-    DIAGOUT        => diagout,
-    DCFEB_TCK      => dl_jtag_tck,
-    DCFEB_TMS      => dl_jtag_tms,
-    DCFEB_TDI      => dl_jtag_tdi,
-    DCFEB_TDO      => dl_jtag_tdo,
-    DCFEB_DONE     => dcfeb_done,
-    LVMB_PON       => lvmb_pon,
-    PON_LOAD       => pon_load,
-    PON_OE_B       => pon_oe_B,
-    R_LVMB_PON     => r_lvmb_PON,
-    LVMB_CSB       => lvmb_csb,
-    LVMB_SCLK      => lvmb_sclk,
-    LVMB_SDIN      => lvmb_sdin,
-    LVMB_SDOUT     => lvmb_sdout,
+    CLK160          => sysclkQuad,
+    CLK40           => sysclk,
+    CLK10           => sysclkQuarter,
+    RST             => rst_global,
+    VME_DATA        => vme_data_io, --for real ODMB there is one line; for KCU we can't use IOBUFs internally
+    -- VME_DATA_IN  => vme_data_io_in,
+    -- VME_DATA_OUT => vme_data_io_out,
+    VME_GAP_B       => vme_ga(5),
+    VME_GA_B        => vme_ga(4 downto 0),
+    VME_ADDR        => vme_addr,
+    VME_AM          => vme_am,
+    VME_AS_B        => vme_as,
+    VME_DS_B        => vme_ds,
+    VME_LWORD_B     => vme_lword,
+    VME_WRITE_B     => vme_write_b,
+    VME_IACK_B      => vme_iack,
+    VME_BERR_B      => vme_berr,
+    VME_SYSRST_B    => vme_sysrst,
+    VME_SYSFAIL_B   => vme_sysfail,
+    VME_DTACK_KUS_B => vme_dtack,
+    VME_CLK_B       => vme_clk_b,
+    KUS_VME_OE_B    => vme_oe_b,
+    KUS_VME_DIR_B   => vme_dir_b,
+    DIAGOUT         => diagout,
+    DCFEB_TCK       => dl_jtag_tck,
+    DCFEB_TMS       => dl_jtag_tms,
+    DCFEB_TDI       => dl_jtag_tdi,
+    DCFEB_TDO       => dl_jtag_tdo,
+    DCFEB_DONE      => dcfeb_done,
+    LVMB_PON        => lvmb_pon,
+    PON_LOAD        => pon_load,
+    PON_OE_B        => pon_oe_B,
+    R_LVMB_PON      => r_lvmb_PON,
+    LVMB_CSB        => lvmb_csb,
+    LVMB_SCLK       => lvmb_sclk,
+    LVMB_SDIN       => lvmb_sdin,
+    LVMB_SDOUT      => lvmb_sdout,
     DCFEB_PRBS_FIBER_SEL => dcfeb_prbs_FIBER_SEL,
     DCFEB_PRBS_EN        => dcfeb_prbs_EN,
     DCFEB_PRBS_RST       => dcfeb_prbs_RST,
     DCFEB_PRBS_RD_EN     => dcfeb_prbs_RD_EN,
     DCFEB_RXPRBSERR      => dcfeb_rxprbserr,
     DCFEB_PRBS_ERR_CNT   => dcfeb_prbs_ERR_CNT,
-    OTMB_TX        => otmb_tx,
-    OTMB_RX        => otmb_rx
+    OTMB_TX         => otmb_tx,
+    OTMB_RX         => otmb_rx
 
     );
    
@@ -443,31 +452,31 @@ begin
   -- VME simulation
   vme_i : vme_master
   port map (
-    clk            => sysclkDouble,    -- VME controller
-    rstn           => rstn,            -- VME controller
-    sw_reset       => rst_global,      -- VME controller
-    vme_cmd        => vc_cmd,          -- VME controller
-    vme_cmd_rd     => vc_cmd_rd,       -- VME controller
-    vme_wr         => vc_cmd,          -- VME controller
-    vme_addr       => vc_addr,         -- VME controller
-    vme_wr_data    => vme_data_in,     -- VME controller
-    vme_rd         => vc_rd,           -- VME controller
-    vme_rd_data    => vc_rd_data,      -- VME controller
-    ga             => vme_ga,          -- between VME and ODMB
-    addr           => vme_addr,        -- between VME and ODMB
-    am             => vme_am,          -- between VME and ODMB
-    as             => vme_as,          -- between VME and ODMB
-    ds0            => vme_ds(0),       -- between VME and ODMB
-    ds1            => vme_ds(1),       -- between VME and ODMB
-    lword          => vme_lword,       -- between VME and ODMB
-    write_b        => vme_write_b,     -- between VME and ODMB
-    iack           => vme_iack,        -- between VME and ODMB
-    berr           => vme_berr,        -- between VME and ODMB
-    sysfail        => vme_sysfail,     -- between VME and ODMB
-    dtack          => vme_dtack,       -- between VME and ODMB
-    oe_b           => vme_oe_b,        -- between VME and ODMB
-    data_in        => vme_data_io_out, -- between VME and ODMB
-    data_out       => vme_data_io_in   -- between VME and ODMB
+    clk            => sysclkDouble,     -- VME controller
+    rstn           => rstn,             -- VME controller
+    sw_reset       => rst_global,       -- VME controller
+    vme_cmd        => vc_cmd,           -- VME controller
+    vme_cmd_rd     => vc_cmd_rd,        -- VME controller
+    vme_wr         => vc_cmd,           -- VME controller
+    vme_addr       => vc_addr,          -- VME controller
+    vme_wr_data    => vme_data_in,      -- VME controller
+    vme_rd         => vc_rd,            -- VME controller
+    vme_rd_data    => vc_rd_data,       -- VME controller
+    ga             => vme_ga,           -- between VME and ODMB
+    addr           => vme_addr,         -- between VME and ODMB
+    am             => vme_am,           -- between VME and ODMB
+    as             => vme_as,           -- between VME and ODMB
+    ds0            => vme_ds(0),        -- between VME and ODMB
+    ds1            => vme_ds(1),        -- between VME and ODMB
+    lword          => vme_lword,        -- between VME and ODMB
+    write_b        => vme_write_b,      -- between VME and ODMB
+    iack           => vme_iack,         -- between VME and ODMB
+    berr           => vme_berr,         -- between VME and ODMB
+    sysfail        => vme_sysfail,      -- between VME and ODMB
+    dtack          => vme_dtack,        -- between VME and ODMB
+    oe_b           => vme_oe_b,         -- between VME and ODMB
+    data_in        => vme_data_io_out,  -- between VME and ODMB
+    data_out       => vme_data_io_in    -- between VME and ODMB
   );
   
 

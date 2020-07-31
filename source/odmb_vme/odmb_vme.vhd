@@ -44,25 +44,22 @@ entity ODMB_VME is
     --------------------
     -- VME signals  <-- relevant ones only
     --------------------
-    -- VME_DATA       : inout std_logic_vector (15 downto 0);  -- FIXME: for real ODMB, there is one line, but for KCU, we can't have internal IOBUFs
-    VME_DATA_IN    : in std_logic_vector (15 downto 0);  -- FIXME: inout for real ODMB
-    VME_DATA_OUT   : out std_logic_vector (15 downto 0); -- FIXME: inout for real ODMB
-    VME_GA         : in std_logic_vector (5 downto 0); -- gap is ga(5)
-    VME_ADDR       : in std_logic_vector (23 downto 1);
-    VME_AM         : in std_logic_vector (5 downto 0);
-    VME_AS_B       : in std_logic;
-    VME_DS_B       : in std_logic_vector (1 downto 0);
-    VME_LWORD_B    : in std_logic;
-    VME_WRITE_B    : in std_logic;
-    VME_IACK_B     : in std_logic;
-    VME_BERR_B     : in std_logic;
-    VME_SYSFAIL_B  : in std_logic;
-    VME_DTACK_V6_B : inout std_logic;   -- Q: what is V6 here?
-    VME_DOE_B      : out std_logic;
-    VME_TOVME_B    : out std_logic;
-
-    --for debugging
-    DIAGOUT        : out std_logic_vector (17 downto 0);
+    VME_DATA_IN   : in std_logic_vector (15 downto 0);
+    VME_DATA_OUT  : out std_logic_vector (15 downto 0);
+    VME_GAP_B     : in std_logic;
+    VME_GA_B      : in std_logic_vector (4 downto 0);
+    VME_ADDR      : in std_logic_vector (23 downto 1);
+    VME_AM        : in std_logic_vector (5 downto 0);
+    VME_AS_B      : in std_logic;
+    VME_DS_B      : in std_logic_vector (1 downto 0);
+    VME_LWORD_B   : in std_logic;
+    VME_WRITE_B   : in std_logic;
+    VME_IACK_B    : in std_logic;
+    VME_BERR_B    : in std_logic;
+    VME_SYSFAIL_B : in std_logic;
+    VME_DTACK_B   : inout std_logic;
+    VME_OE_B      : out std_logic;
+    VME_DIR_B     : out std_logic;
 
     --------------------
     -- JTAG Signals To/From DCFEBs
@@ -76,7 +73,7 @@ entity ODMB_VME is
     DCFEB_INITJTAG : in std_logic;   -- TODO: where does this fit in
 
     --------------------
-    -- TODO: From/To LVMB: ODMB & ODMB7 design, ODMB5 to be seen
+    -- From/To LVMB: ODMB & ODMB7 design, ODMB5 to be seen
     --------------------
     LVMB_PON   : out std_logic_vector(7 downto 0);
     PON_LOAD   : out std_logic;
@@ -86,6 +83,8 @@ entity ODMB_VME is
     LVMB_SCLK  : out std_logic;
     LVMB_SDIN  : out std_logic;
     LVMB_SDOUT : in  std_logic;
+
+    -- DIAGOUT_LVDBMON  : out std_logic_vector(17 downto 0);
 
     --------------------
     -- TODO: DCFEB PRBS signals
@@ -106,6 +105,7 @@ entity ODMB_VME is
     --------------------
     -- Other
     --------------------
+    DIAGOUT     : out std_logic_vector (17 downto 0); -- for debugging
     RST         : in std_logic
     );
 end ODMB_VME;
@@ -188,6 +188,7 @@ architecture Behavioral of ODMB_VME is
   signal strobe    : std_logic := '0';
   signal tovme_b, doe_b : std_logic := '0';
   signal vme_data_out_buf : std_logic_vector(15 downto 0) := (others => '0'); --comment for real ODMB, needed for KCU
+  signal vme_ga : std_logic_vector(5 downto 0) := (others => '0');
 
   signal dtack_dev : std_logic_vector(9 downto 0) := (others => '0');
 
@@ -219,8 +220,8 @@ begin
   DCFEB_TMS <= dl_jtag_tms_inner;
 
   -- Signal relaying for VME 
-  VME_DOE_B   <= doe_b;
-  VME_TOVME_B <= tovme_b;
+  VME_OE_B  <= doe_b;
+  VME_DIR_B <= tovme_b;
 
   -- VME_DATA_OUT <= dev_outdata(device_index);
   VME_DATA_OUT <= vme_data_out_buf;
@@ -231,8 +232,10 @@ begin
   diagout_buf(16 downto 8) <= cmd(8 downto 0);
   diagout_buf(7 downto 0) <= vme_data_out_buf(7 downto 0);
 
-  PULLUP_vme_dtack : PULLUP port map (O => VME_DTACK_V6_B);
-  VME_DTACK_V6_B <= not or_reduce(dtack_dev);
+  PULLUP_vme_dtack : PULLUP port map (O => VME_DTACK_B);
+  VME_DTACK_B <= not or_reduce(dtack_dev);
+
+  vme_ga <= VME_GAP_B & VME_GA_B;
 
   DEV4_DUMMY : CONFREGS_DUMMY
     port map (
@@ -276,7 +279,7 @@ begin
     port map (
       FASTCLK => clk40,
       SLOWCLK => clk10,
-      GA      => VME_GA,               -- gap = ga(5)
+      GA      => vme_ga,
       ADR     => VME_ADDR,             -- input cmd = ADR(11 downto 2)
       AM      => VME_AM,
       AS      => VME_AS_B,
