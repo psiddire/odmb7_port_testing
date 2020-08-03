@@ -157,7 +157,8 @@ architecture Behavioral of ODMB_VME is
       FASTCLK : in std_logic;
       SLOWCLK : in std_logic;
 
-      GA      : in std_logic_vector(5 downto 0);
+      GAP     : in std_logic;
+      GA      : in std_logic_vector(4 downto 0);
       ADR     : in std_logic_vector(23 downto 1);
       AM      : in std_logic_vector(5 downto 0);
 
@@ -188,7 +189,6 @@ architecture Behavioral of ODMB_VME is
   signal strobe    : std_logic := '0';
   signal tovme_b, doe_b : std_logic := '0';
   signal vme_data_out_buf : std_logic_vector(15 downto 0) := (others => '0'); --comment for real ODMB, needed for KCU
-  signal vme_ga : std_logic_vector(5 downto 0) := (others => '0');
 
   signal dtack_dev : std_logic_vector(9 downto 0) := (others => '0');
 
@@ -235,8 +235,6 @@ begin
   PULLUP_vme_dtack : PULLUP port map (O => VME_DTACK_B);
   VME_DTACK_B <= not or_reduce(dtack_dev);
 
-  vme_ga <= VME_GAP_B & VME_GA_B;
-
   DEV4_DUMMY : CONFREGS_DUMMY
     port map (
           SLOWCLK => clk10,
@@ -279,7 +277,8 @@ begin
     port map (
       FASTCLK => clk40,
       SLOWCLK => clk10,
-      GA      => vme_ga,
+      GAP     => VME_GAP_B,
+      GA      => VME_GA_B,
       ADR     => VME_ADDR,             -- input cmd = ADR(11 downto 2)
       AM      => VME_AM,
       AS      => VME_AS_B,

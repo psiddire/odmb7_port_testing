@@ -29,9 +29,9 @@ entity ODMB7_UCSB_DEV is
     --------------------
     -- Signals controlled by ODMB_VME
     --------------------
-    VME_DATA        : inout std_logic_vector(15 downto 0);  -- Bank 48
     -- VME_DATA_IN     : in std_logic_vector(15 downto 0);  -- FIXME: for real ODMB, there is one line, but for KCU, we can't have internal IOBUFs
     -- VME_DATA_OUT    : out std_logic_vector(15 downto 0); -- FIXME: for real ODMB, there is one line, but for KCU, we can't have internal IOBUFs
+    VME_DATA        : inout std_logic_vector(15 downto 0); -- Bank 48
     VME_GAP_B       : in std_logic;                        -- Bank 48
     VME_GA_B        : in std_logic_vector(4 downto 0);     -- Bank 48
     VME_ADDR        : in std_logic_vector(23 downto 1);    -- Bank 46
@@ -179,10 +179,11 @@ architecture Behavioral of ODMB7_UCSB_DEV is
   signal vme_dir_b    : std_logic;
   -- signal vme_oe_b   : std_logic;
 
-  signal dcfeb_tck    : std_logic_vector (NCFEB downto 1);
-  signal dcfeb_tms    : std_logic;
-  signal dcfeb_tdi    : std_logic;
-  signal dcfeb_tdo    : std_logic_vector (NCFEB downto 1);
+  signal dcfeb_tck    : std_logic_vector (NCFEB downto 1) := (others => '0');
+  signal dcfeb_tms    : std_logic := '0';
+  signal dcfeb_tdi    : std_logic := '0';
+  signal dcfeb_tdo    : std_logic_vector (NCFEB downto 1) := (others => '0');
+  -- signal dcfeb_tms_t  : std_logic := '0';
 
   -- signals to generate dcfeb_initjtag when DCFEBs are done programming
   signal pon_rst_reg : std_logic_vector(31 downto 0) := x"00FFFFFF";
@@ -204,14 +205,14 @@ begin
   KUS_VME_DIR_B <= vme_dir_b;
 
   -- Handle DCFEB data line
+  -- OB_DCFEB_TMS: OBUFTDS port map (I => dcfeb_tms, O => DCFEB_TMS_P, OB => DCFEB_TMS_N, T => dcfeb_tms_t);
   OB_DCFEB_TMS: OBUFDS port map (I => dcfeb_tms, O => DCFEB_TMS_P, OB => DCFEB_TMS_N);
   OB_DCFEB_TDI: OBUFDS port map (I => dcfeb_tdi, O => DCFEB_TDI_P, OB => DCFEB_TDI_N);
-  GEN_DCFEBOUT_7 : for I in 1 to NCFEB generate
+  GEN_DCFEBJTAG_7 : for I in 1 to NCFEB generate
   begin
     OB_DCFEB_TCK: OBUFDS port map (I => dcfeb_tck(I), O => DCFEB_TCK_P(I), OB => DCFEB_TCK_N(I));
-    OB_DCFEB_TDO: IBUFDS port map (O => dcfeb_tdo(I), I => DCFEB_TDO_P(I), IB => DCFEB_TDO_N(I));
-  end generate GEN_DCFEBOUT_7;
-
+    IB_DCFEB_TDO: IBUFDS port map (O => dcfeb_tdo(I), I => DCFEB_TDO_P(I), IB => DCFEB_TDO_N(I));
+  end generate GEN_DCFEBJTAG_7;
 
   -- uncomment for real ODMB; in KCU we can't have internal IOBUFs
   GEN_VMEOUT_16 : for I in 0 to 15 generate
