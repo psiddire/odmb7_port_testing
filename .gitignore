@@ -1,0 +1,9 @@
+TestBench_odmb7/vivado*
+TestBench_odmb7/ip
+TestBench_odmb7/tb_project/tb_project.cache/
+TestBench_odmb7/tb_project/tb_project.hw/
+TestBench_odmb7/tb_project/tb_project.ip_user_files/
+TestBench_odmb7/tb_project/tb_project.runs/
+TestBench_odmb7/tb_project/tb_project.sim/
+TestBench_odmb7/tb_project/tb_project.xpr
+

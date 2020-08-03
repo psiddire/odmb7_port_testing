@@ -27,6 +27,7 @@ architecture CONFREGS_DUMMY_Arch of CONFREGS_DUMMY is
 
 begin
 
+  --output 0d3b when given VME command 4100
   cmddev <= "000" & DEVICE & COMMAND & "00";
   gen_output <= '1' when cmddev = x"1100" else '0';
   read_output <= STROBE and gen_output;

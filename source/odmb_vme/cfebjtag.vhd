@@ -8,6 +8,9 @@ use work.ucsb_types.all;
 
 
 entity CFEBJTAG is
+  generic (
+    NCFEB   : integer range 1 to 7 := 7
+  );
   port (
     FASTCLK : in std_logic;
     SLOWCLK : in std_logic;
@@ -24,10 +27,10 @@ entity CFEBJTAG is
     DTACK : out std_logic;
 
     INITJTAGS : in  std_logic;
-    TCK       : out std_logic_vector(7 downto 1);
+    TCK       : out std_logic_vector(NCFEB downto 1);
     TDI       : out std_logic;
     TMS       : out std_logic;
-    FEBTDO    : in  std_logic_vector(7 downto 1);
+    FEBTDO    : in  std_logic_vector(NCFEB downto 1);
 
     LED     : out std_logic;
     DIAGOUT : out std_logic_vector(17 downto 0);

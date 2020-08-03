@@ -27,8 +27,9 @@ entity dcfeb_v6 is
     tck           : in  std_logic;
     tms           : in  std_logic;
     tdi           : in  std_logic;
+    tdo           : out std_logic;
     rtn_shft_en   : out std_logic;
-    tdo           : out std_logic);
+    done          : out std_logic);
 end dcfeb_v6;
 
 
@@ -163,6 +164,7 @@ architecture dcfeb_v6_arch of dcfeb_v6 is
 begin
 
   dcfeb_fsel <= fsel;
+  done <= '1'; --always configured -mo
 
 --  PMAP_dcfeb_data_gen : dcfeb_data_gen
 --    port map(
