@@ -24,9 +24,7 @@ entity odmb7_ucsb_dev is
     CLK40       : in std_logic;  -- NEW (fastclk -> 40MHz)
     CLK10       : in std_logic;  -- NEW (midclk -> fastclk/4 -> 10MHz)
     -- VME signals <-- relevant ones only
-    --VME_DATA       : inout std_logic_vector (15 downto 0);  -- data(15 downto 0)  --for real ODMB, there is one line, but for KCU, we can't have internal IOBUFs
-    VME_DATA_IN    : in std_logic_vector (15 downto 0);
-    VME_DATA_OUT   : out std_logic_vector (15 downto 0);
+    VME_DATA       : inout std_logic_vector (15 downto 0);
     VME_GA         : in std_logic_vector (5 downto 0); --gap is ga(5)
     VME_ADDR       : in std_logic_vector (23 downto 1);
     VME_AM         : in std_logic_vector (5 downto 0);
@@ -48,7 +46,10 @@ entity odmb7_ucsb_dev is
     DCFEB_TDO    : in  std_logic_vector (NCFEB downto 1);
     DCFEB_DONE   : in  std_logic_vector (NCFEB downto 1);
     -- Reset
-    RST         : in std_logic
+    RST         : in std_logic;
+    --KCU signals (not in real ODMB)
+    VME_DATA_IN    : in std_logic_vector (15 downto 0);
+    VME_DATA_OUT   : out std_logic_vector (15 downto 0)
     );
 end odmb7_ucsb_dev;
 
@@ -176,8 +177,17 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal cmd       : std_logic_vector(9 downto 0) := (others => '0');
   signal strobe    : std_logic := '0';
   signal tovme_b, doe_b : std_logic := '0';
-  --signal vme_data_in, vme_data_out : std_logic_vector(15 downto 0) := (others => '0'); --uncomment for real ODMB, not needed for KCU
-  signal vme_data_out_buf : std_logic_vector(15 downto 0) := (others => '0'); --comment for real ODMB, needed for KCU
+  type dev_array is array(0 to 15) of std_logic_vector(15 downto 0);
+  signal dev_outdata : dev_array;
+  signal device_index : integer range 0 to 15;
+  signal vme_data_out_buf, vme_data_in_buf : std_logic_vector(15 downto 0) := (others => '0');
+  
+  --clocks
+  signal clk5_unbuf      : std_logic := '0';
+  signal clk5_inv        : std_logic := '1';
+  signal clk2p5_unbuf    : std_logic := '0';
+  signal clk2p5_inv      : std_logic := '1';
+  signal clk2p5          : std_logic := '0';
 
   signal dtack_dev : std_logic_vector(9 downto 0) := (others => '0');
 
@@ -285,6 +295,13 @@ begin
   DS_DCFEB_INITJTAG    : DELAY_SIGNAL generic map(240) port map(DOUT => dcfeb_initjtag_d, CLK => CLK40, NCYCLES => 240, DIN => dcfeb_initjtag_dd);
   PULSE_DCFEB_INITJTAG : NPULSE2FAST port map(DOUT => dcfeb_initjtag, CLK_DOUT => CLK40, RST => '0', NPULSE => 5, DIN => dcfeb_initjtag_d);
 
+  -- generate 2p5 clock
+  clk5_inv <= not clk5_unbuf;
+  clk2p5_inv <= not clk2p5_unbuf;
+  FDCE_clk5 : FDCE port map(D => clk5_inv, C => CLK10, CE => '1', CLR => '0', Q => clk5_unbuf);
+  FDCE_clk2p5 : FDCE port map(D => clk2p5_inv, C => CLK10, CE => '1', CLR => '0', Q => clk2p5_unbuf);
+  BUFG_clk2p5 : BUFG port map(I => clk2p5_unbuf, O => clk2p5);
+
   -- For CFEBJTAG input
   DCFEB_TCK <= dl_jtag_tck_inner;
   DCFEB_TDI <= dl_jtag_tdi_inner;
@@ -292,33 +309,37 @@ begin
   
   -- debugging
   DIAGOUT <= diagout_buf;
-  diagout_buf(17) <= device(4);
-  diagout_buf(16 downto 8) <= cmd(8 downto 0);
-  diagout_buf(7 downto 0) <= vme_data_out_buf(7 downto 0);
   
-  -- Handle VME data line
-  -- uncomment for real ODMB; in KCU we can't have internal IOBUFs
---  GEN_15 : for I in 0 to 15 generate
---  begin
---    VME_BUF : IOBUF port map(O => vme_data_in(I), IO => vme_data(I), I => vme_data_out(I), T => tovme_b); 
---  end generate GEN_15;
-  --below lines: comment for real ODMB, needed for KCU (?)
-  VME_DATA_OUT <= vme_data_out_buf; 
-  --GEN_15 : for I in 0 to 15 generate
-  --begin
-  --  PULLDOWN_vme_data_out_buf : PULLDOWN port map (O => vme_data_out_buf(I)); 
-  --end generate GEN_15;
-
+  --Handle VME data line
+  --should be 10 to 15 once all modules are implemented
+  GEN_DEV_OUTDATA : for dev in 5 to 15 generate
+    dev_outdata(dev) <= (others => '0');
+  end generate GEN_DEV_OUTDATA;
+  device_index <= to_integer(unsigned(cmd_adrs_inner(15 downto 12)));
+  vme_data_out_buf <= dev_outdata(device_index);
+  -- can't have internal IOBUFs on KCU, real board/simulation can have IOBUFs
+  vme_data_kcu_i : if in_synthesis generate
+    vme_data_in_buf <= VME_DATA_IN;
+    VME_DATA_OUT <= vme_data_out_buf; 
+  end generate vme_data_kcu_i;
+  vme_data_simulation_i : if in_simulation generate
+  GEN_15 : for I in 0 to 15 generate
+    begin
+      VME_BUF : IOBUF port map(O => vme_data_in_buf(I), IO => vme_data(I), I => vme_data_out_buf(I), T => tovme_b); 
+    end generate GEN_15;
+  end generate vme_data_simulation_i;
+  
+  --Handle DTACK
   PULLUP_vme_dtack : PULLUP port map (O => VME_DTACK_V6_B);
   VME_DTACK_V6_B <= not or_reduce(dtack_dev);
   
   DEV4_DUMMY : CONFREGS_DUMMY
     port map (
-          SLOWCLK => clk10,
+          SLOWCLK => clk2p5,
           DEVICE  => device(4),
           STROBE  => strobe,
           COMMAND => cmd,
-          OUTDATA => vme_data_out_buf, --change to vme_data_out in real ODMB, this is KCU fix
+          OUTDATA => dev_outdata(4),
           DTACK => dtack_dev(4)
     );
 
@@ -327,7 +348,7 @@ begin
     port map (
       -- CSP_LVMB_LA_CTRL => CSP_LVMB_LA_CTRL,
       FASTCLK => clk40,
-      SLOWCLK => clk10,
+      SLOWCLK => clk2p5,
       RST     => rst,
 
       DEVICE  => device(1),
@@ -335,8 +356,8 @@ begin
       COMMAND => cmd,
 
       WRITER  => VME_WRITE_B,
-      INDATA  => vme_data_in,   -- VME_DATA_IN,
-      OUTDATA => vme_data_out_buf,  -- change to vme_data_out in real ODMB, this is KCU fix
+      INDATA  => vme_data_in_buf,   -- VME_DATA_IN,
+      OUTDATA => dev_outdata(1),
 
       DTACK   => dtack_dev(1),
 
@@ -353,7 +374,7 @@ begin
   COMMAND_PM : COMMAND_MODULE
     port map (
       FASTCLK => clk40,
-      SLOWCLK => clk10,
+      SLOWCLK => clk2p5,
       GA      => VME_GA,               -- gap = ga(5)
       ADR     => VME_ADDR,             -- input cmd = ADR(11 downto 2)
       AM      => VME_AM,
@@ -371,7 +392,7 @@ begin
       STROBE  => strobe,
       COMMAND => cmd,
       ADRS    => cmd_adrs_inner,
-      DIAGOUT => open,      -- temp
+      DIAGOUT => diagout_buf,      -- temp
       LED     => led_command           -- temp
       );
 

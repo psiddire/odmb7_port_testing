@@ -158,6 +158,8 @@ architecture Behavioral of Firmware_tb is
   signal vme_oe_b    : std_logic := '0';
   signal vme_data_io_in   : std_logic_vector(15 downto 0) := (others => '0');
   signal vme_data_io_out  : std_logic_vector (15 downto 0) := (others => '0');
+  signal vme_data_io_in_buf   : std_logic_vector(15 downto 0) := (others => '0');
+  signal vme_data_io_out_buf  : std_logic_vector (15 downto 0) := (others => '0');
   signal vme_data_io      : std_logic_vector(15 downto 0) := (others => '0'); 
   signal vme_dtack   : std_logic := 'H';
 
@@ -347,7 +349,17 @@ begin
   --begin
   --    VME_DATA_BUF : IOBUF port map(O => vme_data_io_out(I), IO => vme_data_io(I), I => vme_data_io_in(I), T => vme_oe_b); 
   --end generate GEN_15;
-
+  
+  vcc_data_simulation_i : if in_simulation generate
+    VCC_GEN_15 : for I in 0 to 15 generate
+    begin
+      VME_BUF : IOBUF port map(O => vme_data_io_out_buf(I), IO => vme_data_io(I), I => vme_data_io_in_buf(I), T => vme_oe_b); 
+    end generate VCC_GEN_15;
+  end generate vcc_data_simulation_i;
+  vcc_data_kcu_i : if in_synthesis generate
+    vme_data_io_in <= vme_data_io_in_buf;
+    vme_data_io_out_buf <= vme_data_io_out;
+  end generate vcc_data_kcu_i;
 
   --Firmware process
   odmb_i: entity work.odmb7_ucsb_dev
@@ -357,7 +369,7 @@ begin
     CLK40          => sysclk,
     CLK10          => sysclkQuarter,
     RST            => rst_global,
-    --VME_DATA       => vme_data_io, --for real ODMB there is one line; for KCU we can't use IOBUFs internally
+    VME_DATA       => vme_data_io,
     VME_DATA_IN    => vme_data_io_in,
     VME_DATA_OUT   => vme_data_io_out,
     VME_GA         => vme_ga,
@@ -406,7 +418,7 @@ begin
   
   vme_i : vme_master
   port map (
-         clk            => sysclkDouble,    -- VME controller
+         clk            => sysclk,          -- VME controller
          rstn           => rstn,            -- VME controller
          sw_reset       => rst_global,      -- VME controller
          vme_cmd        => vc_cmd,          -- VME controller
@@ -429,8 +441,8 @@ begin
          sysfail        => vme_sysfail,     -- between VME and ODMB
          dtack          => vme_dtack,       -- between VME and ODMB
          oe_b           => vme_oe_b,        -- between VME and ODMB
-         data_in        => vme_data_io_out,    -- between VME and ODMB
-         data_out       => vme_data_io_in      -- between VME and ODMB
+         data_in        => vme_data_io_out_buf,    -- between VME and ODMB
+         data_out       => vme_data_io_in_buf      -- between VME and ODMB
   );
   
 
