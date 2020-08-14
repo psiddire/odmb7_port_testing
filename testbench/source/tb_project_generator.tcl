@@ -14,18 +14,24 @@ create_project tb_project ../tb_project -part $FPGA_TYPE -force
 set_property target_language VHDL [current_project]
 set_property target_simulator XSim [current_project]
 
-# Add files
+# Add testbench files
 add_files -norecurse "Firmware_pkg.vhd Firmware_tb.vhd ../ip/$FPGA_TYPE/clockManager/clockManager.xci ../ip/$FPGA_TYPE/ila/ila.xci ../ip/$FPGA_TYPE/lut_input1/lut_input1.xci ../ip/$FPGA_TYPE/lut_input2/lut_input2.xci"
-add_files "odmb/"
 add_files "vme/"
 add_files "dcfeb/"
-add_files -norecurse "../tb_project/cfebjtag_tb_behav.wcfg"
 add_files -fileset constrs_1 -norecurse "Firmware_tb.xdc"
+
+# Add ODMB source code
+add_files "../../source/"
 
 # Add tcl for simulation
 set_property -name {xsim.simulate.custom_tcl} -value {../../../../source/Firmware_tb.tcl} -objects [get_filesets sim_1]
 
-#Set test bench as top module
+# add_files -norecurse "../tb_project/cfebjtag_tb_behav.wcfg"
+set_property SOURCE_SET sources_1 [get_filesets sim_1]
+add_files -fileset sim_1 -norecurse {../tb_project/cfebjtag_tb_behav.wcfg ../tb_project/vme_master_behav.wcfg}
+# set_property xsim.view {my_tb_behav.wcfg my_tb_behav_1.wcfg my_tb_behav_2.wcfg} [get_filesets sim_1]
+
+# Set test bench as top module
 set_property top Firmware_tb [get_filesets sources_1]
 set_property top Firmware_tb [get_filesets sim_1]
 

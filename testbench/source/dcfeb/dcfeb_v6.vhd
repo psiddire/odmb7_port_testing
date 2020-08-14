@@ -27,8 +27,8 @@ entity dcfeb_v6 is
     tck           : in  std_logic;
     tms           : in  std_logic;
     tdi           : in  std_logic;
-    rtn_shft_en   : out std_logic;
     tdo           : out std_logic;
+    rtn_shft_en   : out std_logic;
     done          : out std_logic);
 end dcfeb_v6;
 

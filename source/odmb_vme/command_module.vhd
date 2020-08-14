@@ -11,9 +11,10 @@ entity COMMAND_MODULE is
     FASTCLK : in std_logic;
     SLOWCLK : in std_logic;
 
-    GA  : in std_logic_vector(5 downto 0);
-    ADR : in std_logic_vector(23 downto 1);
-    AM  : in std_logic_vector(5 downto 0);
+    GAP     : in std_logic;
+    GA      : in std_logic_vector(4 downto 0);
+    ADR     : in std_logic_vector(23 downto 1);
+    AM      : in std_logic_vector(5 downto 0);
 
     AS      : in std_logic;
     DS0     : in std_logic;
@@ -107,7 +108,7 @@ begin  --Architecture
   DOE_B     <= TIMER(7);
 
   -- Generate VALIDGA
-  CGA     <= not GA;
+  CGA     <= (not GAP) & (not GA);
   VALIDGA <= '1' when ((CGA(0) xor CGA(1) xor CGA(2) xor CGA(3) xor CGA(4) xor CGA(5)) = '1') else '0';
 
   -- Generate OLDCRATE / Generate AMS / Generate VALIDAM / Generate GOODAM / Generate FASTCLK_NOT
