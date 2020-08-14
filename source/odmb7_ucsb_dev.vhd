@@ -181,6 +181,7 @@ architecture Behavioral of ODMB7_UCSB_DEV is
   --------------------------------------
   -- signal cmd_adrs     : std_logic_vector (15 downto 0);
   signal vme_dir_b    : std_logic;
+  signal vme_dir      : std_logic;
   signal vme_data_out_buf, vme_data_in_buf : std_logic_vector(15 downto 0) := (others => '0');
 
   --------------------------------------
@@ -234,6 +235,7 @@ begin
 
   -- Handle VME data direction line
   KUS_VME_DIR_B <= vme_dir_b;
+  vme_dir <= not vme_dir_b;
 
   -- multiplex vme_data_in and out lines together
   -- can't have internal IOBUFs on KCU
@@ -243,11 +245,12 @@ begin
   end generate vme_data_kcu_i;
   --real board/simulation can have IOBUFs
   vme_data_simulation_i : if in_simulation generate
-    GEN_15 : for I in 0 to 15 generate
-    begin
-      VME_BUF : IOBUF port map(O => vme_data_in_buf(I), IO => VME_DATA(I), I => vme_data_out_buf(I), T => vme_dir_b); 
-    end generate GEN_15;
+   GEN_VMEOUT_16 : for I in 0 to 15 generate
+   begin
+     VME_BUF : IOBUF port map(O => vme_data_in_buf(I), IO => VME_DATA(I), I => vme_data_out_buf(I), T => vme_dir_b); 
+   end generate GEN_VMEOUT_16;
   end generate vme_data_simulation_i;
+  
 
   -------------------------------------------------------------------------------------------
   -- Handle PPIB/DCFEB signals

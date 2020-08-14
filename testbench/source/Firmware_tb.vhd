@@ -121,7 +121,7 @@ architecture Behavioral of Firmware_tb is
   constant bw_output : integer := 20;
   constant bw_fifo   : integer := 18;
   constant bw_count  : integer := 16;
-  constant bw_wait   : integer := 9;
+  constant bw_wait   : integer := 10;
   constant nclksrun  : integer := 2048;
   -- Counters
   signal waitCounter  : unsigned(bw_wait-1 downto 0) := (others=> '0');
@@ -158,6 +158,7 @@ architecture Behavioral of Firmware_tb is
   signal vme_sysfail : std_logic := '0';
   signal vme_clk_b   : std_logic := '0';
   signal vme_oe_b    : std_logic := '0';
+  signal kus_vme_oe_b : std_logic := '0';
   signal vme_dir_b   : std_logic := '0';
   signal vme_data_io_in   : std_logic_vector(15 downto 0) := (others => '0');
   signal vme_data_io_out  : std_logic_vector (15 downto 0) := (others => '0');
@@ -260,24 +261,22 @@ begin
 
   i_ila : ila
   port map(
-    clk => sysclkQuad,   -- to use the fastest clock here
+    clk => sysclk,   -- everything is clocked on 40 MHz or slower so to maximize useful buffer size use 40 MHz
     probe0 => trig0,
     probe1 => data
   );
-  trig0(63 downto 48) <= cmddev;
-  trig0(34) <= dl_jtag_tms;
-  trig0(33) <= dl_jtag_tdi;
-  trig0(32) <= dl_jtag_tdo(2);
-  trig0(31 downto 16) <= vme_data_in;
-  trig0(15 downto 0) <= vme_data_io_out;
-  data(81 downto 64) <= diagout;
-  data(63 downto 48) <= vme_data_in;
+  trig0(47 downto 32) <= vme_data_io_out;
+  trig0(31 downto 16) <= vme_data_io_in;
+  trig0(15 downto 0) <= cmddev;
+  --
+  data(79 downto 64) <= vme_data_io_out;
+  data(63 downto 48) <= vme_data_io_in;
   data(47 downto 32) <= cmddev;
-  data(19) <= dl_jtag_tck(2);
-  data(18) <= dl_jtag_tms;
-  data(17) <= dl_jtag_tdi;
-  data(16) <= dl_jtag_tdo(2);
-  data(15 downto 0) <= vme_data_io_out;
+  data(21) <= dl_jtag_tck(2);
+  data(20) <= dl_jtag_tms;
+  data(19) <= dl_jtag_tdi;
+  data(18) <= dl_jtag_tdo(2);
+  data(17 downto 0) <= diagout;
 
   -- Input LUTs
   lut_input1_i: lut_input1
@@ -323,7 +322,7 @@ begin
         if waitCounter = 0  then
           if cack = '1' then
             inputCounter <= inputCounter + 1;
-            waitCounter <= "100000000";
+            waitCounter <= "1000000000";
             -- Initalize lut_input_addr_s
             if inputCounter = 0 then
               lut_input_addr1_s <= to_unsigned(0,bw_addr);
@@ -436,7 +435,7 @@ begin
     VME_SYSFAIL_B  => vme_sysfail,
     VME_DTACK_KUS_B => vme_dtack,
     VME_CLK_B       => vme_clk_b,
-    KUS_VME_OE_B    => vme_oe_b,
+    KUS_VME_OE_B    => kus_vme_oe_b,
     KUS_VME_DIR_B   => vme_dir_b,
     DIAGOUT        => diagout,
     DCFEB_TCK_P     => dcfeb_tck_p,
