@@ -167,6 +167,11 @@ architecture Behavioral of ODMB7_UCSB_DEV is
       --------------------
       OTMB_TX : in  std_logic_vector(48 downto 0);
       OTMB_RX : out std_logic_vector(5 downto 0);
+      
+      --------------------
+      -- VMEMON Configuration signals for top level
+      --------------------
+      FW_RESET             : out std_logic;
 
       --------------------
       -- Other
@@ -215,6 +220,18 @@ architecture Behavioral of ODMB7_UCSB_DEV is
   signal dcfeb_initjtag : std_logic := '0';
   signal dcfeb_initjtag_d : std_logic := '0';
   signal dcfeb_initjtag_dd : std_logic := '0';
+  
+  --------------------------------------
+  -- Internal configuration signals
+  --------------------------------------
+
+  --------------------------------------
+  -- Reset signals
+  --------------------------------------
+  signal fw_reset, fw_reset_q : std_logic := '0';
+  signal ccb_softrst_b_q : std_logic := '1'; --no CCB currently
+  signal fw_rst_reg : std_logic_vector(31 downto 0) := (others => '0');
+  signal reset : std_logic := '0';
 
 begin
 
@@ -280,10 +297,6 @@ begin
   end generate cfebjtag_simulation_i;
 
   -- FSM to handle initialization when DONE received from DCFEBs
-  -- pon used to be generated from pll lock, may have to revert
-  pon_rst_reg    <= pon_rst_reg(30 downto 0) & '0' when rising_edge(clk40) else
-                    pon_rst_reg;
-  pon_reset <= pon_rst_reg(31);
   -- Generate dcfeb_initjtag
   done_fsm_regs : process (done_next_state, pon_reset, CLK10)
   begin
@@ -350,6 +363,30 @@ begin
   DS_DCFEB_INITJTAG    : DELAY_SIGNAL generic map(240) port map(DOUT => dcfeb_initjtag_d, CLK => CLK40, NCYCLES => 240, DIN => dcfeb_initjtag_dd);
   PULSE_DCFEB_INITJTAG : NPULSE2FAST port map(DOUT => dcfeb_initjtag, CLK_DOUT => CLK40, RST => '0', NPULSE => 5, DIN => dcfeb_initjtag_d);
 
+  -------------------------------------------------------------------------------------------
+  -- Handle Internal configuration signals
+  -------------------------------------------------------------------------------------------
+
+  -------------------------------------------------------------------------------------------
+  -- Handle reset signals
+  -------------------------------------------------------------------------------------------
+
+  --need flip flop, ultrascale only has fancy ones like FDXE
+  FDRE_FW_RESET : FDRE port map (Q => fw_reset_q, C => CLK40, CE => '1', R => '0', D => fw_reset);
+  fw_rst_reg <= x"3FFFF000" when ((fw_reset_q = '0' and fw_reset = '1') or ccb_softrst_b_q = '0') else
+                  fw_rst_reg(30 downto 0) & '0' when rising_edge(clk40) else
+                  fw_rst_reg;
+  reset <= fw_rst_reg(31) or pon_rst_reg(31) or RST;
+  -- original: reset <= fw_rst_reg(31) or pon_rst_reg(31) or not pb0_q;
+  -- pon_rst_reg used to be reset from pll lock
+  pon_rst_reg    <= pon_rst_reg(30 downto 0) & '0' when rising_edge(clk40) else
+                    pon_rst_reg;
+  pon_reset <= pon_rst_reg(31);
+
+  -------------------------------------------------------------------------------------------
+  -- Sub-modules
+  -------------------------------------------------------------------------------------------
+  
   i_odmb_vme : ODMB_VME
     generic map (
       NCFEB => NCFEB
@@ -402,9 +439,11 @@ begin
 
       OTMB_TX  => OTMB_TX,
       OTMB_RX  => OTMB_RX,
+      
+      FW_RESET => fw_reset,
 
       DIAGOUT  => DIAGOUT,
-      RST      => RST
+      RST      => reset
       );
 
 end Behavioral;

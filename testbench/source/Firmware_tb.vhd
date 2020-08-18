@@ -92,7 +92,7 @@ architecture Behavioral of Firmware_tb is
 
   -- LUT constents
   constant bw_addr   : integer := 4;
-  constant bw_addr_entries : integer := 9;
+  constant bw_addr_entries : integer := 16;
   constant bw_input1 : integer := 16;
   constant bw_input2 : integer := 16;
   component lut_input1 is
@@ -371,7 +371,7 @@ begin
 
   --aVME signal management
   rstn <= not rst_global;
-  vc_cmd <= '1' when (cmddev(15 downto 12) = x"1" or cmddev(15 downto 12) = x"4") else '0';
+  vc_cmd <= '1' when (cmddev(15 downto 12) = x"1" or cmddev(15 downto 12) = x"4" or cmddev(15 downto 12) = x"3") else '0';
   vc_addr <= x"A8" & cmddev(15 downto 1);
   vc_rd <=  '1' when vme_data_in = x"2EAD" else '0';
 

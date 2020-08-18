@@ -104,6 +104,11 @@ entity ODMB_VME is
     OTMB_RX : out std_logic_vector(5 downto 0);
 
     --------------------
+    -- VMEMON Configuration signals for top level
+    --------------------
+    FW_RESET             : out std_logic;
+
+    --------------------
     -- Other
     --------------------
     DIAGOUT     : out std_logic_vector (17 downto 0); -- for debugging
@@ -150,6 +155,52 @@ architecture Behavioral of ODMB_VME is
       FEBTDO    : in  std_logic_vector(NCFEB downto 1);
       DIAGOUT   : out std_logic_vector(17 downto 0);
       LED       : out std_logic
+      );
+  end component;
+
+  component VMEMON is
+    generic (
+      NCFEB   : integer range 1 to 7 := NCFEB
+      );    
+    port (
+      SLOWCLK : in std_logic;
+      CLK40   : in std_logic;
+      RST     : in std_logic;
+
+      DEVICE  : in std_logic;
+      STROBE  : in std_logic;
+      COMMAND : in std_logic_vector(9 downto 0);
+      WRITER  : in std_logic;
+
+      INDATA  : in  std_logic_vector(15 downto 0);
+      OUTDATA : out std_logic_vector(15 downto 0);
+
+      DTACK : out std_logic;
+
+      DCFEB_DONE  : in std_logic_vector(NCFEB downto 1);
+      QPLL_LOCKED : in std_logic;
+
+      OPT_RESET_PULSE : out std_logic;
+      L1A_RESET_PULSE : out std_logic;
+      FW_RESET        : out std_logic;
+      REPROG_B        : out std_logic;
+      TEST_INJ        : out std_logic;
+      TEST_PLS        : out std_logic;
+      TEST_PED        : out std_logic;
+      TEST_BC0        : out std_logic;
+      TEST_LCT        : out std_logic;
+      OTMB_LCT_RQST   : out std_logic;
+      OTMB_EXT_TRIG   : out std_logic;
+
+      MASK_L1A      : out std_logic_vector(NCFEB downto 0);
+      MASK_PLS      : out std_logic;
+      TP_SEL        : out std_logic_vector(15 downto 0);
+      MAX_WORDS_DCFEB        : out std_logic_vector(15 downto 0);
+      ODMB_CTRL     : out std_logic_vector(15 downto 0);
+      ODMB_DATA_SEL : out std_logic_vector(7 downto 0);
+      ODMB_DATA     : in  std_logic_vector(15 downto 0);
+      TXDIFFCTRL    : out std_logic_vector(3 downto 0);  -- Controls the TX voltage swing
+      LOOPBACK      : out std_logic_vector(2 downto 0)  -- For internal loopback tests
       );
   end component;
 
@@ -287,6 +338,48 @@ begin
 
       DIAGOUT => open,
       LED     => led_cfebjtag
+      );
+
+    DEV3_VMEMON : VMEMON
+    generic map (NCFEB => NCFEB)
+    port map (
+      SLOWCLK => clk2p5,
+      CLK40   => clk40,
+      RST     => rst,
+
+      DEVICE  => device(3),
+      STROBE  => strobe,
+      COMMAND => cmd,
+      WRITER  => vme_write_b,
+
+      INDATA  => vme_data_in,
+      OUTDATA => dev_outdata(3),
+      DTACK => dtack_dev(3),
+
+      DCFEB_DONE  => dcfeb_done,
+      QPLL_LOCKED => '1',
+
+      OPT_RESET_PULSE => open,
+      L1A_RESET_PULSE => open,
+      FW_RESET        => FW_RESET,
+      REPROG_B        => open,
+      TEST_INJ        => open,
+      TEST_PLS        => open,
+      TEST_PED        => open,
+      TEST_BC0        => open,
+      TEST_LCT        => open,
+      OTMB_LCT_RQST   => open,
+      OTMB_EXT_TRIG   => open,
+
+      MASK_PLS      => open,
+      MASK_L1A      => open,
+      TP_SEL        => open,
+      MAX_WORDS_DCFEB => open,
+      ODMB_CTRL     => open,
+      ODMB_DATA_SEL => open,
+      ODMB_DATA     => x"0000",
+      TXDIFFCTRL    => open,      -- Controls the TX voltage swing
+      LOOPBACK      => open         -- For internal loopback tests
       );
 
   COMMAND_PM : COMMAND_MODULE
