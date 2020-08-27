@@ -3,7 +3,10 @@
 library ieee;
 library unisim;
 use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
 use unisim.vcomponents.all;
+
+use work.Firmware_pkg.all;     -- for switch between sim and synthesis
 
 entity dcfeb_v6 is
   generic (
@@ -21,7 +24,7 @@ entity dcfeb_v6 is
     dcfeb_dv      : out std_logic;
     dcfeb_data    : out std_logic_vector(15 downto 0);
     adc_mask      : out std_logic_vector(11 downto 0);
-    dcfeb_fsel    : out std_logic_vector(32 downto 0);
+    dcfeb_fsel    : out std_logic_vector(63 downto 0);
     dcfeb_jtag_ir : out std_logic_vector(9 downto 0);
     trst          : in  std_logic;
     tck           : in  std_logic;
@@ -29,7 +32,10 @@ entity dcfeb_v6 is
     tdi           : in  std_logic;
     tdo           : out std_logic;
     rtn_shft_en   : out std_logic;
-    done          : out std_logic);
+    done          : out std_logic;
+    INJPLS        : in std_logic;
+    EXTPLS        : in std_logic;
+    RESYNC        : in std_logic);
 end dcfeb_v6;
 
 
@@ -55,7 +61,8 @@ architecture dcfeb_v6_arch of dcfeb_v6 is
     port(
       TDO_0C : in  std_ulogic;
       TDO_17 : in  std_ulogic;
-      FSEL   : in  std_logic_vector(32 downto 0);
+      TDO_3B3C : in std_ulogic;
+      FSEL   : in  std_logic_vector(63 downto 0);
       TDO    : out std_ulogic
       );
   end component;
@@ -104,7 +111,7 @@ architecture dcfeb_v6_arch of dcfeb_v6 is
       SHIFT  : in  std_ulogic;
       RST    : in  std_ulogic;
       CLR    : in  std_ulogic;
-      F      : out std_logic_vector (32 downto 0);
+      F      : out std_logic_vector (63 downto 0);
       TDO    : out std_ulogic
       );
   end component;
@@ -148,24 +155,69 @@ architecture dcfeb_v6_arch of dcfeb_v6 is
       TDO     : out std_ulogic
       );      
   end component;
+  
+  component user_counter_reg is
+  port(
+    DRCK : in std_logic;      --Data Reg Clock
+    FSEL_3B : in std_logic;   --3B (INJPLS counter) function select
+    FSEL_3C : in std_logic;   --3C (EXTPLS counter) function select
+    SEL : in std_logic;       --User mode active
+    TDI : in std_logic;       --JTAG serial test data in
+    SHIFT : in std_logic;     --Indicates JTAG (Data Register) shift state
+    CAPTURE : in std_logic;   --Indicates JTAG (Data Register) capture state
+    RST : in std_logic;       --Reset default state
+    INJPLS_COUNTER : in unsigned(11 downto 0); --INJPLS counter
+    EXTPLS_COUNTER : in unsigned(11 downto 0); --EXTPLS counter
+    TDO : out std_logic      --Serial test data out
+    );
+  end component;
 
 
-  signal fsel                                           : std_logic_vector(32 downto 0);
+
+  signal fsel                                           : std_logic_vector(63 downto 0);
   signal bpi_status                                     : std_logic_vector(15 downto 0);
   signal int_adc_mask                                   : std_logic_vector(11 downto 0);
   signal drck1, sel1, reset1, shift1, capture1, update1 : std_logic;
   signal drck2, sel2, reset2, shift2, capture2, update2 : std_logic;
-  signal tdo_f0c, tdo_f17                               : std_logic;
+  signal tdo_f0c, tdo_f17, tdo_f3b3c                    : std_logic;
   signal tdo1                                           : std_logic;
   signal tdo2                                           : std_logic;
   signal tdo3                                           : std_logic := '0';
   signal tdo4                                           : std_logic := '0';
 
+  --signals for counting pulses
+  signal injpls_prev, extpls_prev       : std_logic := '0';
+  signal injpls_counter, extpls_counter : unsigned(11 downto 0) := (others=>'0');
+
 begin
 
   dcfeb_fsel <= fsel;
-  done <= '1'; --always configured -mo
+  done <= '1'; 
+  --always configured
 
+  --handle pulse inputs in top level
+  --on KCU, just use P lines as signals
+ 
+  --count pulses
+  pulse_counter : process (RESYNC, CLK, injpls, extpls)
+  begin
+    if RESYNC'event and RESYNC='1' then
+      injpls_counter <= x"000";
+      extpls_counter <= x"000";
+    end if;
+    if CLK'event and CLK='1' then
+      if injpls='1' and injpls_prev='0' then
+        injpls_counter <= injpls_counter + 1;
+      end if;
+      if extpls='1' and extpls_prev='0' then
+        extpls_counter <= extpls_counter + 1;
+      end if;
+      injpls_prev <= injpls;
+      extpls_prev <= extpls;
+    end if;
+  end process;
+
+  --currently not using data-generation functionality
 --  PMAP_dcfeb_data_gen : dcfeb_data_gen
 --    port map(
 --      clk          => clk,
@@ -234,6 +286,7 @@ begin
 
       TDO_0C => tdo_f0c,                -- in
       TDO_17 => tdo_f17,                -- in
+      TDO_3B3C => tdo_f3b3c,
       FSEL   => fsel,
       TDO    => tdo2
       );
@@ -285,6 +338,21 @@ begin
       PI      => bpi_status,            -- in
       TDO     => tdo_f17                -- in
       );      
+
+  PMAP_COUNTERS : user_counter_reg
+  port map (
+    DRCK      => drck2,
+    FSEL_3B   => fsel(59),
+    FSEL_3C   => fsel(60),
+    SEL       => sel2,
+    TDI       => TDI,
+    SHIFT     => shift2,
+    CAPTURE   => capture2,
+    RST       => reset2,
+    INJPLS_COUNTER => injpls_counter,
+    EXTPLS_COUNTER => extpls_counter,
+    TDO       => tdo_f3b3c
+    );
 
 
 end dcfeb_v6_arch;

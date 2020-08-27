@@ -107,6 +107,22 @@ entity ODMB_VME is
     -- VMEMON Configuration signals for top level
     --------------------
     FW_RESET             : out std_logic;
+    L1A_RESET_PULSE      : out std_logic;
+    TEST_INJ             : out std_logic;
+    TEST_PLS             : out std_logic;
+    TEST_PED             : out std_logic;
+    MASK_PLS             : out std_logic;
+    ODMB_DATA            : in std_logic_vector(15 downto 0);
+    ODMB_DATA_SEL        : out std_logic_vector(7 downto 0);
+
+    --------------------
+    -- VMECONFREGS Configuration signals for top level
+    --------------------
+    LCT_L1A_DLY          : out std_logic_vector(5 downto 0);
+    INJ_DLY              : out std_logic_vector(4 downto 0);
+    EXT_DLY              : out std_logic_vector(4 downto 0);
+    CALLCT_DLY           : out std_logic_vector(3 downto 0);
+    CABLE_DLY            : out integer range 0 to 1;
 
     --------------------
     -- Other
@@ -122,12 +138,17 @@ architecture Behavioral of ODMB_VME is
 
   component CONFREGS_DUMMY is
     port (
-      SLOWCLK   : in std_logic;
-      DEVICE    : in std_logic;
-      STROBE    : in std_logic;
-      COMMAND   : in std_logic_vector(9 downto 0);
-      OUTDATA   : inout std_logic_vector(15 downto 0);
-      DTACK     : out std_logic
+      SLOWCLK              : in std_logic;
+      DEVICE               : in std_logic;
+      STROBE               : in std_logic;
+      COMMAND              : in std_logic_vector(9 downto 0);
+      OUTDATA              : inout std_logic_vector(15 downto 0);
+      DTACK                : out std_logic;
+      LCT_L1A_DLY          : out std_logic_vector(5 downto 0);
+      INJ_DLY              : out std_logic_vector(4 downto 0);
+      EXT_DLY              : out std_logic_vector(4 downto 0);
+      CALLCT_DLY           : out std_logic_vector(3 downto 0);
+      CABLE_DLY            : out integer range 0 to 1
     );
   end component;
 
@@ -309,7 +330,12 @@ begin
           STROBE  => strobe,
           COMMAND => cmd,
           OUTDATA => dev_outdata(4),
-          DTACK => dtack_dev(4)
+          DTACK => dtack_dev(4),
+          LCT_L1A_DLY => LCT_L1A_DLY,
+          INJ_DLY => INJ_DLY, 
+          EXT_DLY => EXT_DLY, 
+          CALLCT_DLY => CALLCT_DLY,
+          CABLE_DLY => CABLE_DLY
     );
 
   DEV1_CFEBJTAG : CFEBJTAG
@@ -360,24 +386,24 @@ begin
       QPLL_LOCKED => '1',
 
       OPT_RESET_PULSE => open,
-      L1A_RESET_PULSE => open,
+      L1A_RESET_PULSE => L1A_RESET_PULSE,
       FW_RESET        => FW_RESET,
       REPROG_B        => open,
-      TEST_INJ        => open,
-      TEST_PLS        => open,
-      TEST_PED        => open,
+      TEST_INJ        => TEST_INJ,
+      TEST_PLS        => TEST_PLS,
+      TEST_PED        => TEST_PED,
       TEST_BC0        => open,
       TEST_LCT        => open,
       OTMB_LCT_RQST   => open,
       OTMB_EXT_TRIG   => open,
 
-      MASK_PLS      => open,
+      MASK_PLS      => MASK_PLS,
       MASK_L1A      => open,
       TP_SEL        => open,
       MAX_WORDS_DCFEB => open,
       ODMB_CTRL     => open,
-      ODMB_DATA_SEL => open,
-      ODMB_DATA     => x"0000",
+      ODMB_DATA_SEL => ODMB_DATA_SEL,
+      ODMB_DATA     => ODMB_DATA,
       TXDIFFCTRL    => open,      -- Controls the TX voltage swing
       LOOPBACK      => open         -- For internal loopback tests
       );

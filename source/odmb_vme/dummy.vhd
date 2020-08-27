@@ -9,12 +9,17 @@ use work.ucsb_types.all;
 
 entity CONFREGS_DUMMY is
   port (
-    SLOWCLK : in std_logic;
-    DEVICE  : in std_logic;
-    STROBE  : in std_logic;
-    COMMAND : in std_logic_vector(9 downto 0);
-    OUTDATA : out std_logic_vector(15 downto 0);
-    DTACK   : out std_logic
+    SLOWCLK              : in std_logic;
+    DEVICE               : in std_logic;
+    STROBE               : in std_logic;
+    COMMAND              : in std_logic_vector(9 downto 0);
+    OUTDATA              : out std_logic_vector(15 downto 0);
+    DTACK                : out std_logic;
+    LCT_L1A_DLY          : out std_logic_vector(5 downto 0);
+    INJ_DLY              : out std_logic_vector(4 downto 0);
+    EXT_DLY              : out std_logic_vector(4 downto 0);
+    CALLCT_DLY           : out std_logic_vector(3 downto 0);
+    CABLE_DLY            : out integer range 0 to 1
     );
 end CONFREGS_DUMMY;
 
@@ -35,5 +40,11 @@ begin
   d_dtack <= '1' when (read_output = '1') else '0';
   FD_dtack : FD port map(D => d_dtack, C => SLOWCLK, Q => DTACK);
 
+  --hardwire DLY registers
+  LCT_L1A_DLY <= "011001";
+  INJ_DLY <= "01000"; --what is normal value?
+  EXT_DLY <= "01000"; --what is normal value?
+  CALLCT_DLY <= "0100"; --what is normal value?
+  CABLE_DLY <= 1; --what is normal value?
 
 end CONFREGS_DUMMY_Arch;

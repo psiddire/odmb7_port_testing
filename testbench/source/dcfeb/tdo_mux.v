@@ -55,14 +55,18 @@
 module tdo_mux(
   input TDO_0C,
   input TDO_17,
-  input [32:0] FSEL,
+  input TDO_3B3C,
+  input [63:0] FSEL,
   output reg TDO);
 
   
-  always @(TDO_0C or TDO_17 or FSEL)
+  always @(TDO_0C or TDO_17 or TDO_3B3C or FSEL)
 		 case (FSEL)
-		    33'h000001000: TDO <= TDO_0C;
-		    33'h000800000: TDO <= TDO_17;
+		    64'h0000000000001000: TDO <= TDO_0C;
+		    64'h0000000000800000: TDO <= TDO_17;
+            64'h0800000000000000: TDO <= TDO_3B3C;
+            64'h1000000000000000: TDO <= TDO_3B3C;
+                    
 		    default: TDO <= 1'b0;
 		 endcase
   

@@ -19,12 +19,12 @@ end PULSE2FAST;
 
 architecture PULSE2FAST_Arch of PULSE2FAST is
   signal pulse0 : std_logic; -- Separated from 1/2 to avoid warning "signal has no load"
-  signal pulse : std_logic_vector(1 to 2);
+  signal pulse : std_logic_vector(2 downto 1);
 begin
 
-  FD0 : FDC generic map(INIT => '1') port map(pulse0, CLK_DOUT, RST, DIN);
-  FD1 : FDC generic map(INIT => '1') port map(pulse(1), CLK_DOUT, RST, pulse0);
-  FD2 : FDC generic map(INIT => '1') port map(pulse(2), CLK_DOUT, RST, pulse(1));
+  FD0 : FDC generic map(INIT => '1') port map(Q => pulse0, C => CLK_DOUT, CLR => RST, D => DIN);
+  FD1 : FDC generic map(INIT => '1') port map(Q => pulse(1), C => CLK_DOUT, CLR => RST, D => pulse0);
+  FD2 : FDC generic map(INIT => '1') port map(Q => pulse(2), C => CLK_DOUT, CLR => RST, D => pulse(1));
 
   DOUT <= pulse(1) and not pulse(2);
   

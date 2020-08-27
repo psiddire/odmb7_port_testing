@@ -49,7 +49,7 @@ architecture Behavioral of Firmware_tb is
       DCFEB_DV      : out std_logic;
       DCFEB_DATA    : out std_logic_vector(15 downto 0);
       ADC_MASK      : out std_logic_vector(11 downto 0);
-      DCFEB_FSEL    : out std_logic_vector(32 downto 0);
+      DCFEB_FSEL    : out std_logic_vector(63 downto 0);
       DCFEB_JTAG_IR : out std_logic_vector(9 downto 0);
       TRST          : in  std_logic;
       TCK           : in  std_logic;
@@ -57,7 +57,10 @@ architecture Behavioral of Firmware_tb is
       TDI           : in  std_logic;
       RTN_SHFT_EN   : out std_logic;
       TDO           : out std_logic;
-      DONE          : out std_logic
+      DONE          : out std_logic;
+      INJPLS        : in std_logic;
+      EXTPLS        : in std_logic;
+      RESYNC        : in std_logic
    );
    end component;
    component vme_master is
@@ -181,6 +184,15 @@ architecture Behavioral of Firmware_tb is
   signal dcfeb_tdi_n    : std_logic := '0';
   signal dcfeb_tdo_p    : std_logic_vector (NCFEB downto 1)  := (others => '0');
   signal dcfeb_tdo_n    : std_logic_vector (NCFEB downto 1)  := (others => '0');
+  signal injpls         : std_logic := '0';
+  signal injpls_p       : std_logic := '0';
+  signal injpls_n       : std_logic := '0';
+  signal extpls         : std_logic := '0'; 
+  signal extpls_p       : std_logic := '0';
+  signal extpls_n       : std_logic := '0';
+  signal dcfeb_resync   : std_logic := '0';
+  signal resync_p       : std_logic := '0';
+  signal resync_n       : std_logic := '0';
   -- signal dcfeb_tdo_t    : std_logic_vector (NCFEB downto 1)  := (others => '0');
 
   signal dcfeb_done       : std_logic_vector (NCFEB downto 1) := (others => '0');
@@ -395,6 +407,9 @@ begin
   cfebjtag_conn_simulation_i : if in_simulation generate
     IB_DCFEB_TMS: IBUFDS port map (O => dl_jtag_tms, I => dcfeb_tms_p, IB => dcfeb_tms_n);
     IB_DCFEB_TDI: IBUFDS port map (O => dl_jtag_tdi, I => dcfeb_tdi_p, IB => dcfeb_tdi_n);
+    IB_DCFEB_INJPLS: IBUFDS port map (O => injpls, I => injpls_p, IB => injpls_n);
+    IB_DCFEB_EXTPLS: IBUFDS port map (O => extpls, I => extpls_p, IB => extpls_n);
+    IB_DCFEB_RESYNC: IBUFDS port map (O => dcfeb_resync, I => resync_p, IB => resync_n);
     GEN_DCFEB_7 : for I in 1 to NCFEB generate
     begin
       IB_DCFEB_TCK: IBUFDS port map (O => dl_jtag_tck(I), I => dcfeb_tck_p(I), IB => dcfeb_tck_n(I));
@@ -410,13 +425,18 @@ begin
     dl_jtag_tck <= dcfeb_tck_p;
     dcfeb_tdo_p <= dl_jtag_tdo;
     dcfeb_tdo_n <= (others => '0');
+    injpls <= injpls_p;
+    extpls <= extpls_p;
+    dcfeb_resync <= resync_p;
   end generate cfebjtag_conn_kcu_i;
+  
 
   -- ODMB Firmware module
   odmb_i: entity work.ODMB7_UCSB_DEV
   port map(
     -- Clock
     CLK160         => sysclkQuad,
+    CLK80          => sysclkDouble,
     CLK40          => sysclk,
     CLK10          => sysclkQuarter,
     RST            => rst_global,
@@ -447,6 +467,12 @@ begin
     DCFEB_TDO_P     => dcfeb_tdo_p,
     DCFEB_TDO_N     => dcfeb_tdo_n,
     DCFEB_DONE      => dcfeb_done,
+    RESYNC_P        => resync_p,
+    RESYNC_N        => resync_n,
+    INJPLS_P        => injpls_p,
+    INJPLS_N        => injpls_n,
+    EXTPLS_P        => extpls_p,
+    EXTPLS_N        => extpls_n,
     LVMB_PON        => lvmb_pon,
     PON_LOAD        => pon_load,
     PON_OE_B        => pon_oe_B,
@@ -471,9 +497,9 @@ begin
   -- DCFEB simulation
   dcfeb_i: dcfeb_v6
   port map (
-    CLK             => '0',             -- not needed for JTAG communication
-    DCFEBCLK        => '0',
-    RST             => '0',
+    CLK             => sysclk,  
+    DCFEBCLK        => sysclkQuad,
+    RST             => rst_global,
     L1A             => '0',
     L1A_MATCH       => '0',
     TX_ACK          => '0',
@@ -489,7 +515,10 @@ begin
     TDI             => dl_jtag_tdi,     -- between ODMB and DCFEB (through PPIB)
     TDO             => dl_jtag_tdo(2),  -- between ODMB and DCFEB (through PPIB)
     RTN_SHFT_EN     => open,
-    DONE            => dcfeb_done(2)
+    DONE            => dcfeb_done(2),
+    INJPLS          => injpls,
+    EXTPLS          => extpls,
+    RESYNC          => dcfeb_resync
   );
   
   -- VME simulation
