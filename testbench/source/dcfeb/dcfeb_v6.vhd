@@ -35,6 +35,7 @@ entity dcfeb_v6 is
     done          : out std_logic;
     INJPLS        : in std_logic;
     EXTPLS        : in std_logic;
+    BC0           : in std_logic;
     RESYNC        : in std_logic);
 end dcfeb_v6;
 
@@ -159,8 +160,10 @@ architecture dcfeb_v6_arch of dcfeb_v6 is
   component user_counter_reg is
   port(
     DRCK : in std_logic;      --Data Reg Clock
+    FSEL_3A : in std_logic;   --3A (L1AMATCH counter) function select
     FSEL_3B : in std_logic;   --3B (INJPLS counter) function select
     FSEL_3C : in std_logic;   --3C (EXTPLS counter) function select
+    FSEL_3D : in std_logic;   --3D (BC0 counter) function select
     SEL : in std_logic;       --User mode active
     TDI : in std_logic;       --JTAG serial test data in
     SHIFT : in std_logic;     --Indicates JTAG (Data Register) shift state
@@ -168,6 +171,8 @@ architecture dcfeb_v6_arch of dcfeb_v6 is
     RST : in std_logic;       --Reset default state
     INJPLS_COUNTER : in unsigned(11 downto 0); --INJPLS counter
     EXTPLS_COUNTER : in unsigned(11 downto 0); --EXTPLS counter
+    BC0_COUNTER : in unsigned(11 downto 0); --BC0 counter
+    L1A_MATCH_COUNTER : in unsigned(11 downto 0); --L1A MATCH counter
     TDO : out std_logic      --Serial test data out
     );
   end component;
@@ -179,7 +184,7 @@ architecture dcfeb_v6_arch of dcfeb_v6 is
   signal int_adc_mask                                   : std_logic_vector(11 downto 0);
   signal drck1, sel1, reset1, shift1, capture1, update1 : std_logic;
   signal drck2, sel2, reset2, shift2, capture2, update2 : std_logic;
-  signal tdo_f0c, tdo_f17, tdo_f3b3c                    : std_logic;
+  signal tdo_f0c, tdo_f17, tdo_f3a3b3c3d                : std_logic;
   signal tdo1                                           : std_logic;
   signal tdo2                                           : std_logic;
   signal tdo3                                           : std_logic := '0';
@@ -187,7 +192,7 @@ architecture dcfeb_v6_arch of dcfeb_v6 is
 
   --signals for counting pulses
   signal injpls_prev, extpls_prev       : std_logic := '0';
-  signal injpls_counter, extpls_counter : unsigned(11 downto 0) := (others=>'0');
+  signal injpls_counter, extpls_counter, bc0_counter, l1a_match_counter : unsigned(11 downto 0) := (others=>'0');
 
 begin
 
@@ -199,22 +204,37 @@ begin
   --on KCU, just use P lines as signals
  
   --count pulses
-  pulse_counter : process (RESYNC, CLK, injpls, extpls)
+  pulse_counter : process (RESYNC, INJPLS, EXTPLS, BC0, L1A_MATCH)
   begin
     if RESYNC'event and RESYNC='1' then
+      l1a_match_counter <= x"000";
       injpls_counter <= x"000";
       extpls_counter <= x"000";
+      bc0_counter <= x"000";
     end if;
-    if CLK'event and CLK='1' then
-      if injpls='1' and injpls_prev='0' then
-        injpls_counter <= injpls_counter + 1;
-      end if;
-      if extpls='1' and extpls_prev='0' then
-        extpls_counter <= extpls_counter + 1;
-      end if;
-      injpls_prev <= injpls;
-      extpls_prev <= extpls;
+    if INJPLS'event and INJPLS='1' then
+      injpls_counter <= injpls_counter + 1;
     end if;
+    if EXTPLS'event and EXTPLS='1' then
+      extpls_counter <= extpls_counter + 1;
+    end if;
+    if BC0'event and BC0='1' then
+      bc0_counter <= bc0_counter + 1;
+    end if;
+    if L1A_MATCH'event and L1A_MATCH='1' then
+      l1a_match_counter <= l1a_match_counter + 1;
+    end if;
+    
+--    if CLK'event and CLK='1' then
+--      if injpls='1' and injpls_prev='0' then
+--        injpls_counter <= injpls_counter + 1;
+--      end if;
+--      if extpls='1' and extpls_prev='0' then
+--        extpls_counter <= extpls_counter + 1;
+--      end if;
+--      injpls_prev <= injpls;
+--      extpls_prev <= extpls;
+--    end if;
   end process;
 
   --currently not using data-generation functionality
@@ -286,7 +306,7 @@ begin
 
       TDO_0C => tdo_f0c,                -- in
       TDO_17 => tdo_f17,                -- in
-      TDO_3B3C => tdo_f3b3c,
+      TDO_3B3C => tdo_f3a3b3c3d,
       FSEL   => fsel,
       TDO    => tdo2
       );
@@ -342,8 +362,10 @@ begin
   PMAP_COUNTERS : user_counter_reg
   port map (
     DRCK      => drck2,
+    FSEL_3A   => fsel(58),
     FSEL_3B   => fsel(59),
     FSEL_3C   => fsel(60),
+    FSEL_3D   => fsel(61),
     SEL       => sel2,
     TDI       => TDI,
     SHIFT     => shift2,
@@ -351,7 +373,9 @@ begin
     RST       => reset2,
     INJPLS_COUNTER => injpls_counter,
     EXTPLS_COUNTER => extpls_counter,
-    TDO       => tdo_f3b3c
+    BC0_COUNTER => bc0_counter,
+    L1A_MATCH_COUNTER => l1a_match_counter,
+    TDO       => tdo_f3a3b3c3d
     );
 
 

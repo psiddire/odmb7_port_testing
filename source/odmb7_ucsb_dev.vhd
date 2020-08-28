@@ -5,12 +5,9 @@ use ieee.std_logic_misc.all;
 
 library unisim;
 use unisim.vcomponents.all;
+
+--library work;
 use work.ucsb_types.all;
-
--- To mimic the behavior of ODMB_VME on the component CFEBJTAG
-
--- library UNISIM;
--- use UNISIM.VComponents.all;
 
 use work.Firmware_pkg.all;     -- for switch between sim and synthesis
 
@@ -59,10 +56,16 @@ entity ODMB7_UCSB_DEV is
     DCFEB_DONE     : in  std_logic_vector(NCFEB downto 1); -- Bank 68
     RESYNC_P       : out std_logic;                        -- Bank 66
     RESYNC_N       : out std_logic;                        -- Bank 66
+    BC0_P          : out std_logic;                        -- Bank 68
+    BC0_N          : out std_logic;                        -- Bank 68
     INJPLS_P       : out std_logic;                        -- Bank 66, ODMB CTRL
     INJPLS_N       : out std_logic;                        -- Bank 66, ODMB CTRL
     EXTPLS_P       : out std_logic;                        -- Bank 66, ODMB CTRL
     EXTPLS_N       : out std_logic;                        -- Bank 66, ODMB CTRL
+    L1A_P          : out std_logic;                        -- Bank 66, ODMB CTRL
+    L1A_N          : out std_logic;                        -- Bank 66, ODMB CTRL
+    L1A_MATCH_P    : out std_logic_vector(NCFEB downto 1); -- Bank 66, ODMB CTRL
+    L1A_MATCH_N    : out std_logic_vector(NCFEB downto 1); -- Bank 66, ODMB CTRL
 
     LVMB_PON   : out std_logic_vector(7 downto 0);
     PON_LOAD   : out std_logic;
@@ -182,8 +185,12 @@ architecture Behavioral of ODMB7_UCSB_DEV is
       L1A_RESET_PULSE      : out std_logic;
       TEST_INJ             : out std_logic;
       TEST_PLS             : out std_logic;
+      TEST_BC0             : out std_logic;
       TEST_PED             : out std_logic;
+      TEST_LCT             : out std_logic;
+      MASK_L1A             : out std_logic_vector(NCFEB downto 0);
       MASK_PLS             : out std_logic;
+      ODMB_CTRL            : out std_logic_vector(15 downto 0);
       ODMB_DATA            : in std_logic_vector(15 downto 0);
       ODMB_DATA_SEL        : out std_logic_vector(7 downto 0);
 
@@ -229,6 +236,17 @@ architecture Behavioral of ODMB7_UCSB_DEV is
       INJ_DLY       : in std_logic_vector(4 downto 0);
       EXT_DLY       : in std_logic_vector(4 downto 0);
       CALLCT_DLY    : in std_logic_vector(3 downto 0);
+
+      --------------------
+      -- Configuration
+      --------------------
+      CAL_MODE      : in std_logic;
+      PEDESTAL      : in std_logic;
+
+      --------------------
+      -- Triggers
+      --------------------
+      RAW_L1A       : in std_logic;
       
       --------------------
       -- To/From DCFEBs (FF-EMU-MOD)
@@ -243,6 +261,15 @@ architecture Behavioral of ODMB7_UCSB_DEV is
       --------------------
       DIAGOUT     : out std_logic_vector (17 downto 0); -- for debugging
       RST         : in std_logic
+      );
+  end component;
+
+  component LCTDLY is  -- Aligns RAW_LCT with L1A by 2.4 us to 4.8 us
+    port (
+      DIN   : in std_logic;
+      CLK   : in std_logic;
+      DELAY : in std_logic_vector(5 downto 0);
+      DOUT : out std_logic
       );
   end component;
 
@@ -278,7 +305,9 @@ architecture Behavioral of ODMB7_UCSB_DEV is
   signal reset_pulse, reset_pulse_q : std_logic := '0';
   signal l1acnt_rst, l1a_reset_pulse, l1a_reset_pulse_q : std_logic := '0';
   signal premask_injpls, premask_extpls, dcfeb_injpls, dcfeb_extpls : std_logic := '0';
-  signal dcfeb_resync : std_logic := '0';
+  signal test_bc0, pre_bc0, dcfeb_bc0, dcfeb_resync : std_logic := '0';
+  signal dcfeb_l1a, masked_l1a, odmbctrl_l1a : std_logic := '0';
+  signal dcfeb_l1a_match, masked_l1a_match, odmbctrl_l1a_match : std_logic_vector(NCFEB downto 1) := (others => '0');
 
   -- signals to generate dcfeb_initjtag when DCFEBs are done programming
   signal pon_rst_reg : std_logic_vector(31 downto 0) := x"00FFFFFF";
@@ -293,16 +322,24 @@ architecture Behavioral of ODMB7_UCSB_DEV is
   signal dcfeb_initjtag : std_logic := '0';
   signal dcfeb_initjtag_d : std_logic := '0';
   signal dcfeb_initjtag_dd : std_logic := '0';
+
+  --------------------------------------
+  -- Triggers
+  --------------------------------------
+  signal test_lct, test_pb_lct, test_l1a : std_logic := '0';
+  signal raw_l1a : std_logic := '0';
   
   --------------------------------------
   -- Internal configuration signals
   --------------------------------------
   signal mask_pls : std_logic := '0';
+  signal mask_l1a : std_logic_vector(NCFEB downto 0) := (others => '0');
   signal lct_l1a_dly : std_logic_vector(5 downto 0) := (others => '0');
   signal inj_dly : std_logic_vector(4 downto 0) := (others => '0');
   signal ext_dly : std_logic_vector(4 downto 0) := (others => '0');
   signal callct_dly : std_logic_vector(3 downto 0) := (others => '0');
   signal cable_dly : integer range 0 to 1;
+  signal odmb_ctrl_reg : std_logic_vector(15 downto 0) := (others => '0');
 
   --------------------------------------
   -- ODMB VME<->ODMB CTRL signals
@@ -329,6 +366,7 @@ begin
   -- Handle clock synthesizer signals and generate clocks
   -------------------------------------------------------------------------------------------
 
+  -- In first version of test firmware, we will want to generate everything from 40 MHz cms clock, likely with Clock Manager IP
   -- generate 20 and 2p5 clock
   clk20_inv <= not clk20_unbuf;
   clk5_inv <= not clk5_unbuf;
@@ -382,6 +420,12 @@ begin
     EXTPLS_N <= '0';
     RESYNC_P <= dcfeb_resync;
     RESYNC_N <= '0';
+    BC0_P <= dcfeb_bc0;
+    BC0_N <= '0';
+    L1A_P <= dcfeb_l1a;
+    L1A_N <= '0';
+    L1A_MATCH_P <= dcfeb_l1a_match;
+    L1A_MATCH_N <= (others => '0');
     dcfeb_tdo <= DCFEB_TDO_P;
   end generate cfebjtag_kcu_i;
   --real board/simulation has I/OBUFs
@@ -391,10 +435,13 @@ begin
     OB_DCFEB_INJPLS: OBUFDS port map (I => dcfeb_injpls, O => INJPLS_P, OB => INJPLS_N);
     OB_DCFEB_EXTPLS: OBUFDS port map (I => dcfeb_extpls, O => EXTPLS_P, OB => EXTPLS_N);
     OB_DCFEB_RESYNC: OBUFDS port map (I => dcfeb_resync, O => RESYNC_P, OB => RESYNC_N);
+    OB_DCFEB_BC0: OBUFDS port map (I => dcfeb_bc0, O => BC0_P, OB => BC0_N);
+    OB_DCFEB_L1A: OBUFDS port map (I => dcfeb_l1a, O => L1A_P, OB => L1A_N);
     GEN_DCFEBJTAG_7 : for I in 1 to NCFEB generate
     begin
       OB_DCFEB_TCK: OBUFDS port map (I => dcfeb_tck(I), O => DCFEB_TCK_P(I), OB => DCFEB_TCK_N(I));
       IB_DCFEB_TDO: IBUFDS port map (O => dcfeb_tdo(I), I => DCFEB_TDO_P(I), IB => DCFEB_TDO_N(I));
+      OB_DCFEB_L1A_MATCH: OBUFDS port map (I => dcfeb_l1a_match(I), O => L1A_MATCH_P(I), OB => L1A_MATCH_N(I));
     end generate GEN_DCFEBJTAG_7;
   end generate cfebjtag_simulation_i;
 
@@ -402,12 +449,21 @@ begin
   dcfeb_injpls <= '0' when mask_pls = '1' else premask_injpls;
   dcfeb_extpls <= '0' when mask_pls = '1' else premask_extpls;
   
-  --generate RESYNC, BC0, and L1A signals to DCFEBs
+  --generate RESYNC, BC0, L1A, and L1A match signals to DCFEBs
   RESETPULSE : PULSE2SAME port map(DOUT => reset_pulse, CLK_DOUT => clk40, RST => '0', DIN => reset);
   FD_RESETPULSE_Q : FD port map (Q => reset_pulse_q, C => CLK40, D => reset_pulse);
   FD_L1APULSE_Q : FD port map (Q => l1a_reset_pulse_q, C => CLK40, D => l1a_reset_pulse);
   l1acnt_rst <= clk20 and (l1a_reset_pulse or l1a_reset_pulse_q or reset_pulse or reset_pulse_q);
   DS_RESYNC : DELAY_SIGNAL generic map (NCYCLES_MAX => 1) port map (DOUT => dcfeb_resync, CLK => CLK40, NCYCLES => cable_dly, DIN => l1acnt_rst);
+  pre_bc0 <= test_bc0;
+  DS_BC0 : DELAY_SIGNAL generic map (NCYCLES_MAX => 1) port map (DOUT => dcfeb_bc0, CLK => CLK40, NCYCLES => cable_dly, DIN => pre_bc0);
+  masked_l1a <= '0' when mask_l1a(0)='1' else odmbctrl_l1a;
+  DS_L1A : DELAY_SIGNAL generic map (NCYCLES_MAX => 1) port map (DOUT => dcfeb_l1a, CLK => CLK40, NCYCLES => cable_dly, DIN => masked_l1a);
+  GEN_DCFEB_L1A_MATCH : for I in 1 to NCFEB generate
+  begin
+    masked_l1a_match(I) <= '0' when mask_l1a(I)='1' else odmbctrl_l1a_match(I);
+    DS_L1A_MATCH : DELAY_SIGNAL generic map (NCYCLES_MAX => 1) port map (DOUT => dcfeb_l1a_match(I), CLK => CLK40, NCYCLES => cable_dly, DIN => masked_l1a_match(I));
+  end generate GEN_DCFEB_L1A_MATCH;
 
   -- FSM to handle initialization when DONE received from DCFEBs
   -- Generate dcfeb_initjtag
@@ -475,6 +531,14 @@ begin
   --temporarily using clk40 so I don't have to wait an eternity
   DS_DCFEB_INITJTAG    : DELAY_SIGNAL generic map(240) port map(DOUT => dcfeb_initjtag_d, CLK => CLK40, NCYCLES => 240, DIN => dcfeb_initjtag_dd);
   PULSE_DCFEB_INITJTAG : NPULSE2FAST port map(DOUT => dcfeb_initjtag, CLK_DOUT => CLK40, RST => '0', NPULSE => 5, DIN => dcfeb_initjtag_d);
+
+  -------------------------------------------------------------------------------------------
+  -- Handle Triggers
+  -------------------------------------------------------------------------------------------
+
+  test_pb_lct <= test_lct;
+  LCTDLY_GTRG : LCTDLY port map(DIN => test_pb_lct, CLK => CLK40, DELAY => lct_l1a_dly, DOUT => test_l1a);
+  raw_l1a <= test_l1a;
 
   -------------------------------------------------------------------------------------------
   -- Handle Internal configuration signals
@@ -575,8 +639,12 @@ begin
       L1A_RESET_PULSE => l1a_reset_pulse,
       TEST_INJ => test_inj,
       TEST_PLS => test_pls,
+      TEST_BC0 => test_bc0,
       TEST_PED => test_ped,
+      TEST_LCT => test_lct,
+      MASK_L1A => mask_l1a,
       MASK_PLS => mask_pls,
+      ODMB_CTRL => odmb_ctrl_reg,
       ODMB_DATA => odmb_data,
       ODMB_DATA_SEL => odmb_data_sel,
 
@@ -602,6 +670,11 @@ begin
       TEST_CCBPLS => test_pls,
       TEST_CCBPED => test_ped, 
 
+      CAL_MODE => odmb_ctrl_reg(0),
+      PEDESTAL => odmb_ctrl_reg(13),
+
+      RAW_L1A => raw_l1a,
+
       LCT_L1A_DLY => lct_l1a_dly,
       INJ_DLY => inj_dly, 
       EXT_DLY => ext_dly, 
@@ -609,8 +682,8 @@ begin
       
       DCFEB_INJPULSE => premask_injpls,
       DCFEB_EXTPULSE => premask_extpls,
-      DCFEB_L1A => open,                    --TODO: connect this
-      DCFEB_L1A_MATCH => open,              --TODO: connect this
+      DCFEB_L1A => odmbctrl_l1a,                    
+      DCFEB_L1A_MATCH => odmbctrl_l1a_match,        
 
       DIAGOUT => open,
       RST => reset

@@ -14,15 +14,15 @@
       </db_ref>
    </db_ref_list>
    <zoom_setting>
-      <ZoomStartTime time="205830552000fs"></ZoomStartTime>
-      <ZoomEndTime time="206583552001fs"></ZoomEndTime>
-      <Cursor1Time time="206312542000fs"></Cursor1Time>
+      <ZoomStartTime time="113833333333fs"></ZoomStartTime>
+      <ZoomEndTime time="265233333334fs"></ZoomEndTime>
+      <Cursor1Time time="240000000000fs"></Cursor1Time>
    </zoom_setting>
    <column_width_setting>
-      <NameColumnWidth column_width="142"></NameColumnWidth>
+      <NameColumnWidth column_width="138"></NameColumnWidth>
       <ValueColumnWidth column_width="66"></ValueColumnWidth>
    </column_width_setting>
-   <WVObjectSize size="52" />
+   <WVObjectSize size="46" />
    <wave_markers>
       <marker label="" time="669732" />
    </wave_markers>
@@ -114,46 +114,6 @@
       <obj_property name="ElementShortName">clk20</obj_property>
       <obj_property name="ObjectShortName">clk20</obj_property>
    </wvobject>
-   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/reset_pulse">
-      <obj_property name="ElementShortName">reset_pulse</obj_property>
-      <obj_property name="ObjectShortName">reset_pulse</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/reset_pulse_q">
-      <obj_property name="ElementShortName">reset_pulse_q</obj_property>
-      <obj_property name="ObjectShortName">reset_pulse_q</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/i_odmb_vme/DEV3_VMEMON/w_dcfeb_resync">
-      <obj_property name="ElementShortName">w_dcfeb_resync</obj_property>
-      <obj_property name="ObjectShortName">w_dcfeb_resync</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/i_odmb_vme/DEV3_VMEMON/PLS_L1ARESET/pulse0">
-      <obj_property name="ElementShortName">pulse0</obj_property>
-      <obj_property name="ObjectShortName">pulse0</obj_property>
-   </wvobject>
-   <wvobject type="array" fp_name="/Firmware_tb/odmb_i/i_odmb_vme/DEV3_VMEMON/PLS_L1ARESET/pulse">
-      <obj_property name="ElementShortName">pulse[2:1]</obj_property>
-      <obj_property name="ObjectShortName">pulse[2:1]</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/i_odmb_vme/DEV3_VMEMON/PLS_L1ARESET/dout_inner">
-      <obj_property name="ElementShortName">dout_inner</obj_property>
-      <obj_property name="ObjectShortName">dout_inner</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/i_odmb_vme/DEV3_VMEMON/PLS_L1ARESET/DOUT">
-      <obj_property name="ElementShortName">DOUT</obj_property>
-      <obj_property name="ObjectShortName">DOUT</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/i_odmb_vme/DEV3_VMEMON/L1A_RESET_PULSE">
-      <obj_property name="ElementShortName">L1A_RESET_PULSE</obj_property>
-      <obj_property name="ObjectShortName">L1A_RESET_PULSE</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/l1a_reset_pulse">
-      <obj_property name="ElementShortName">l1a_reset_pulse</obj_property>
-      <obj_property name="ObjectShortName">l1a_reset_pulse</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/l1a_reset_pulse_q">
-      <obj_property name="ElementShortName">l1a_reset_pulse_q</obj_property>
-      <obj_property name="ObjectShortName">l1a_reset_pulse_q</obj_property>
-   </wvobject>
    <wvobject type="logic" fp_name="/Firmware_tb/resync_p">
       <obj_property name="ElementShortName">resync_p</obj_property>
       <obj_property name="ObjectShortName">resync_p</obj_property>
@@ -194,9 +154,9 @@
       <obj_property name="ElementShortName">tdo2</obj_property>
       <obj_property name="ObjectShortName">tdo2</obj_property>
    </wvobject>
-   <wvobject type="logic" fp_name="/Firmware_tb/dcfeb_i/tdo_f3b3c">
-      <obj_property name="ElementShortName">tdo_f3b3c</obj_property>
-      <obj_property name="ObjectShortName">tdo_f3b3c</obj_property>
+   <wvobject type="logic" fp_name="/Firmware_tb/dcfeb_i/tdo_f3a3b3c3d">
+      <obj_property name="ElementShortName">tdo_f3a3b3c3d</obj_property>
+      <obj_property name="ObjectShortName">tdo_f3a3b3c3d</obj_property>
    </wvobject>
    <wvobject type="array" fp_name="/Firmware_tb/dcfeb_i/PMAP_COUNTERS/d">
       <obj_property name="ElementShortName">d[11:0]</obj_property>
@@ -214,6 +174,10 @@
       <obj_property name="ElementShortName">IR_reg[9:0]</obj_property>
       <obj_property name="ObjectShortName">IR_reg[9:0]</obj_property>
    </wvobject>
+   <wvobject type="logic" fp_name="/Firmware_tb/dcfeb_i/PMAP_COUNTERS/ce_l1amatch">
+      <obj_property name="ElementShortName">ce_l1amatch</obj_property>
+      <obj_property name="ObjectShortName">ce_l1amatch</obj_property>
+   </wvobject>
    <wvobject type="logic" fp_name="/Firmware_tb/dcfeb_i/PMAP_COUNTERS/ce_injpls">
       <obj_property name="ElementShortName">ce_injpls</obj_property>
       <obj_property name="ObjectShortName">ce_injpls</obj_property>
@@ -222,9 +186,17 @@
       <obj_property name="ElementShortName">ce_extpls</obj_property>
       <obj_property name="ObjectShortName">ce_extpls</obj_property>
    </wvobject>
+   <wvobject type="logic" fp_name="/Firmware_tb/dcfeb_i/PMAP_COUNTERS/ce_bc0">
+      <obj_property name="ElementShortName">ce_bc0</obj_property>
+      <obj_property name="ObjectShortName">ce_bc0</obj_property>
+   </wvobject>
    <wvobject type="logic" fp_name="/Firmware_tb/dcfeb_i/RESYNC">
       <obj_property name="ElementShortName">RESYNC</obj_property>
       <obj_property name="ObjectShortName">RESYNC</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/Firmware_tb/dcfeb_i/l1a_match_counter">
+      <obj_property name="ElementShortName">l1a_match_counter[11:0]</obj_property>
+      <obj_property name="ObjectShortName">l1a_match_counter[11:0]</obj_property>
    </wvobject>
    <wvobject type="array" fp_name="/Firmware_tb/dcfeb_i/injpls_counter">
       <obj_property name="ElementShortName">injpls_counter[11:0]</obj_property>
@@ -233,5 +205,9 @@
    <wvobject type="array" fp_name="/Firmware_tb/dcfeb_i/extpls_counter">
       <obj_property name="ElementShortName">extpls_counter[11:0]</obj_property>
       <obj_property name="ObjectShortName">extpls_counter[11:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/Firmware_tb/dcfeb_i/bc0_counter">
+      <obj_property name="ElementShortName">bc0_counter[11:0]</obj_property>
+      <obj_property name="ObjectShortName">bc0_counter[11:0]</obj_property>
    </wvobject>
 </wave_config>

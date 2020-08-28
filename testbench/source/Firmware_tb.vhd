@@ -60,6 +60,7 @@ architecture Behavioral of Firmware_tb is
       DONE          : out std_logic;
       INJPLS        : in std_logic;
       EXTPLS        : in std_logic;
+      BC0           : in std_logic;
       RESYNC        : in std_logic
    );
    end component;
@@ -193,6 +194,16 @@ architecture Behavioral of Firmware_tb is
   signal dcfeb_resync   : std_logic := '0';
   signal resync_p       : std_logic := '0';
   signal resync_n       : std_logic := '0';
+  signal dcfeb_bc0      : std_logic := '0';
+  signal bc0_p          : std_logic := '0';
+  signal bc0_n          : std_logic := '0';
+  signal dcfeb_l1a      : std_logic := '0';
+  signal l1a_p          : std_logic := '0';
+  signal l1a_n          : std_logic := '0';
+  signal dcfeb_l1a_match : std_logic_vector(NCFEB downto 1) := (others => '0');
+  signal l1a_match_p     : std_logic_vector(NCFEB downto 1) := (others => '0');
+  signal l1a_match_n     : std_logic_vector(NCFEB downto 1) := (others => '0');
+
   -- signal dcfeb_tdo_t    : std_logic_vector (NCFEB downto 1)  := (others => '0');
 
   signal dcfeb_done       : std_logic_vector (NCFEB downto 1) := (others => '0');
@@ -410,10 +421,13 @@ begin
     IB_DCFEB_INJPLS: IBUFDS port map (O => injpls, I => injpls_p, IB => injpls_n);
     IB_DCFEB_EXTPLS: IBUFDS port map (O => extpls, I => extpls_p, IB => extpls_n);
     IB_DCFEB_RESYNC: IBUFDS port map (O => dcfeb_resync, I => resync_p, IB => resync_n);
+    IB_DCFEB_BC0: IBUFDS port map (O => dcfeb_bc0, I => bc0_p, IB => bc0_n);
+    IB_DCFEB_L1A: IBUFDS port map (O => dcfeb_l1a, I => l1a_p, IB => l1a_n);
     GEN_DCFEB_7 : for I in 1 to NCFEB generate
     begin
       IB_DCFEB_TCK: IBUFDS port map (O => dl_jtag_tck(I), I => dcfeb_tck_p(I), IB => dcfeb_tck_n(I));
       OB_DCFEB_TDO: OBUFDS port map (I => dl_jtag_tdo(I), O => dcfeb_tdo_p(I), OB => dcfeb_tdo_n(I));
+      IB_DCFEB_L1A_MATCH: IBUFDS port map (O => dcfeb_l1a_match(I), I => l1a_match_p(I), IB => l1a_match_n(I));
       -- OB_DCFEB_TDO: OBUFTDS port map (I => dl_jtag_tdo(I), O => dcfeb_tdo_p(I), OB => dcfeb_tdo_n(I), T => dcfeb_tdo_t(I));
       -- dcfeb_tdo_t(I) <= '0' when dl_jtag_tdo(I) = '1' or dl_jtag_tdo(I) = '0' else '1';
     end generate GEN_DCFEB_7;
@@ -428,6 +442,9 @@ begin
     injpls <= injpls_p;
     extpls <= extpls_p;
     dcfeb_resync <= resync_p;
+    dcfeb_bc0 <= bc0_p;
+    dcfeb_l1a <= l1a_p;
+    dcfeb_l1a_match <= l1a_match_p;
   end generate cfebjtag_conn_kcu_i;
   
 
@@ -457,7 +474,7 @@ begin
     VME_CLK_B       => vme_clk_b,
     KUS_VME_OE_B    => kus_vme_oe_b,
     KUS_VME_DIR_B   => vme_dir_b,
-    DIAGOUT        => diagout,
+    DIAGOUT         => diagout,
     DCFEB_TCK_P     => dcfeb_tck_p,
     DCFEB_TCK_N     => dcfeb_tck_n,
     DCFEB_TMS_P     => dcfeb_tms_p,
@@ -469,10 +486,16 @@ begin
     DCFEB_DONE      => dcfeb_done,
     RESYNC_P        => resync_p,
     RESYNC_N        => resync_n,
+    BC0_P           => bc0_p,
+    BC0_N           => bc0_n,
     INJPLS_P        => injpls_p,
     INJPLS_N        => injpls_n,
     EXTPLS_P        => extpls_p,
     EXTPLS_N        => extpls_n,
+    L1A_P           => l1a_p,
+    L1A_N           => l1a_n,
+    L1A_MATCH_P     => l1a_match_p,
+    L1A_MATCH_N     => l1a_match_n,
     LVMB_PON        => lvmb_pon,
     PON_LOAD        => pon_load,
     PON_OE_B        => pon_oe_B,
@@ -500,8 +523,8 @@ begin
     CLK             => sysclk,  
     DCFEBCLK        => sysclkQuad,
     RST             => rst_global,
-    L1A             => '0',
-    L1A_MATCH       => '0',
+    L1A             => dcfeb_l1a,
+    L1A_MATCH       => dcfeb_l1a_match(2),
     TX_ACK          => '0',
     NWORDS_DUMMY    => x"0000",
     DCFEB_DV        => open,
@@ -518,6 +541,7 @@ begin
     DONE            => dcfeb_done(2),
     INJPLS          => injpls,
     EXTPLS          => extpls,
+    BC0             => dcfeb_bc0,
     RESYNC          => dcfeb_resync
   );
   

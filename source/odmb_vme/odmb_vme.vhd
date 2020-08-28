@@ -110,8 +110,12 @@ entity ODMB_VME is
     L1A_RESET_PULSE      : out std_logic;
     TEST_INJ             : out std_logic;
     TEST_PLS             : out std_logic;
+    TEST_BC0             : out std_logic;
     TEST_PED             : out std_logic;
+    TEST_LCT             : out std_logic;
+    MASK_L1A             : out std_logic_vector (NCFEB downto 0);
     MASK_PLS             : out std_logic;
+    ODMB_CTRL            : out std_logic_vector(15 downto 0);
     ODMB_DATA            : in std_logic_vector(15 downto 0);
     ODMB_DATA_SEL        : out std_logic_vector(7 downto 0);
 
@@ -392,16 +396,16 @@ begin
       TEST_INJ        => TEST_INJ,
       TEST_PLS        => TEST_PLS,
       TEST_PED        => TEST_PED,
-      TEST_BC0        => open,
-      TEST_LCT        => open,
+      TEST_BC0        => TEST_BC0,
+      TEST_LCT        => TEST_LCT,
       OTMB_LCT_RQST   => open,
       OTMB_EXT_TRIG   => open,
 
       MASK_PLS      => MASK_PLS,
-      MASK_L1A      => open,
+      MASK_L1A      => MASK_L1A,
       TP_SEL        => open,
       MAX_WORDS_DCFEB => open,
-      ODMB_CTRL     => open,
+      ODMB_CTRL     => ODMB_CTRL,
       ODMB_DATA_SEL => ODMB_DATA_SEL,
       ODMB_DATA     => ODMB_DATA,
       TXDIFFCTRL    => open,      -- Controls the TX voltage swing

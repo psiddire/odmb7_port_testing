@@ -38,6 +38,17 @@ entity ODMB_CTRL is
     INJ_DLY       : in std_logic_vector(4 downto 0);
     EXT_DLY       : in std_logic_vector(4 downto 0);
     CALLCT_DLY    : in std_logic_vector(3 downto 0);
+
+    --------------------
+    -- Configuration
+    --------------------
+    CAL_MODE      : in std_logic;
+    PEDESTAL      : in std_logic;
+
+    --------------------
+    -- Triggers
+    --------------------
+    RAW_L1A       : in std_logic;
     
     --------------------
     -- To/From DCFEBs (FF-EMU-MOD)
@@ -56,7 +67,6 @@ entity ODMB_CTRL is
 end ODMB_CTRL;
 
 architecture Behavioral of ODMB_CTRL is
-  -- Constants
 
   component CALIBTRG is
     port (
@@ -87,7 +97,23 @@ architecture Behavioral of ODMB_CTRL is
       );
   end component;
 
+  component DUMMY_TRIGCTRL is
+    generic (
+      NCFEB : integer range 1 to 7 := 7
+      );
+    port (
+      CLK40       : in  std_logic;
+      RAW_L1A     : in  std_logic;
+      CAL_L1A     : in  std_logic;
+      CAL_MODE    : in  std_logic;
+      PEDESTAL    : in  std_logic;
+      DCFEB_L1A   : out std_logic;
+      DCFEB_L1A_MATCH : out std_logic_vector(NCFEB downto 1)
+      );
+  end component;
+
   signal plsinjen, plsinjen_inv : std_logic := '0';
+  signal cal_gtrg : std_logic := '0';
 
 begin
 
@@ -122,12 +148,26 @@ begin
       RNDMPLS => '0',             --unused
       RNDMGTRG => '0',            --unused
       PEDESTAL => open,           --unused
-      CAL_GTRG => open,           --TODO connect to TRGCNTRL
+      CAL_GTRG => cal_gtrg,           
       CALLCT => open,             --TODO connect to TRGCNTRL
       INJBACK => DCFEB_INJPULSE,
       PLSBACK => DCFEB_EXTPULSE,
       LCTRQST => open, 
       INJPLS => open              --unused
       );
+
+  DUMMY_TRIGCTRL_PM : DUMMY_TRIGCTRL
+    generic map (
+      NCFEB => NCFEB
+    )
+    port map (
+      CLK40 => CLK40,
+      RAW_L1A => RAW_L1A,
+      CAL_L1A => cal_gtrg,
+      CAL_MODE => CAL_MODE,
+      PEDESTAL => PEDESTAL,
+      DCFEB_L1A => DCFEB_L1A,
+      DCFEB_L1A_MATCH => DCFEB_L1A_MATCH
+    );
 
 end Behavioral;
