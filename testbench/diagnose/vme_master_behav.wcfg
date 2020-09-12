@@ -14,15 +14,15 @@
       </db_ref>
    </db_ref_list>
    <zoom_setting>
-      <ZoomStartTime time="113833333333fs"></ZoomStartTime>
-      <ZoomEndTime time="265233333334fs"></ZoomEndTime>
-      <Cursor1Time time="240000000000fs"></Cursor1Time>
+      <ZoomStartTime time="109160363fs"></ZoomStartTime>
+      <ZoomEndTime time="148110364fs"></ZoomEndTime>
+      <Cursor1Time time="117260363fs"></Cursor1Time>
    </zoom_setting>
    <column_width_setting>
-      <NameColumnWidth column_width="138"></NameColumnWidth>
+      <NameColumnWidth column_width="134"></NameColumnWidth>
       <ValueColumnWidth column_width="66"></ValueColumnWidth>
    </column_width_setting>
-   <WVObjectSize size="46" />
+   <WVObjectSize size="50" />
    <wave_markers>
       <marker label="" time="669732" />
    </wave_markers>
@@ -33,6 +33,22 @@
    <wvobject type="logic" fp_name="/Firmware_tb/vc_cmd">
       <obj_property name="ElementShortName">vc_cmd</obj_property>
       <obj_property name="ObjectShortName">vc_cmd</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/Firmware_tb/waitCounter">
+      <obj_property name="ElementShortName">waitCounter[9:0]</obj_property>
+      <obj_property name="ObjectShortName">waitCounter[9:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/Firmware_tb/inputCounter">
+      <obj_property name="ElementShortName">inputCounter[15:0]</obj_property>
+      <obj_property name="ObjectShortName">inputCounter[15:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/Firmware_tb/lut_input_addr1_s">
+      <obj_property name="ElementShortName">lut_input_addr1_s[3:0]</obj_property>
+      <obj_property name="ObjectShortName">lut_input_addr1_s[3:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/Firmware_tb/lut_input_addr2_s">
+      <obj_property name="ElementShortName">lut_input_addr2_s[3:0]</obj_property>
+      <obj_property name="ObjectShortName">lut_input_addr2_s[3:0]</obj_property>
    </wvobject>
    <wvobject type="array" fp_name="/Firmware_tb/lut_input1_dout_c">
       <obj_property name="ElementShortName">lut_input1_dout_c[15:0]</obj_property>

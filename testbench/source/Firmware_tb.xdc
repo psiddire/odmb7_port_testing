@@ -1,12 +1,12 @@
-set_property LOC AK17 [get_ports CLK_IN_P]
+set_property PACKAGE_PIN AK17 [get_ports CLK_IN_P]
 set_property IOSTANDARD  DIFF_SSTL12 [get_ports CLK_IN_P]
 set_property ODT         RTT_48 [get_ports CLK_IN_P]
 
-set_property LOC AK16 [get_ports CLK_IN_N]
+set_property PACKAGE_PIN AK16 [get_ports CLK_IN_N]
 set_property IOSTANDARD  DIFF_SSTL12 [get_ports CLK_IN_N]
 set_property ODT         RTT_48 [get_ports CLK_IN_N]
 
-set_property LOC H27 [get_ports J36_USER_SMA_GPIO_P]
+set_property PACKAGE_PIN H27 [get_ports J36_USER_SMA_GPIO_P]
 set_property IOSTANDARD  LVCMOS18 [get_ports J36_USER_SMA_GPIO_P]
 
 # Constrain only P side of the clock: https://www.xilinx.com/support/answers/57109.html

@@ -22,8 +22,6 @@ library unisim;
 use unisim.vcomponents.all;
 use work.ucsb_types.all;
 
--- To mimic the behavior of ODMB_VME on the component CFEBJTAG
-
 -- library UNISIM;
 -- use UNISIM.VComponents.all;
 
@@ -139,6 +137,7 @@ end ODMB_VME;
 architecture Behavioral of ODMB_VME is
   -- Constants
   constant bw_data  : integer := 16; -- data bit width
+  constant num_dev  : integer := 9;  -- number of devices (exclude dev0)
 
   component CONFREGS_DUMMY is
     port (
@@ -261,13 +260,18 @@ architecture Behavioral of ODMB_VME is
       );
   end component;
 
-  signal device    : std_logic_vector(9 downto 0) := (others => '0');
+  signal device    : std_logic_vector(num_dev downto 0) := (others => '0');
   signal cmd       : std_logic_vector(9 downto 0) := (others => '0');
   signal strobe    : std_logic := '0';
   signal tovme_b, doe_b : std_logic := '0';
   signal vme_data_out_buf : std_logic_vector(15 downto 0) := (others => '0'); --comment for real ODMB, needed for KCU
 
-  signal dtack_dev : std_logic_vector(9 downto 0) := (others => '0');
+  type dev_array is array(0 to num_dev) of std_logic_vector(15 downto 0);
+  signal outdata_dev : dev_array;
+  signal dtack_dev   : std_logic_vector(num_dev downto 0) := (others => '0');
+  signal idx_dev     : integer range 0 to num_dev;
+
+  signal devout      : std_logic_vector(bw_data-1 downto 0) := (others => '0'); --devtmp: used in place of the array
 
   signal diagout_buf : std_logic_vector(17 downto 0) := (others => '0');
   signal led_cfebjtag     : std_logic := '0';
@@ -276,21 +280,7 @@ architecture Behavioral of ODMB_VME is
   signal dl_jtag_tck_inner : std_logic_vector(6 downto 0);
   signal dl_jtag_tdi_inner, dl_jtag_tms_inner : std_logic;
 
-  -- ODMB implementation
-  -- type dev_array is array(0 to 15) of std_logic_vector(15 downto 0);
-  -- signal dev_outdata       : dev_array;
-
-  -- Temporary, used in place of the array
-  signal devout : std_logic_vector(bw_data-1 downto 0) := (others => '0');
-  type dev_array is array(0 to 15) of std_logic_vector(15 downto 0);
-  signal dev_outdata : dev_array;
-  signal device_index : integer range 0 to 15;
-
   signal cmd_adrs_inner : std_logic_vector(17 downto 2) := (others => '0');
-
-  -- signals between vme_master_fsm and command_module
-  -- signal vme_adr     : std_logic_vector(23 downto 1) := (others => '0');
-
 
 begin
 
@@ -302,17 +292,17 @@ begin
   DCFEB_TMS <= dl_jtag_tms_inner;
 
   ----------------------------------
-  -- Signal relaying for VME 
+  -- Signal relaying for command module
   ----------------------------------
   VME_OE_B  <= doe_b;
   VME_DIR_B <= tovme_b;
 
-  --GEN_DEV_OUTDATA should be 10 to 15 once all modules are implemented
-  GEN_DEV_OUTDATA : for dev in 5 to 15 generate
-    dev_outdata(dev) <= (others => '0');
-  end generate GEN_DEV_OUTDATA;
-  device_index <= to_integer(unsigned(cmd_adrs_inner(15 downto 12)));
-  VME_DATA_OUT <= dev_outdata(device_index);
+  -- This will not be needed when all devs are ready --devtmp
+  GEN_OUTDATA_DEV : for dev in 5 to num_dev generate --devtmp
+    outdata_dev(dev) <= (others => '0');             --devtmp
+  end generate GEN_OUTDATA_DEV;                      --devtmp
+  idx_dev <= to_integer(unsigned(cmd_adrs_inner(15 downto 12)));
+  VME_DATA_OUT <= outdata_dev(idx_dev);
 
   --Handle DTACK
   PULLUP_vme_dtack : PULLUP port map (O => VME_DTACK_B);
@@ -333,7 +323,7 @@ begin
           DEVICE  => device(4),
           STROBE  => strobe,
           COMMAND => cmd,
-          OUTDATA => dev_outdata(4),
+          OUTDATA => outdata_dev(4),
           DTACK => dtack_dev(4),
           LCT_L1A_DLY => LCT_L1A_DLY,
           INJ_DLY => INJ_DLY, 
@@ -353,11 +343,10 @@ begin
       DEVICE  => device(1),
       STROBE  => strobe,
       COMMAND => cmd,
-
       WRITER  => VME_WRITE_B,
-      INDATA  => vme_data_in,   -- VME_DATA_IN,
-      OUTDATA => dev_outdata(1),
 
+      INDATA  => VME_DATA_IN,
+      OUTDATA => outdata_dev(1),
       DTACK   => dtack_dev(1),
 
       INITJTAGS => DCFEB_INITJTAG,
@@ -370,7 +359,7 @@ begin
       LED     => led_cfebjtag
       );
 
-    DEV3_VMEMON : VMEMON
+  DEV3_VMEMON : VMEMON
     generic map (NCFEB => NCFEB)
     port map (
       SLOWCLK => clk2p5,
@@ -380,14 +369,14 @@ begin
       DEVICE  => device(3),
       STROBE  => strobe,
       COMMAND => cmd,
-      WRITER  => vme_write_b,
+      WRITER  => VME_WRITE_B,
 
-      INDATA  => vme_data_in,
-      OUTDATA => dev_outdata(3),
-      DTACK => dtack_dev(3),
+      INDATA  => VME_DATA_IN,
+      OUTDATA => outdata_dev(3),
+      DTACK   => dtack_dev(3),
 
       DCFEB_DONE  => dcfeb_done,
-      QPLL_LOCKED => '1',
+      QPLL_LOCKED => '1',         -- input: obsolete signal in OMDB7/5, can be removed
 
       OPT_RESET_PULSE => open,
       L1A_RESET_PULSE => L1A_RESET_PULSE,
@@ -406,10 +395,10 @@ begin
       TP_SEL        => open,
       MAX_WORDS_DCFEB => open,
       ODMB_CTRL     => ODMB_CTRL,
-      ODMB_DATA_SEL => ODMB_DATA_SEL,
-      ODMB_DATA     => ODMB_DATA,
-      TXDIFFCTRL    => open,      -- Controls the TX voltage swing
-      LOOPBACK      => open         -- For internal loopback tests
+      ODMB_DATA_SEL => ODMB_DATA_SEL,   -- output: <= COMMAND[9:2] directly
+      ODMB_DATA     => ODMB_DATA,       -- input depend on ODMB_DATA_SEL
+      TXDIFFCTRL    => open,      -- TX voltage swing, W 3110 is disabled: constant output x"8"
+      LOOPBACK      => open       -- For internal loopback tests, bbb for W 3100 bbb
       );
 
   COMMAND_PM : COMMAND_MODULE
@@ -434,8 +423,8 @@ begin
       STROBE  => strobe,
       COMMAND => cmd,
       ADRS    => cmd_adrs_inner,
-      DIAGOUT => diagout_buf,      -- temp
-      LED     => led_command           -- temp
+      DIAGOUT => diagout_buf,
+      LED     => led_command
       );
 
 

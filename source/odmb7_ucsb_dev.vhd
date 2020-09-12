@@ -17,7 +17,7 @@ entity ODMB7_UCSB_DEV is
   );
   PORT (
     --------------------
-    -- Clock
+    -- Clocks from testbench
     --------------------
     CLK160      : in std_logic;  -- For dcfeb prbs (160MHz)
     CLK80       : in std_logic;
@@ -93,7 +93,7 @@ entity ODMB7_UCSB_DEV is
     RST         : in std_logic;
 
     --------------------------------
-    --KCU signals (not in real ODMB)
+    -- KCU signals (not in real ODMB)
     --------------------------------
     VME_DATA_IN    : in std_logic_vector (15 downto 0); --no internal IOBUFs on KCU
     VME_DATA_OUT   : out std_logic_vector (15 downto 0) --no internal IOBUFs on KCU
@@ -122,8 +122,8 @@ architecture Behavioral of ODMB7_UCSB_DEV is
       --------------------
       VME_DATA_IN   : in std_logic_vector (15 downto 0);
       VME_DATA_OUT  : out std_logic_vector (15 downto 0);
-      VME_GAP_B     : in std_logic;
-      VME_GA_B      : in std_logic_vector (4 downto 0); -- VME_GAP is GA(5)
+      VME_GAP_B     : in std_logic;     -- Also known as GA(5)
+      VME_GA_B      : in std_logic_vector (4 downto 0);
       VME_ADDR      : in std_logic_vector (23 downto 1);
       VME_AM        : in std_logic_vector (5 downto 0);
       VME_AS_B      : in std_logic;
@@ -371,10 +371,10 @@ begin
   clk20_inv <= not clk20_unbuf;
   clk5_inv <= not clk5_unbuf;
   clk2p5_inv <= not clk2p5_unbuf;
-  FDCE_clk20 : FDCE port map(D => clk20_inv, C => CLK40, CE => '1', CLR => '0', Q => clk20_unbuf);
-  FDCE_clk5 : FDCE port map(D => clk5_inv, C => CLK10, CE => '1', CLR => '0', Q => clk5_unbuf);
-  FDCE_clk2p5 : FDCE port map(D => clk2p5_inv, C => CLK10, CE => '1', CLR => '0', Q => clk2p5_unbuf);
-  BUFG_clk20 : BUFG port map(I => clk20_unbuf, O => clk20);
+  FD_clk20  : FD port map(D => clk20_inv,  C => CLK40, Q => clk20_unbuf );
+  FD_clk5   : FD port map(D => clk5_inv,   C => CLK10, Q => clk5_unbuf  );
+  FD_clk2p5 : FD port map(D => clk2p5_inv, C => CLK10, Q => clk2p5_unbuf);
+  BUFG_clk20  : BUFG port map(I => clk20_unbuf, O => clk20);
   BUFG_clk2p5 : BUFG port map(I => clk2p5_unbuf, O => clk2p5);
 
   -------------------------------------------------------------------------------------------
@@ -385,7 +385,7 @@ begin
   KUS_VME_DIR_B <= vme_dir_b;
   vme_dir <= not vme_dir_b;
 
-  -- multiplex vme_data_in and out lines together
+  -- FIXME: KCU only: multiplex vme_data_in and out lines together
   -- can't have internal IOBUFs on KCU
   vme_data_kcu_i : if in_synthesis generate
     vme_data_in_buf <= VME_DATA_IN;
@@ -406,7 +406,7 @@ begin
 
   -- Handle DCFEB I/O buffers
   -- OB_DCFEB_TMS: OBUFTDS port map (I => dcfeb_tms, O => DCFEB_TMS_P, OB => DCFEB_TMS_N, T => dcfeb_tms_t);
-  --on KCU, just use P lines as signals
+  -- FIXME: KCU only: on KCU, just use P lines as signals
   cfebjtag_kcu_i : if in_synthesis generate
     DCFEB_TMS_P <= dcfeb_tms;
     DCFEB_TMS_N <= '0';
@@ -451,14 +451,17 @@ begin
   
   --generate RESYNC, BC0, L1A, and L1A match signals to DCFEBs
   RESETPULSE : PULSE2SAME port map(DOUT => reset_pulse, CLK_DOUT => clk40, RST => '0', DIN => reset);
-  FD_RESETPULSE_Q : FD port map (Q => reset_pulse_q, C => CLK40, D => reset_pulse);
-  FD_L1APULSE_Q : FD port map (Q => l1a_reset_pulse_q, C => CLK40, D => l1a_reset_pulse);
+  FD_RESETPULSE_Q : FD port map (Q => reset_pulse_q,     C => CLK40, D => reset_pulse);
+  FD_L1APULSE_Q   : FD port map (Q => l1a_reset_pulse_q, C => CLK40, D => l1a_reset_pulse);
+
   l1acnt_rst <= clk20 and (l1a_reset_pulse or l1a_reset_pulse_q or reset_pulse or reset_pulse_q);
-  DS_RESYNC : DELAY_SIGNAL generic map (NCYCLES_MAX => 1) port map (DOUT => dcfeb_resync, CLK => CLK40, NCYCLES => cable_dly, DIN => l1acnt_rst);
-  pre_bc0 <= test_bc0;
-  DS_BC0 : DELAY_SIGNAL generic map (NCYCLES_MAX => 1) port map (DOUT => dcfeb_bc0, CLK => CLK40, NCYCLES => cable_dly, DIN => pre_bc0);
+  pre_bc0    <= test_bc0;
   masked_l1a <= '0' when mask_l1a(0)='1' else odmbctrl_l1a;
-  DS_L1A : DELAY_SIGNAL generic map (NCYCLES_MAX => 1) port map (DOUT => dcfeb_l1a, CLK => CLK40, NCYCLES => cable_dly, DIN => masked_l1a);
+
+  DS_RESYNC : DELAY_SIGNAL generic map (NCYCLES_MAX => 1) port map (DOUT => dcfeb_resync, CLK => CLK40, NCYCLES => cable_dly, DIN => l1acnt_rst);
+  DS_BC0    : DELAY_SIGNAL generic map (NCYCLES_MAX => 1) port map (DOUT => dcfeb_bc0,    CLK => CLK40, NCYCLES => cable_dly, DIN => pre_bc0   );
+  DS_L1A    : DELAY_SIGNAL generic map (NCYCLES_MAX => 1) port map (DOUT => dcfeb_l1a,    CLK => CLK40, NCYCLES => cable_dly, DIN => masked_l1a);
+
   GEN_DCFEB_L1A_MATCH : for I in 1 to NCFEB generate
   begin
     masked_l1a_match(I) <= '0' when mask_l1a(I)='1' else odmbctrl_l1a_match(I);
@@ -482,6 +485,7 @@ begin
       end if;
     end loop;
   end process;
+
   done_fsm_logic : process (done_current_state, DCFEB_DONE, done_cnt)
   begin
     for dev in 1 to NCFEB loop
@@ -527,9 +531,11 @@ begin
       end case;
     end loop;
   end process;
+
   dcfeb_initjtag_dd <= or_reduce(dcfeb_done_pulse);
-  --temporarily using clk40 so I don't have to wait an eternity
+  -- FIXME: temporarily using clk40 so I don't have to wait an eternity, 10kHz in realistic design
   DS_DCFEB_INITJTAG    : DELAY_SIGNAL generic map(240) port map(DOUT => dcfeb_initjtag_d, CLK => CLK40, NCYCLES => 240, DIN => dcfeb_initjtag_dd);
+  -- FIXME: temporarily using clk40 so I don't have to wait an eternity, 625kHz in realistic design
   PULSE_DCFEB_INITJTAG : NPULSE2FAST port map(DOUT => dcfeb_initjtag, CLK_DOUT => CLK40, RST => '0', NPULSE => 5, DIN => dcfeb_initjtag_d);
 
   -------------------------------------------------------------------------------------------
@@ -548,8 +554,7 @@ begin
   -- Handle reset signals
   -------------------------------------------------------------------------------------------
 
-  --need flip flop, ultrascale only has fancy ones like FDXE
-  FDRE_FW_RESET : FDRE port map (Q => fw_reset_q, C => CLK40, CE => '1', R => '0', D => fw_reset);
+  FD_FW_RESET : FD port map (Q => fw_reset_q, C => CLK40, D => fw_reset);
   fw_rst_reg <= x"3FFFF000" when ((fw_reset_q = '0' and fw_reset = '1') or ccb_softrst_b_q = '0') else
                   fw_rst_reg(30 downto 0) & '0' when rising_edge(clk40) else
                   fw_rst_reg;

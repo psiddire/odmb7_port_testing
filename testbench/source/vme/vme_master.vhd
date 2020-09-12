@@ -78,7 +78,7 @@ begin
   sysfail <= '1';
   lword   <= '1';
   ga      <= "101010";
-  am      <= "111010";
+  am      <= "111010";         -- mode 3A: A24 non previlege 
 
   proc_dtack_timeout : process (clk, dtack_waiting)
     variable dtack_timeout_counter  : unsigned(9 downto 0) := (others=> '0');
