@@ -1,6 +1,7 @@
 vivado*
 testbench/vivado*
 .Xil
+ip/
 testbench/tb_project/tb_project.cache
 testbench/tb_project/tb_project.hw
 testbench/tb_project/tb_project.ip_user_files

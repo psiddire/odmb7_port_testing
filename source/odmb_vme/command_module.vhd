@@ -2,7 +2,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 library UNISIM;
 use UNISIM.vcomponents.all;
-library work;
+
 -- library hdlmacro;
 
 entity COMMAND_MODULE is
@@ -30,8 +30,8 @@ entity COMMAND_MODULE is
     COMMAND : out std_logic_vector(9 downto 0);
     ADRS    : out std_logic_vector(17 downto 2);  --NOTE: output of ADRS
 
-    TOVME_B : out std_logic;
-    DOE_B   : out std_logic;
+    TOVME_B : out std_logic;            -- VME_DIR_B
+    DOE_B   : out std_logic;            -- VME_OE_B
 
     DIAGOUT : out std_logic_vector(17 downto 0);
     LED     : out std_logic_vector(2 downto 0)
@@ -43,9 +43,8 @@ architecture COMMAND_MODULE_Arch of COMMAND_MODULE is
 
   --Declaring internal signals
   signal CGA           : std_logic_vector(5 downto 0);  --NOTE: replacing CGAP with CGA(5)
-  signal AMS           : std_logic_vector(5 downto 0);
-  signal ADRS_INNER    : std_logic_vector(23 downto 1);
-  signal GOODAM        : std_logic;
+  signal AMS           : std_logic_vector(5 downto 0) := (others => '1');
+  signal ADRS_INNER    : std_logic_vector(23 downto 1) := (others => '0');
   signal VALIDAM       : std_logic;
   signal VALIDGA       : std_logic;
   signal SYSOK         : std_logic;
@@ -53,18 +52,13 @@ architecture COMMAND_MODULE_Arch of COMMAND_MODULE is
   signal PRE_BOARDENB  : std_logic;
   signal BROADCAST     : std_logic;
   signal BOARDENB      : std_logic;
-  signal BOARD_SEL_NEW : std_logic;
+  signal BOARD_SEL     : std_logic;
   signal ASYNSTRB      : std_logic;
   signal ASYNSTRB_NOT  : std_logic;
   signal FASTCLK_NOT   : std_logic;
   signal STROBE_TEMP1  : std_logic;
   signal STROBE_TEMP2  : std_logic;
   signal ADRSHIGH      : std_logic;
-
-  signal D1, C1, Q1, D2, C2, Q2, D3, C3, Q3, D4, C4                                             : std_logic;
-  signal D1_second, C1_second, Q1_second, D2_second, C2_second, Q2_seconD                       : std_logic;
-  signal D3_second, C3_second, Q3_second, D4_second, C4_second, Q4_second, D5_second, C5_second : std_logic;
-  signal TOVME_INNER                                                                            : std_logic;
 
   signal CE_DOE_B, CLR_DOE_B : std_logic;
   signal TIMER               : std_logic_vector(7 downto 0);
@@ -83,20 +77,6 @@ architecture COMMAND_MODULE_Arch of COMMAND_MODULE is
       );
   end component;
 
--- Transparent Input Data Latch
-  component ILD
-    generic(
-      INIT : bit := '0'
-      );
-    port (
-      Q  : out STD_LOGIC;
-      D  : in STD_LOGIC;
-      G  : in STD_LOGIC
-      );
-
-  end component;
-  -----------------------------------------------------------------------------
-
 begin  --Architecture
 
   -- Generate DOE_B
@@ -104,37 +84,38 @@ begin  --Architecture
   CLR_DOE_B <= TOVME_INNER_B;
   CB8CE_DOE : CB8CE port map (open, TIMER, open, SLOWCLK, CE_DOE_B, CLR_DOE_B);
   -- component CB8CE port (CEO, Q, TC, C, CE, CLR, );
-  -- CB8CE(SLOWCLK, CE_DOE_B, CLR_DOE_B, dummy1, TIMER, dummy2, dummy3);
-  DOE_B     <= TIMER(7);
+  DOE_B     <= TIMER(7); -- counter until 128th clock
 
   -- Generate VALIDGA
   CGA     <= (not GAP) & (not GA);
   VALIDGA <= '1' when ((CGA(0) xor CGA(1) xor CGA(2) xor CGA(3) xor CGA(4) xor CGA(5)) = '1') else '0';
 
   -- Generate OLDCRATE / Generate AMS / Generate VALIDAM / Generate GOODAM / Generate FASTCLK_NOT
-  OLDCRATE <= '1' when CGA = "000000" else '0';
+  OLDCRATE <= '1' when CGA = "000000" else '0'; -- Not the case for VME 
 
-  ILD_AM_GEN : for i in 0 to 5 generate
+  -- Replaced ILD as it's no longer primitive, replace with process -- wsc
+  -- Adding requirement of rising clock edge to preven AS being mistaken as clk
+  process(AM, AS, ADR, FASTCLK)
   begin
-    ILD_AM : ILD port map(AMS(i), AM(i), AS);
-  end generate ILD_AM_GEN;
+    if rising_edge(FASTCLK) and AS = '1' then
+      AMS <= AM;
+      ADRS_INNER <= ADR;
+    end if;
+  end process;
+
+  -- Check if AM signal is valid
   VALIDAM     <= '1' when (AMS(0) /= AMS(1) and AMS(5 downto 3) = "111" and LWORD = '1') else '0';
-  GOODAM      <= '1' when (AMS(0) /= AMS(1) and AMS(5 downto 3) = "111" and LWORD = '1') else '0';
   FASTCLK_NOT <= not FASTCLK;
 
   -- Generate STROBE
-  ILD_ADRS_GEN : for i in 1 to 23 generate
-  begin
-    ILD_ADRS : ILD port map(ADRS_INNER(i), ADR(i), AS);
-  end generate ILD_ADRS_GEN;
 
-  BOARD_SEL_NEW <= '1' when (ADRS_INNER(23 downto 19) = CGA(4 downto 0))              else '0';
-  PRE_BOARDENB  <= '1' when (BOARD_SEL_NEW = '1' and VALIDGA = '1')                   else '0';
+  BOARD_SEL     <= '1' when (ADRS_INNER(23 downto 19) = CGA(4 downto 0))              else '0';
+  PRE_BOARDENB  <= '1' when (BOARD_SEL = '1' and VALIDGA = '1')                       else '0';
   BROADCAST     <= '1' when (ADRS_INNER(23 downto 19) = "11111")                      else '0';
   BOARDENB      <= '1' when (OLDCRATE = '1' or PRE_BOARDENB = '1' or BROADCAST = '1') else '0';
   SYSOK         <= '1' when (SYSFAIL = '1' and IACK = '1')                            else '0';
 
-  (TOVME_INNER_B, TOVME_B, LED(0)) <= std_logic_vector'("001") when (GOODAM = '1' and WRITER = '1' and SYSOK = '1' and BOARDENB = '1') else
+  (TOVME_INNER_B, TOVME_B, LED(0)) <= std_logic_vector'("001") when (VALIDAM = '1' and WRITER = '1' and SYSOK = '1' and BOARDENB = '1') else
                                       std_logic_vector'("110");
   ASYNSTRB     <= '1' when (SYSOK = '1' and VALIDAM = '1' and BOARDENB = '1' and DS0 = '0' and DS1 = '0') else '0';
   ASYNSTRB_NOT <= not ASYNSTRB;
@@ -181,44 +162,15 @@ begin  --Architecture
 
   with ADRSDEV select
     DEVICE <= "0000000001" when "00000",
-    "0000000010"           when "00001",
-    "0000000100"           when "00010",
-    "0000001000"           when "00011",
-    "0000010000"           when "00100",
-    "0000100000"           when "00101",
-    "0001000000"           when "00110",
-    "0010000000"           when "00111",
-    "0100000000"           when "01000",
-    "1000000000"           when "01001",
-    "0000000000"           when others;
+              "0000000010" when "00001",
+              "0000000100" when "00010",
+              "0000001000" when "00011",
+              "0000010000" when "00100",
+              "0000100000" when "00101",
+              "0001000000" when "00110",
+              "0010000000" when "00111",
+              "0100000000" when "01000",
+              "1000000000" when "01001",
+              "0000000000" when others;
   
 end COMMAND_MODULE_Arch;
-
-library ieee;
-use ieee.std_logic_1164.all;
-entity ILD is
-  generic( INIT : bit := '0' );
-  port (
-    Q  : out STD_LOGIC;
-    D  : in STD_LOGIC;
-    G  : in STD_LOGIC
-    );
--- attribute IOB         : string ;
--- attribute IOB of Q : signal is "True";
-
-end ILD;
-
-architecture Behavioral_ild of ILD is
-  signal q_tmp : std_logic := TO_X01(INIT);
-
-begin
-  Q <= q_tmp;
-
-  process(D, G)
-  begin
-    if (G = '1') then
-      q_tmp <= D;
-    end if;
-  end process;
-
-end Behavioral_ild;

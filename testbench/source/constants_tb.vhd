@@ -9,7 +9,7 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.all;
 
-package Firmware_pkg is
+package odmb_consts is
 
   ---- Flag for synthesis/simulation
   -- For simulation
@@ -19,7 +19,8 @@ package Firmware_pkg is
   -- synthesis translate_on
   ;
   constant in_synthesis : BOOLEAN := not in_simulation;
+  constant in_kcu105 : BOOLEAN := in_synthesis and true;
 
   type FSM_FIFO is ( INIT, STANDBY, RDONLY, WRONLY, RDWR );
 
-end Firmware_pkg;
+end odmb_consts;

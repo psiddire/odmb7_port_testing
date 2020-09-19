@@ -32,6 +32,10 @@ if { $argc != 1 } {
   #set_property -dict [list CONFIG.Memory_Type {Single_Port_ROM} CONFIG.Write_Width_A {12} CONFIG.Write_Depth_A {128} CONFIG.Enable_A {Always_Enabled} CONFIG.Register_PortA_Output_of_Memory_Primitives {false} CONFIG.Load_Init_File {true} CONFIG.Coe_File {../../../source/data/Input2.coe} CONFIG.Read_Width_A {12} CONFIG.Write_Width_B {12} CONFIG.Read_Width_B {12} CONFIG.Port_A_Write_Rate {0}] [get_ips lut_input2]
   #set_property -dict [list CONFIG.Write_Width_A {16} CONFIG.Write_Depth_A {8} CONFIG.Read_Width_A {16} CONFIG.Write_Width_B {16} CONFIG.Read_Width_B {16}] [get_ips lut_input2]
 
+  create_ip -name ibert_ultrascale_gth -vendor xilinx.com -library ip -version 1.4 -module_name ibert_kcu_gth -dir ../ip/$FPGA_TYPE
+  set_property -dict [list CONFIG.C_SYSCLK_FREQUENCY {156.25} CONFIG.C_SYSCLK_IO_PIN_LOC_N {UNASSIGNED} CONFIG.C_SYSCLK_IO_PIN_LOC_P {UNASSIGNED} CONFIG.C_SYSCLK_IS_DIFF {0} CONFIG.C_SYSCLK_IO_PIN_STD {LVCMOS18} CONFIG.C_SYSCLK_MODE_EXTERNAL {0} CONFIG.C_SYSCLOCK_SOURCE_INT {QUAD227_0} CONFIG.C_RXOUTCLK_FREQUENCY {250.0} CONFIG.C_RXOUTCLK_GT_LOCATION {QUAD225_0} CONFIG.C_REFCLK_SOURCE_QUAD_4 {MGTREFCLK0_227} CONFIG.C_REFCLK_SOURCE_QUAD_3 {MGTREFCLK0_227} CONFIG.C_REFCLK_SOURCE_QUAD_2 {MGTREFCLK0_227} CONFIG.C_REFCLK_SOURCE_QUAD_1 {MGTREFCLK0_227} CONFIG.C_REFCLK_SOURCE_QUAD_0 {None} CONFIG.C_PROTOCOL_QUAD4 {Custom_1_/_10_Gbps} CONFIG.C_PROTOCOL_QUAD3 {Custom_1_/_10_Gbps} CONFIG.C_PROTOCOL_QUAD2 {Custom_1_/_10_Gbps} CONFIG.C_PROTOCOL_QUAD1 {Custom_1_/_10_Gbps} CONFIG.C_PROTOCOL_QUAD0 {None} CONFIG.C_GT_CORRECT {true} CONFIG.C_PROTOCOL_QUAD_COUNT_1 {4} CONFIG.C_PROTOCOL_REFCLK_FREQUENCY_1 {156.25} CONFIG.C_PROTOCOL_MAXLINERATE_1 {10}] [get_ips ibert_kcu_gth]
+
+
   puts "\[Success\] Created ip for $FPGA_TYPE"
   close_project
 }

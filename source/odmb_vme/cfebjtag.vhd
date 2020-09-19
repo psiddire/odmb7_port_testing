@@ -33,9 +33,9 @@ entity CFEBJTAG is
     FEBTDO    : in  std_logic_vector(NCFEB downto 1);
 
     LED     : out std_logic;
-    DIAGOUT : out std_logic_vector(17 downto 0);
+    DIAGOUT : out std_logic_vector(17 downto 0)
 
-    CSP_LVMB_LA_CTRL : inout std_logic_vector(35 downto 0)
+    -- CSP_LVMB_LA_CTRL : inout std_logic_vector(35 downto 0)
     );
 end CFEBJTAG;
 

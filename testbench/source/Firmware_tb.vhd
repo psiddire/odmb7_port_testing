@@ -16,7 +16,22 @@ entity Firmware_tb is
     CLK_IN_P : in std_logic;
     CLK_IN_N : in std_logic;
     -- 40 MHz clk out
-    J36_USER_SMA_GPIO_P : out std_logic
+    J36_USER_SMA_GPIO_P : out std_logic;
+
+    -- IBERT test pins
+    MGTREFCLK0_227_P : in std_logic;
+    MGTREFCLK0_227_N : in std_logic;
+    MGTREFCLK1_227_P : in std_logic;
+    MGTREFCLK1_227_N : in std_logic;
+
+    GTH_TXN_O : out std_logic_vector(15 downto 0); -- simply things for now
+    GTH_TXP_O : out std_logic_vector(15 downto 0); -- simply things for now
+    GTH_RXN_I : in std_logic_vector(15 downto 0);  -- simply things for now
+    GTH_RXP_I : in std_logic_vector(15 downto 0);  -- simply things for now
+
+    SEL_SI570_CLK_O : out std_logic;
+
+    VME_DTACK_B : out std_logic         -- for compile concern
   );      
 end Firmware_tb;
 
@@ -247,6 +262,35 @@ architecture Behavioral of Firmware_tb is
   -- Checker bit
   signal checker  : std_logic := '0';
 
+  signal daq_rx_p, daq_rx_n : std_logic_vector(10 downto 0) := (others => '0');
+  signal b04_rx_p, b04_rx_n : std_logic_vector(4 downto 2) := (others => '0');
+  signal daq_tx_p, daq_tx_n : std_logic_vector(4 downto 1) := (others => '0');
+  signal bck_prs_p, bck_prs_n : std_logic := '0';
+  signal spy_tx_p, spy_tx_n : std_logic := '0';
+  signal daq_spy_rx_p, daq_spy_rx_n : std_logic := '0';
+
+  signal rx12_sda, rx12_scl : std_logic := '0';
+  signal rx12_i2c_ena, rx12_cs_b, rx12_rst_b : std_logic := '0';
+  signal rx12_int_b, rx12_present_b : std_logic := '0';
+  signal tx12_sda, tx12_scl : std_logic := '0';
+  signal tx12_i2c_ena, tx12_cs_b, tx12_rst_b : std_logic := '0';
+  signal tx12_int_b, tx12_present_b : std_logic := '0';
+  signal b04_sda, b04_scl : std_logic := '0';
+  signal b04_i2c_ena, b04_cs_b, b04_rst_b : std_logic := '0';
+  signal b04_int_b, b04_present_b : std_logic := '0';
+  signal spy_i2c_ena, spy_tdis : std_logic := '0';
+  signal spy_sda, spy_scl : std_logic := '0';
+  signal spy_sd : std_logic := '0';
+
+  -- Dummy signals
+  signal dummy_clk_p : std_logic := '1';
+  signal dummy_clk_n : std_logic := '0';
+
+  -- signal GTH_TXN_O : std_logic_vector(15 downto 0); -- simplify things for now
+  -- signal GTH_TXP_O : std_logic_vector(15 downto 0); -- simplify things for now
+  -- signal GTH_RXN_I : std_logic_vector(15 downto 0); -- simplify things for now
+  -- signal GTH_RXP_I : std_logic_vector(15 downto 0); -- simplify things for now
+
 begin
 
   --generate clock in simulation
@@ -281,6 +325,8 @@ begin
           );
 
   J36_USER_SMA_GPIO_P <= sysclk;
+
+  VME_DTACK_B <= vme_dtack;
 
   i_ila : ila
   port map(
@@ -512,7 +558,68 @@ begin
     DCFEB_PRBS_ERR_CNT   => dcfeb_prbs_ERR_CNT,
     OTMB_TX         => otmb_tx,
     OTMB_RX         => otmb_rx,
+    CMS_CLK_FPGA_P => dummy_clk_p,
+    CMS_CLK_FPGA_N => dummy_clk_n,
+    GP_CLK_6_P     => dummy_clk_p,
+    GP_CLK_6_N     => dummy_clk_n,
+    GP_CLK_7_P     => CLK_IN_P,
+    GP_CLK_7_N     => CLK_IN_N,
+    REF_CLK_1_P    => dummy_clk_p,
+    REF_CLK_1_N    => dummy_clk_n,
+    REF_CLK_2_P    => dummy_clk_p,
+    REF_CLK_2_N    => dummy_clk_n,
+    REF_CLK_3_P    => MGTREFCLK0_227_P,
+    REF_CLK_3_N    => MGTREFCLK0_227_N,
+    REF_CLK_4_P    => dummy_clk_p,
+    REF_CLK_4_N    => dummy_clk_n,
+    REF_CLK_5_P    => dummy_clk_p,
+    REF_CLK_5_N    => dummy_clk_n,
+    CLK_125_REF_P  => MGTREFCLK1_227_P,
+    CLK_125_REF_N  => MGTREFCLK1_227_N,
+    DAQ_RX_P       => DAQ_RX_P,
+    DAQ_RX_N       => DAQ_RX_N,
+    DAQ_SPY_RX_P   => DAQ_SPY_RX_P,
+    DAQ_SPY_RX_N   => DAQ_SPY_RX_N,
+    DAQ_SPY_SEL    => SEL_SI570_CLK_O,
+    B04_RX_P       => B04_RX_P,
+    B04_RX_N       => B04_RX_N,
+    BCK_PRS_P      => BCK_PRS_P,
+    BCK_PRS_N      => BCK_PRS_N,
+    SPY_TX_P       => SPY_TX_P,
+    SPY_TX_N       => SPY_TX_N,
+    DAQ_TX_P       => DAQ_TX_P,
+    DAQ_TX_N       => DAQ_TX_N,
+    RX12_I2C_ENA   => RX12_I2C_ENA,
+    RX12_SDA       => RX12_SDA,
+    RX12_SCL       => RX12_SCL,
+    RX12_CS_B      => RX12_CS_B,
+    RX12_RST_B     => RX12_RST_B,
+    RX12_INT_B     => RX12_INT_B,
+    RX12_PRESENT_B => RX12_PRESENT_B,
+    TX12_I2C_ENA   => TX12_I2C_ENA,
+    TX12_SDA       => TX12_SDA,
+    TX12_SCL       => TX12_SCL,
+    TX12_CS_B      => TX12_CS_B,
+    TX12_RST_B     => TX12_RST_B,
+    TX12_INT_B     => TX12_INT_B,
+    TX12_PRESENT_B => TX12_PRESENT_B,
+    B04_I2C_ENA    => B04_I2C_ENA,
+    B04_SDA        => B04_SDA,
+    B04_SCL        => B04_SCL,
+    B04_CS_B       => B04_CS_B,
+    B04_RST_B      => B04_RST_B,
+    B04_INT_B      => B04_INT_B,
+    B04_PRESENT_B  => B04_PRESENT_B,
+    SPY_I2C_ENA    => SPY_I2C_ENA,
+    SPY_SDA        => SPY_SDA,
+    SPY_SCL        => SPY_SCL,
+    SPY_SD         => SPY_SD,
+    SPY_TDIS       => SPY_TDIS,
     --KCU only signals
+    KCU_GTH_TXN_O  => GTH_TXN_O,
+    KCU_GTH_TXP_O  => GTH_TXP_O,
+    KCU_GTH_RXN_I  => GTH_RXN_I,
+    KCU_GTH_RXP_I  => GTH_RXP_I,
     VME_DATA_IN    => vme_data_io_in,        --unused/open in real ODMB
     VME_DATA_OUT   => vme_data_io_out       --unused/open in real ODMB
     );
