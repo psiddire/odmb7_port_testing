@@ -54,7 +54,7 @@ entity ODMB_VME is
     VME_IACK_B    : in std_logic;
     VME_BERR_B    : in std_logic;
     VME_SYSFAIL_B : in std_logic;
-    VME_DTACK_B   : inout std_logic;
+    VME_DTACK_B   : out std_logic;
     VME_OE_B      : out std_logic;
     VME_DIR_B     : out std_logic;
 
@@ -67,10 +67,10 @@ entity ODMB_VME is
     DCFEB_TDO    : in  std_logic_vector (NCFEB downto 1);
 
     DCFEB_DONE     : in std_logic_vector (NCFEB downto 1);
-    DCFEB_INITJTAG : in std_logic;   -- TODO: where does this fit in
+    DCFEB_INITJTAG : in std_logic;
 
     --------------------
-    -- From/To LVMB: ODMB & ODMB7 design, ODMB5 to be seen
+    -- TODO: From/To LVMB: ODMB & ODMB7 design, ODMB5 to be seen
     --------------------
     LVMB_PON   : out std_logic_vector(7 downto 0);
     PON_LOAD   : out std_logic;
@@ -302,8 +302,6 @@ begin
   idx_dev <= to_integer(unsigned(cmd_adrs_inner(15 downto 12)));
   VME_DATA_OUT <= outdata_dev(idx_dev);
 
-  --Handle DTACK
-  PULLUP_vme_dtack : PULLUP port map (O => VME_DTACK_B);
   VME_DTACK_B <= not or_reduce(dtack_dev);
 
   ----------------------------------

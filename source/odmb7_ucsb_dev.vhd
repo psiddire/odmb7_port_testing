@@ -57,7 +57,7 @@ entity ODMB7_UCSB_DEV is
     VME_CLK_B       : in std_logic;                        -- Bank 48, not used
     KUS_VME_OE_B    : out std_logic;                       -- Bank 44
     KUS_VME_DIR_B   : out std_logic;                       -- Bank 44
-    VME_DTACK_KUS_B : inout std_logic;                     -- Bank 44
+    VME_DTACK_KUS_B : out std_logic;                       -- Bank 44
 
     DCFEB_TCK_P    : out std_logic_vector(NCFEB downto 1); -- Labeled as "TCK_X_P"; Bank 68
     DCFEB_TCK_N    : out std_logic_vector(NCFEB downto 1); -- Labeled as "TCK_X_N"; Bank 68
@@ -172,18 +172,18 @@ entity ODMB7_UCSB_DEV is
     --------------------------------
     -- KCU signals (not in ODMB)
     --------------------------------
-    -- ;
-    -- VME_DATA_IN   : in  std_logic_vector (15 downto 0); --no internal IOBUFs on KCU
-    -- VME_DATA_OUT  : out std_logic_vector (15 downto 0)  --no internal IOBUFs on KCU
+    -- ; --kcuonly
+    -- VME_DATA_IN   : in  std_logic_vector (15 downto 0); --kcuonly
+    -- VME_DATA_OUT  : out std_logic_vector (15 downto 0) --kcuonly
 
     -- --------------------------------
     -- -- IBERT test signals for KCU (not in ODMB)
     -- --------------------------------
-    -- ;
-    -- KCU_GTH_TXN_O : out std_logic_vector(15 downto 0); -- simply things for now
-    -- KCU_GTH_TXP_O : out std_logic_vector(15 downto 0); -- simply things for now
-    -- KCU_GTH_RXN_I : in std_logic_vector(15 downto 0);  -- simply things for now
-    -- KCU_GTH_RXP_I : in std_logic_vector(15 downto 0)   -- simply things for now
+    -- ; --kcuonly
+    -- KCU_GTH_TXN_O : out std_logic_vector(15 downto 0); --kcuonly
+    -- KCU_GTH_TXP_O : out std_logic_vector(15 downto 0); --kcuonly
+    -- KCU_GTH_RXN_I : in std_logic_vector(15 downto 0); --kcuonly
+    -- KCU_GTH_RXP_I : in std_logic_vector(15 downto 0) --kcuonly
 
     );
 end ODMB7_UCSB_DEV;
@@ -221,7 +221,7 @@ architecture Behavioral of ODMB7_UCSB_DEV is
       VME_IACK_B    : in std_logic;
       VME_BERR_B    : in std_logic;
       VME_SYSFAIL_B : in std_logic;
-      VME_DTACK_B   : inout std_logic;
+      VME_DTACK_B   : out std_logic;
       VME_OE_B      : out std_logic;
       VME_DIR_B     : out std_logic;
 
@@ -363,13 +363,29 @@ architecture Behavioral of ODMB7_UCSB_DEV is
 
   component clock_manager is
     port (
-      CLK_IN1_P  : in std_logic;
-      CLK_IN1_N  : in std_logic;
-      CLK_OUT160 : out std_logic;
-      CLK_OUT80  : out std_logic;
-      CLK_OUT40  : out std_logic;
-      CLK_OUT20  : out std_logic;
-      CLK_OUT10  : out std_logic
+      clk_in1_p  : in std_logic;
+      clk_in1_n  : in std_logic;
+      clk_out160 : out std_logic;
+      clk_out80  : out std_logic;
+      clk_out40  : out std_logic;
+      clk_out20  : out std_logic;
+      clk_out10  : out std_logic
+      );
+  end component;
+
+  component ila is
+    port (
+      clk : in std_logic := '0';
+      probe0 : in std_logic_vector(255 downto 0) := (others=> '0');
+      probe1 : in std_logic_vector(4095 downto 0) := (others => '0')
+      );
+  end component;
+
+  component vio_top
+    port (
+      clk : in std_logic;
+      probe_in0 : in std_logic_vector(31 downto 0);
+      probe_out0 : out std_logic_vector(0 downto 0)
       );
   end component;
 
@@ -511,6 +527,11 @@ architecture Behavioral of ODMB7_UCSB_DEV is
   signal odmb_data_sel : std_logic_vector(7 downto 0) := (others => '0');
 
   --------------------------------------
+  -- Debug signals
+  --------------------------------------
+  signal vio_mon : std_logic_vector(31 downto 0) := (others => '0');
+
+  --------------------------------------
   -- Signals for the IBERT test
   --------------------------------------
   signal gth_txn_o : std_logic_vector(15 downto 0);
@@ -547,14 +568,14 @@ begin
   -------------------------------------------------------------------------------------------
   -- Handle clock synthesizer signals and generate clocks
   -------------------------------------------------------------------------------------------
-  clk_gen_i : clock_manager
+  u_clk_gen : clock_manager
     port map(
-      CLK_IN1_P  => CMS_CLK_FPGA_P,
-      CLK_IN1_N  => CMS_CLK_FPGA_N,
-      CLK_OUT160 => clk160,
-      CLK_OUT80  => clk80,
-      CLK_OUT40  => clk40,
-      CLK_OUT10  => clk10
+      clk_in1_p  => CMS_CLK_FPGA_P,
+      clk_in1_n  => CMS_CLK_FPGA_N,
+      clk_out160 => clk160,
+      clk_out80  => clk80,
+      clk_out40  => clk40,
+      clk_out10  => clk10
       );
 
   -- In first version of test firmware, we will want to generate everything from 40 MHz cms clock, likely with Clock Manager IP
@@ -573,15 +594,12 @@ begin
   KUS_VME_DIR_B <= vme_dir_b;
   vme_dir <= not vme_dir_b;
 
-  -- FIXME: Is VME_DTACK_KUS_B really an inout signal? 
-  -- VME_DTACK_KUS_B
-
   -- FIXME: KCU only: multiplex vme_data_in and out lines together
   -- can't have internal IOBUFs on KCU
-  -- vme_data_kcu_i : if in_kcu105 generate
-  --   vme_data_in_buf <= VME_DATA_IN;
-  --   VME_DATA_OUT <= vme_data_out_buf; 
-  -- end generate vme_data_kcu_i;
+  -- vme_data_kcu_i : if in_kcu105 generate --kcuonly
+  --   vme_data_in_buf <= VME_DATA_IN; --kcuonly
+  --   VME_DATA_OUT <= vme_data_out_buf; --kcuonly
+  -- end generate vme_data_kcu_i; --kcuonly
 
   --real board/simulation can have IOBUFs
   vme_data_simulation_i : if not in_kcu105 generate
@@ -821,7 +839,15 @@ begin
   SPY_TX_P <= gth_txp_o(11);
   SPY_TX_N <= gth_txn_o(11);
 
-  DAQ_SPY_SEL <= '1';   -- will connect to sel_si570_clk in KCU
+  -- DAQ_SPY_SEL <= '1';   -- will connect to sel_si570_clk in KCU
+  vio_mon <= odmb_data & vme_data_out_buf;
+
+  u_vio_top : vio_top
+    port map (
+      clk => clk80,                  -- same as IBERT
+      probe_in0 => vio_mon,
+      probe_out0(0) => DAQ_SPY_SEL      -- default '1'
+      );
 
   -- Possible options for the IBERT sysclk
   
@@ -1058,6 +1084,11 @@ begin
       gtsouthrefclk01_i => gth_qsouthrefclk01_i,
       gtsouthrefclk11_i => gth_qsouthrefclk11_i
       );
+
+  -------------------------------------------------------------------------------------------
+  -- Debug functions
+  -------------------------------------------------------------------------------------------
+  
 
 
 end Behavioral;
