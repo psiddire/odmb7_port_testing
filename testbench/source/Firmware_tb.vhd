@@ -5,7 +5,7 @@ use ieee.numeric_std.all;
 library UNISIM;
 use UNISIM.VComponents.all;
 
-use work.Firmware_pkg.all;
+use work.odmb_consts.all;
 
 entity Firmware_tb is
   generic (
@@ -29,20 +29,19 @@ entity Firmware_tb is
     GTH_RXN_I : in std_logic_vector(15 downto 0);  -- simply things for now
     GTH_RXP_I : in std_logic_vector(15 downto 0);  -- simply things for now
 
-    SEL_SI570_CLK_O : out std_logic;
-
-    VME_DTACK_B : out std_logic         -- for compile concern
+    SEL_SI570_CLK_O : out std_logic
   );      
 end Firmware_tb;
 
 architecture Behavioral of Firmware_tb is
   component clockManager is
   port (
-    CLK_IN300  : in std_logic := '0';
-    CLK_OUT40  : out std_logic := '0';
-    CLK_OUT10  : out std_logic := '0';
-    CLK_OUT80  : out std_logic := '0';
-    CLK_OUT160 : out std_logic := '0'
+    clk_in300  : in std_logic := '0';
+    clk_out40  : out std_logic := '0';
+    clk_out20  : out std_logic := '0';
+    clk_out10  : out std_logic := '0';
+    clk_out80  : out std_logic := '0';
+    clk_out160 : out std_logic := '0'
   );
   end component;
   component ila is
@@ -132,10 +131,13 @@ architecture Behavioral of Firmware_tb is
   -- Clock signals
   signal clk_in_buf : std_logic := '0';
   signal sysclk : std_logic := '0';
+  signal sysclkHalf : std_logic := '0'; 
   signal sysclkQuarter : std_logic := '0'; 
   signal sysclkDouble : std_logic := '0';
   signal sysclkQuad : std_logic := '0';
   signal init_done: std_logic := '0';
+  signal sysclk_p : std_logic := '0';
+  signal sysclk_n : std_logic := '1';
   -- Constants
   constant bw_output : integer := 20;
   constant bw_fifo   : integer := 18;
@@ -184,7 +186,7 @@ architecture Behavioral of Firmware_tb is
   signal vme_data_io_in_buf   : std_logic_vector(15 downto 0) := (others => '0');
   signal vme_data_io_out_buf  : std_logic_vector (15 downto 0) := (others => '0');
   signal vme_data_io      : std_logic_vector(15 downto 0) := (others => '0'); 
-  signal vme_dtack   : std_logic := 'H';
+  signal vme_dtack   : std_logic := '0';
 
   -- DCFEB signals (ODMB <-> (xD)CFEB)
   signal dl_jtag_tck    : std_logic_vector (NCFEB downto 1)  := (others => '0');
@@ -223,24 +225,15 @@ architecture Behavioral of Firmware_tb is
 
   signal dcfeb_done       : std_logic_vector (NCFEB downto 1) := (others => '0');
 
-  signal lvmb_pon   : std_logic_vector(7 downto 0);
-  signal pon_load   : std_logic;
-  signal pon_oe_B   : std_logic;
-  signal r_lvmb_PON : std_logic_vector(7 downto 0);
-  signal lvmb_csb   : std_logic_vector(6 downto 0);
-  signal lvmb_sclk  : std_logic;
-  signal lvmb_sdin  : std_logic;
-  signal lvmb_sdout : std_logic;
-
-  signal dcfeb_prbs_FIBER_SEL : std_logic_vector(3 downto 0);
-  signal dcfeb_prbs_EN        : std_logic;
-  signal dcfeb_prbs_RST       : std_logic;
-  signal dcfeb_prbs_RD_EN     : std_logic;
-  signal dcfeb_rxprbserr      : std_logic;
-  signal dcfeb_prbs_ERR_CNT   : std_logic_vector(15 downto 0);
-
-  signal otmb_tx    : std_logic_vector(48 downto 0);
-  signal otmb_rx    : std_logic_vector(5 downto 0);
+  signal lvmb_pon     : std_logic_vector(7 downto 0);
+  signal pon_load     : std_logic;
+  signal pon_oe_B     : std_logic;
+  signal r_lvmb_PON   : std_logic_vector(7 downto 0);
+  signal lvmb_csb     : std_logic_vector(6 downto 0);
+  signal lvmb_sclk    : std_logic;
+  signal lvmb_sdin    : std_logic;
+  signal lvmb_sdout_p : std_logic;
+  signal lvmb_sdout_n : std_logic;
 
   -- ILA
   signal trig0 : std_logic_vector(255 downto 0) := (others=> '0');
@@ -306,7 +299,7 @@ begin
       end loop;
     end process;
   end generate input_clk_simulation_i;
-  input_clk_synthesize_i : if in_synthesis generate
+  input_clk_synthesize_i : if in_kcu105 generate
     ibufg_i : IBUFGDS
     port map (
                I => CLK_IN_P,
@@ -319,6 +312,7 @@ begin
   port map(
             CLK_IN300 => clk_in_buf,
             CLK_OUT40 => sysclk,
+            CLK_OUT20 => sysclkHalf,
             CLK_OUT10 => sysclkQuarter,
             CLK_OUT80 => sysclkDouble,
             CLK_OUT160 => sysclkQuad
@@ -326,8 +320,9 @@ begin
 
   J36_USER_SMA_GPIO_P <= sysclk;
 
-  VME_DTACK_B <= vme_dtack;
-
+  sysclk_p <= sysclk;
+  sysclk_n <= not sysclk;
+  
   i_ila : ila
   port map(
     clk => sysclk,   -- everything is clocked on 40 MHz or slower so to maximize useful buffer size use 40 MHz
@@ -446,14 +441,14 @@ begin
 
   -- Manage ODMB<->VME<->VCC signals-------------------------------------------------------------------
   -- in simulation/real ODMB, use IOBUF
-  vcc_data_simulation_i : if in_simulation generate
+  vcc_data_simulation_i : if not in_kcu105 generate
     VCC_GEN_15 : for I in 0 to 15 generate
     begin
       VME_BUF : IOBUF port map(O => vme_data_io_out_buf(I), IO => vme_data_io(I), I => vme_data_io_in_buf(I), T => vme_oe_b); 
     end generate VCC_GEN_15;
   end generate vcc_data_simulation_i;
   -- on KCU use the separated signals
-  vcc_data_kcu_i : if in_synthesis generate
+  vcc_data_kcu_i : if in_kcu105 generate
     vme_data_io_in <= vme_data_io_in_buf;
     vme_data_io_out_buf <= vme_data_io_out;
   end generate vcc_data_kcu_i;
@@ -461,7 +456,7 @@ begin
   -- DCFEB simulation
   -- Manage ODMB<->PPIB<->DCFEB signals----------------------------------------------------------------
   -- in simulation/real ODMB, use I/OBUFDS
-  cfebjtag_conn_simulation_i : if in_simulation generate
+  cfebjtag_conn_simulation_i : if not in_kcu105 generate
     IB_DCFEB_TMS: IBUFDS port map (O => dl_jtag_tms, I => dcfeb_tms_p, IB => dcfeb_tms_n);
     IB_DCFEB_TDI: IBUFDS port map (O => dl_jtag_tdi, I => dcfeb_tdi_p, IB => dcfeb_tdi_n);
     IB_DCFEB_INJPLS: IBUFDS port map (O => injpls, I => injpls_p, IB => injpls_n);
@@ -479,7 +474,7 @@ begin
     end generate GEN_DCFEB_7;
   end generate cfebjtag_conn_simulation_i;
   -- on KCU use the P lines as signals
-  cfebjtag_conn_kcu_i : if in_synthesis generate
+  cfebjtag_conn_kcu_i : if in_kcu105 generate
     dl_jtag_tms <= dcfeb_tms_p;
     dl_jtag_tdi <= dcfeb_tdi_p;
     dl_jtag_tck <= dcfeb_tck_p;
@@ -494,33 +489,69 @@ begin
   end generate cfebjtag_conn_kcu_i;
   
 
+  -- IBERT ports re-mapping
+  DAQ_RX_P     <= GTH_RXP_I(10 downto 0);
+  DAQ_RX_N     <= GTH_RXN_I(10 downto 0);
+  DAQ_SPY_RX_P <= GTH_RXP_I(11);
+  DAQ_SPY_RX_N <= GTH_RXN_I(11);
+  BCK_PRS_P    <= GTH_RXP_I(12);
+  BCK_PRS_N    <= GTH_RXN_I(12);
+  B04_RX_P     <= GTH_RXP_I(15 downto 13);
+  B04_RX_N     <= GTH_RXN_I(15 downto 13);
+
+  GTH_TXP_O(15 downto 12) <= DAQ_TX_P;
+  GTH_TXN_O(15 downto 12) <= DAQ_TX_N;
+  GTH_TXP_O(11)           <= SPY_TX_P;
+  GTH_TXN_O(11)           <= SPY_TX_N;
+
+
   -- ODMB Firmware module
   odmb_i: entity work.ODMB7_UCSB_DEV
   port map(
     -- Clock
-    CLK160         => sysclkQuad,
-    CLK80          => sysclkDouble,
-    CLK40          => sysclk,
-    CLK10          => sysclkQuarter,
-    RST            => rst_global,
-    VME_DATA       => vme_data_io,
-    VME_GAP_B      => vme_ga(5),
-    VME_GA_B       => vme_ga(4 downto 0),
-    VME_ADDR       => vme_addr,
-    VME_AM         => vme_am,
-    VME_AS_B       => vme_as,
-    VME_DS_B       => vme_ds,
-    VME_LWORD_B    => vme_lword,
-    VME_WRITE_B    => vme_write_b,
-    VME_IACK_B     => vme_iack,
-    VME_BERR_B     => vme_berr,
-    VME_SYSRST_B   => vme_sysrst,
-    VME_SYSFAIL_B  => vme_sysfail,
+    TB_CLK160       => sysclkQuad,
+    TB_CLK80        => sysclkDouble,
+    TB_CLK40        => sysclk,
+    TB_CLK20        => sysclkHalf,
+    TB_CLK10        => sysclkQuarter,
+    CMS_CLK_FPGA_P  => sysclk_p, -- system clock: 40.07897 MHz
+    CMS_CLK_FPGA_N  => sysclk_n, -- system clock: 40.07897 MHz
+    GP_CLK_6_P      => dummy_clk_p, -- system clock: ? MHz
+    GP_CLK_6_N      => dummy_clk_n, -- system clock: ? MHz
+    GP_CLK_7_P      => dummy_clk_p, -- system clock: ? MHz, pretend 80
+    GP_CLK_7_N      => dummy_clk_n, -- system clock: ? MHz, pretend 80
+    REF_CLK_1_P     => dummy_clk_p, -- optical TX/RX refclk, 160 MHz
+    REF_CLK_1_N     => dummy_clk_n, -- optical TX/RX refclk, 160 MHz
+    REF_CLK_2_P     => dummy_clk_p, -- optical TX/RX refclk, 160 MHz
+    REF_CLK_2_N     => dummy_clk_n, -- optical TX/RX refclk, 160 MHz
+    REF_CLK_3_P     => MGTREFCLK0_227_P, -- optical TX/RX refclk, 156.25 MHz
+    REF_CLK_3_N     => MGTREFCLK0_227_N, -- optical TX/RX refclk, 156.25 MHz
+    REF_CLK_4_P     => dummy_clk_p, -- optical TX/RX refclk, 160 MHz
+    REF_CLK_4_N     => dummy_clk_n, -- optical TX/RX refclk, 160 MHz
+    REF_CLK_5_P     => dummy_clk_p, -- optical TX/RX refclk, 160 MHz
+    REF_CLK_5_N     => dummy_clk_n, -- optical TX/RX refclk, 160 MHz
+    CLK_125_REF_P   => MGTREFCLK1_227_P, -- place holder
+    CLK_125_REF_N   => MGTREFCLK1_227_N, -- place holder
+
+    -- RST          => rst_global,
+    VME_DATA        => vme_data_io,
+    VME_GAP_B       => vme_ga(5),
+    VME_GA_B        => vme_ga(4 downto 0),
+    VME_ADDR        => vme_addr,
+    VME_AM          => vme_am,
+    VME_AS_B        => vme_as,
+    VME_DS_B        => vme_ds,
+    VME_LWORD_B     => vme_lword,
+    VME_WRITE_B     => vme_write_b,
+    VME_IACK_B      => vme_iack,
+    VME_BERR_B      => vme_berr,
+    VME_SYSRST_B    => vme_sysrst,
+    VME_SYSFAIL_B   => vme_sysfail,
     VME_DTACK_KUS_B => vme_dtack,
     VME_CLK_B       => vme_clk_b,
     KUS_VME_OE_B    => kus_vme_oe_b,
     KUS_VME_DIR_B   => vme_dir_b,
-    DIAGOUT         => diagout,
+    -- DIAGOUT      => diagout,
     DCFEB_TCK_P     => dcfeb_tck_p,
     DCFEB_TCK_N     => dcfeb_tck_n,
     DCFEB_TMS_P     => dcfeb_tms_p,
@@ -545,83 +576,59 @@ begin
     LVMB_PON        => lvmb_pon,
     PON_LOAD        => pon_load,
     PON_OE_B        => pon_oe_B,
-    R_LVMB_PON      => r_lvmb_PON,
+    MON_LVMB_PON    => r_lvmb_PON,
     LVMB_CSB        => lvmb_csb,
     LVMB_SCLK       => lvmb_sclk,
     LVMB_SDIN       => lvmb_sdin,
-    LVMB_SDOUT      => lvmb_sdout,
-    DCFEB_PRBS_FIBER_SEL => dcfeb_prbs_FIBER_SEL,
-    DCFEB_PRBS_EN        => dcfeb_prbs_EN,
-    DCFEB_PRBS_RST       => dcfeb_prbs_RST,
-    DCFEB_PRBS_RD_EN     => dcfeb_prbs_RD_EN,
-    DCFEB_RXPRBSERR      => dcfeb_rxprbserr,
-    DCFEB_PRBS_ERR_CNT   => dcfeb_prbs_ERR_CNT,
-    OTMB_TX         => otmb_tx,
-    OTMB_RX         => otmb_rx,
-    CMS_CLK_FPGA_P => dummy_clk_p,
-    CMS_CLK_FPGA_N => dummy_clk_n,
-    GP_CLK_6_P     => dummy_clk_p,
-    GP_CLK_6_N     => dummy_clk_n,
-    GP_CLK_7_P     => CLK_IN_P,
-    GP_CLK_7_N     => CLK_IN_N,
-    REF_CLK_1_P    => dummy_clk_p,
-    REF_CLK_1_N    => dummy_clk_n,
-    REF_CLK_2_P    => dummy_clk_p,
-    REF_CLK_2_N    => dummy_clk_n,
-    REF_CLK_3_P    => MGTREFCLK0_227_P,
-    REF_CLK_3_N    => MGTREFCLK0_227_N,
-    REF_CLK_4_P    => dummy_clk_p,
-    REF_CLK_4_N    => dummy_clk_n,
-    REF_CLK_5_P    => dummy_clk_p,
-    REF_CLK_5_N    => dummy_clk_n,
-    CLK_125_REF_P  => MGTREFCLK1_227_P,
-    CLK_125_REF_N  => MGTREFCLK1_227_N,
-    DAQ_RX_P       => DAQ_RX_P,
-    DAQ_RX_N       => DAQ_RX_N,
-    DAQ_SPY_RX_P   => DAQ_SPY_RX_P,
-    DAQ_SPY_RX_N   => DAQ_SPY_RX_N,
-    DAQ_SPY_SEL    => SEL_SI570_CLK_O,
-    B04_RX_P       => B04_RX_P,
-    B04_RX_N       => B04_RX_N,
-    BCK_PRS_P      => BCK_PRS_P,
-    BCK_PRS_N      => BCK_PRS_N,
-    SPY_TX_P       => SPY_TX_P,
-    SPY_TX_N       => SPY_TX_N,
-    DAQ_TX_P       => DAQ_TX_P,
-    DAQ_TX_N       => DAQ_TX_N,
-    RX12_I2C_ENA   => RX12_I2C_ENA,
-    RX12_SDA       => RX12_SDA,
-    RX12_SCL       => RX12_SCL,
-    RX12_CS_B      => RX12_CS_B,
-    RX12_RST_B     => RX12_RST_B,
-    RX12_INT_B     => RX12_INT_B,
-    RX12_PRESENT_B => RX12_PRESENT_B,
-    TX12_I2C_ENA   => TX12_I2C_ENA,
-    TX12_SDA       => TX12_SDA,
-    TX12_SCL       => TX12_SCL,
-    TX12_CS_B      => TX12_CS_B,
-    TX12_RST_B     => TX12_RST_B,
-    TX12_INT_B     => TX12_INT_B,
-    TX12_PRESENT_B => TX12_PRESENT_B,
-    B04_I2C_ENA    => B04_I2C_ENA,
-    B04_SDA        => B04_SDA,
-    B04_SCL        => B04_SCL,
-    B04_CS_B       => B04_CS_B,
-    B04_RST_B      => B04_RST_B,
-    B04_INT_B      => B04_INT_B,
-    B04_PRESENT_B  => B04_PRESENT_B,
-    SPY_I2C_ENA    => SPY_I2C_ENA,
-    SPY_SDA        => SPY_SDA,
-    SPY_SCL        => SPY_SCL,
-    SPY_SD         => SPY_SD,
-    SPY_TDIS       => SPY_TDIS,
+    LVMB_SDOUT_P    => lvmb_sdout_p,
+    LVMB_SDOUT_N    => lvmb_sdout_n,
+    DAQ_RX_P        => DAQ_RX_P,
+    DAQ_RX_N        => DAQ_RX_N,
+    DAQ_SPY_RX_P    => DAQ_SPY_RX_P,
+    DAQ_SPY_RX_N    => DAQ_SPY_RX_N,
+    DAQ_SPY_SEL     => SEL_SI570_CLK_O,
+    B04_RX_P        => B04_RX_P,
+    B04_RX_N        => B04_RX_N,
+    BCK_PRS_P       => BCK_PRS_P,
+    BCK_PRS_N       => BCK_PRS_N,
+    SPY_TX_P        => SPY_TX_P,
+    SPY_TX_N        => SPY_TX_N,
+    DAQ_TX_P        => DAQ_TX_P,
+    DAQ_TX_N        => DAQ_TX_N,
+    RX12_I2C_ENA    => RX12_I2C_ENA,
+    RX12_SDA        => RX12_SDA,
+    RX12_SCL        => RX12_SCL,
+    RX12_CS_B       => RX12_CS_B,
+    RX12_RST_B      => RX12_RST_B,
+    RX12_INT_B      => RX12_INT_B,
+    RX12_PRESENT_B  => RX12_PRESENT_B,
+    TX12_I2C_ENA    => TX12_I2C_ENA,
+    TX12_SDA        => TX12_SDA,
+    TX12_SCL        => TX12_SCL,
+    TX12_CS_B       => TX12_CS_B,
+    TX12_RST_B      => TX12_RST_B,
+    TX12_INT_B      => TX12_INT_B,
+    TX12_PRESENT_B  => TX12_PRESENT_B,
+    B04_I2C_ENA     => B04_I2C_ENA,
+    B04_SDA         => B04_SDA,
+    B04_SCL         => B04_SCL,
+    B04_CS_B        => B04_CS_B,
+    B04_RST_B       => B04_RST_B,
+    B04_INT_B       => B04_INT_B,
+    B04_PRESENT_B   => B04_PRESENT_B,
+    SPY_I2C_ENA     => SPY_I2C_ENA,
+    SPY_SDA         => SPY_SDA,
+    SPY_SCL         => SPY_SCL,
+    SPY_SD          => SPY_SD,
+    SPY_TDIS        => SPY_TDIS
     --KCU only signals
-    KCU_GTH_TXN_O  => GTH_TXN_O,
-    KCU_GTH_TXP_O  => GTH_TXP_O,
-    KCU_GTH_RXN_I  => GTH_RXN_I,
-    KCU_GTH_RXP_I  => GTH_RXP_I,
-    VME_DATA_IN    => vme_data_io_in,        --unused/open in real ODMB
-    VME_DATA_OUT   => vme_data_io_out       --unused/open in real ODMB
+    -- ,
+    -- KCU_GTH_TXN_O   => GTH_TXN_O,
+    -- KCU_GTH_TXP_O   => GTH_TXP_O,
+    -- KCU_GTH_RXN_I   => GTH_RXN_I,
+    -- KCU_GTH_RXP_I   => GTH_RXP_I,
+    -- VME_DATA_IN     => vme_data_io_in,       --unused/open in real ODMB
+    -- VME_DATA_OUT    => vme_data_io_out       --unused/open in real ODMB
     );
    
   -- DCFEB simulation

@@ -6,8 +6,6 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use unisim.vcomponents.all;
 
-use work.Firmware_pkg.all;     -- for switch between sim and synthesis
-
 entity dcfeb_v6 is
   generic (
     dcfeb_addr : std_logic_vector(3 downto 0) := "1000"  -- DCFEB address

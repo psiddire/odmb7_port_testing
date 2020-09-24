@@ -127,7 +127,7 @@ entity ODMB7_UCSB_DEV is
 
     RX12_I2C_ENA   : out std_logic;
     RX12_SDA       : inout std_logic;
-    RX12_SCL       : inout std_logic;
+    RX12_SCL       : out std_logic;
     RX12_CS_B      : out std_logic;
     RX12_RST_B     : out std_logic;
     RX12_INT_B     : in std_logic;
@@ -135,7 +135,7 @@ entity ODMB7_UCSB_DEV is
 
     TX12_I2C_ENA   : out std_logic;
     TX12_SDA       : inout std_logic;
-    TX12_SCL       : inout std_logic;
+    TX12_SCL       : out std_logic;
     TX12_CS_B      : out std_logic;
     TX12_RST_B     : out std_logic;
     TX12_INT_B     : in std_logic;
@@ -143,7 +143,7 @@ entity ODMB7_UCSB_DEV is
 
     B04_I2C_ENA   : out std_logic;
     B04_SDA       : inout std_logic;
-    B04_SCL       : inout std_logic;
+    B04_SCL       : out std_logic;
     B04_CS_B      : out std_logic;
     B04_RST_B     : out std_logic;
     B04_INT_B     : in std_logic;
@@ -151,7 +151,7 @@ entity ODMB7_UCSB_DEV is
 
     SPY_I2C_ENA   : out std_logic;
     SPY_SDA       : inout std_logic;
-    SPY_SCL       : inout std_logic;
+    SPY_SCL       : out std_logic;
     SPY_SD        : in std_logic;       -- Signal Detect
     SPY_TDIS      : out std_logic       -- Transmitter Disable
 
@@ -164,10 +164,11 @@ entity ODMB7_UCSB_DEV is
     -- Test bench signals (not in ODMB)
     --------------------------------
     -- ;
-    -- CLK160      : in std_logic;  -- For dcfeb prbs (160MHz)
-    -- CLK80       : in std_logic;
-    -- CLK40       : in std_logic;  -- NEW (fastclk -> 40MHz)
-    -- CLK10       : in std_logic;  -- NEW (midclk -> fastclk/4 -> 10MHz)
+    -- TB_CLK160      : in std_logic;  --kcuonly
+    -- TB_CLK80       : in std_logic;  --kcuonly
+    -- TB_CLK40       : in std_logic;  --kcuonly
+    -- TB_CLK20       : in std_logic;  --kcuonly
+    -- TB_CLK10       : in std_logic   --kcuonly
 
     --------------------------------
     -- KCU signals (not in ODMB)
@@ -568,15 +569,26 @@ begin
   -------------------------------------------------------------------------------------------
   -- Handle clock synthesizer signals and generate clocks
   -------------------------------------------------------------------------------------------
-  u_clk_gen : clock_manager
-    port map(
-      clk_in1_p  => CMS_CLK_FPGA_P,
-      clk_in1_n  => CMS_CLK_FPGA_N,
-      clk_out160 => clk160,
-      clk_out80  => clk80,
-      clk_out40  => clk40,
-      clk_out10  => clk10
-      );
+  clkgen_i : if not in_kcu105 generate
+    u_clk_gen : clock_manager
+      port map(
+        clk_in1_p  => CMS_CLK_FPGA_P,
+        clk_in1_n  => CMS_CLK_FPGA_N,
+        clk_out160 => clk160,
+        clk_out80  => clk80,
+        clk_out40  => clk40,
+        clk_out20  => clk20,
+        clk_out10  => clk10
+        );
+  end generate clkgen_i;
+
+  -- clkgen_kcu : if not in_kcu105 generate --kcuonly
+  --   clk160 <= TB_CLK160; --kcuonly
+  --   clk80  <= TB_CLK80; --kcuonly
+  --   clk40  <= TB_CLK40; --kcuonly
+  --   clk20  <= TB_CLK20; --kcuonly
+  --   clk10  <= TB_CLK10; --kcuonly
+  -- end generate clkgen_kcu; --kcuonly
 
   -- In first version of test firmware, we will want to generate everything from 40 MHz cms clock, likely with Clock Manager IP
   -- generate 2p5 clock 
@@ -819,10 +831,10 @@ begin
       );
 
   -- -- to simplify the datalines for KCU
-  -- KCU_GTH_TXN_O <= gth_txn_o;
-  -- KCU_GTH_TXP_O <= gth_txp_o;
-  -- gth_rxn_i <= KCU_GTH_RXN_I;
-  -- gth_rxp_i <= KCU_GTH_RXP_I;
+  -- KCU_GTH_TXN_O <= gth_txn_o; --kcuonly
+  -- KCU_GTH_TXP_O <= gth_txp_o; --kcuonly
+  -- gth_rxn_i <= KCU_GTH_RXN_I; --kcuonly
+  -- gth_rxp_i <= KCU_GTH_RXP_I; --kcuonly
 
   -- Real ODMB configs
   gth_rxp_i(10 downto 0)  <= DAQ_RX_P;

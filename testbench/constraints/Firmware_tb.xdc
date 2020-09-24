@@ -1,3 +1,5 @@
+
+# Set I/O pin out for the KCU105 testboard
 set_property PACKAGE_PIN AK17 [get_ports CLK_IN_P]
 set_property IOSTANDARD  DIFF_SSTL12 [get_ports CLK_IN_P]
 set_property ODT         RTT_48 [get_ports CLK_IN_P]

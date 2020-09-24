@@ -19,8 +19,7 @@ package odmb_consts is
   -- synthesis translate_on
   ;
   constant in_synthesis : BOOLEAN := not in_simulation;
-
-  constant in_kcu105 : BOOLEAN := true;
+  constant in_kcu105 : BOOLEAN := in_synthesis and false;
 
   type FSM_FIFO is ( INIT, STANDBY, RDONLY, WRONLY, RDWR );
 

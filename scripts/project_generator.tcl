@@ -18,9 +18,9 @@ set_property target_simulator XSim [current_project]
 add_files "../source/"
 
 # Add IP core files
-add_files "../ip/xcku035-ffva1156-1-c/ibert_odmb7_gth/ibert_odmb7_gth.xci"
-add_files "../ip/xcku035-ffva1156-1-c/clock_manager/clock_manager.xci"
-add_files "../ip/xcku035-ffva1156-1-c/vio_top/vio_top.xci"
+add_files "../ip/$FPGA_TYPE/ibert_odmb7_gth/ibert_odmb7_gth.xci"
+add_files "../ip/$FPGA_TYPE/clock_manager/clock_manager.xci"
+add_files "../ip/$FPGA_TYPE/vio_top/vio_top.xci"
 
 # Add constraint files
 add_files -fileset constrs_1 "../constraints/"
