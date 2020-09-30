@@ -33,9 +33,7 @@ entity CFEBJTAG is
     FEBTDO    : in  std_logic_vector(NCFEB downto 1);
 
     LED     : out std_logic;
-    DIAGOUT : out std_logic_vector(17 downto 0);
-
-    CSP_LVMB_LA_CTRL : inout std_logic_vector(35 downto 0)
+    DIAGOUT : out std_logic_vector(17 downto 0)
     );
 end CFEBJTAG;
 
@@ -335,7 +333,7 @@ begin
   FDC_q2resetjtag : FDC port map(D => Q1_RESETJTAG, C => SLOWCLK, CLR => RST, Q => Q2_RESETJTAG);
   OKRST         <= '1' when (Q1_RESETJTAG = '1' and Q2_RESETJTAG = '1')           else '0';
   CLR_RESETJTAG <= '1' when (RESETDONE = '1' or RST = '1')                        else '0';
-  FDC_q3resetjtag : FDC port map(D => LOGICH, C => OKRST, CLR => CLR_RESETJTAG, Q => Q3_RESETJTAG);
+  FDC_q3resetjtag : FDCE port map(D => LOGICH, C => SLOWCLK, CE => OKRST, CLR => CLR_RESETJTAG, Q => Q3_RESETJTAG);
   FDC_resetjtag : FDC port map(D => Q3_RESETJTAG, C => SLOWCLK, CLR => CLR_RESETJTAG, Q => RESETJTAG);
 
 
@@ -361,13 +359,14 @@ begin
   tms_inner              <= Q6_RESETJTAG_TMS when (RESETJTAG = '1') else 'Z';  -- BGB
 
 -- Generate TCK
-  TCK(1) <= SELFEB(1) and TCK_GLOBAL;
-  TCK(2) <= SELFEB(2) and TCK_GLOBAL;
-  TCK(3) <= SELFEB(3) and TCK_GLOBAL;
-  TCK(4) <= SELFEB(4) and TCK_GLOBAL;
-  TCK(5) <= SELFEB(5) and TCK_GLOBAL;
-  TCK(6) <= SELFEB(6) and TCK_GLOBAL;
-  TCK(7) <= SELFEB(7) and TCK_GLOBAL;
+  TCK(1) <= TCK_GLOBAL when SELFEB(1)='1' else '0';
+  TCK(2) <= TCK_GLOBAL when SELFEB(2)='1' else '0';
+  TCK(3) <= TCK_GLOBAL when SELFEB(3)='1' else '0';
+  TCK(4) <= TCK_GLOBAL when SELFEB(4)='1' else '0';
+  TCK(5) <= TCK_GLOBAL when SELFEB(5)='1' else '0';
+  TCK(6) <= TCK_GLOBAL when SELFEB(6)='1' else '0';
+  TCK(7) <= TCK_GLOBAL when SELFEB(7)='1' else '0';
+  --TCK(7) <= SELFEB(7) and TCK_GLOBAL;
 
 
 -- Generate TDI

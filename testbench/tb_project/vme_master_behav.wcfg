@@ -14,15 +14,15 @@
       </db_ref>
    </db_ref_list>
    <zoom_setting>
-      <ZoomStartTime time="113833333333fs"></ZoomStartTime>
-      <ZoomEndTime time="265233333334fs"></ZoomEndTime>
-      <Cursor1Time time="240000000000fs"></Cursor1Time>
+      <ZoomStartTime time="0fs"></ZoomStartTime>
+      <ZoomEndTime time="65737446813fs"></ZoomEndTime>
+      <Cursor1Time time="160000000000fs"></Cursor1Time>
    </zoom_setting>
    <column_width_setting>
-      <NameColumnWidth column_width="138"></NameColumnWidth>
+      <NameColumnWidth column_width="130"></NameColumnWidth>
       <ValueColumnWidth column_width="66"></ValueColumnWidth>
    </column_width_setting>
-   <WVObjectSize size="46" />
+   <WVObjectSize size="48" />
    <wave_markers>
       <marker label="" time="669732" />
    </wave_markers>
@@ -142,6 +142,10 @@
       <obj_property name="ElementShortName">tp_sel_inner[15:0]</obj_property>
       <obj_property name="ObjectShortName">tp_sel_inner[15:0]</obj_property>
    </wvobject>
+   <wvobject type="array" fp_name="/Firmware_tb/odmb_i/i_odmb_vme/DEV1_CFEBJTAG/Q_OUTDATA">
+      <obj_property name="ElementShortName">Q_OUTDATA[15:0]</obj_property>
+      <obj_property name="ObjectShortName">Q_OUTDATA[15:0]</obj_property>
+   </wvobject>
    <wvobject fp_name="divider89" type="divider">
       <obj_property name="label">DCFEB</obj_property>
       <obj_property name="DisplayName">label</obj_property>
@@ -193,6 +197,10 @@
    <wvobject type="logic" fp_name="/Firmware_tb/dcfeb_i/RESYNC">
       <obj_property name="ElementShortName">RESYNC</obj_property>
       <obj_property name="ObjectShortName">RESYNC</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/Firmware_tb/dcfeb_i/INJPLS">
+      <obj_property name="ElementShortName">INJPLS</obj_property>
+      <obj_property name="ObjectShortName">INJPLS</obj_property>
    </wvobject>
    <wvobject type="array" fp_name="/Firmware_tb/dcfeb_i/l1a_match_counter">
       <obj_property name="ElementShortName">l1a_match_counter[11:0]</obj_property>

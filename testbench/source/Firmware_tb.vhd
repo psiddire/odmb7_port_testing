@@ -61,7 +61,8 @@ architecture Behavioral of Firmware_tb is
       INJPLS        : in std_logic;
       EXTPLS        : in std_logic;
       BC0           : in std_logic;
-      RESYNC        : in std_logic
+      RESYNC        : in std_logic;
+      DIAGOUT       : out std_logic_vector(17 downto 0)
    );
    end component;
    component vme_master is
@@ -203,6 +204,7 @@ architecture Behavioral of Firmware_tb is
   signal dcfeb_l1a_match : std_logic_vector(NCFEB downto 1) := (others => '0');
   signal l1a_match_p     : std_logic_vector(NCFEB downto 1) := (others => '0');
   signal l1a_match_n     : std_logic_vector(NCFEB downto 1) := (others => '0');
+  signal dcfeb_diagout  : std_logic_vector(17 downto 0) := (others => '0');
 
   -- signal dcfeb_tdo_t    : std_logic_vector (NCFEB downto 1)  := (others => '0');
 
@@ -288,10 +290,12 @@ begin
     probe0 => trig0,
     probe1 => data
   );
+  trig0(48) <= injpls;
   trig0(47 downto 32) <= vme_data_io_out;
   trig0(31 downto 16) <= vme_data_io_in;
   trig0(15 downto 0) <= cmddev;
   --
+  data(97 downto 80) <= dcfeb_diagout;
   data(79 downto 64) <= vme_data_io_out;
   data(63 downto 48) <= vme_data_io_in;
   data(47 downto 32) <= cmddev;
@@ -345,7 +349,7 @@ begin
         if waitCounter = 0  then
           if cack = '1' then
             inputCounter <= inputCounter + 1;
-            waitCounter <= "1000000000";
+            waitCounter <= "1100000000";
             -- Initalize lut_input_addr_s
             if inputCounter = 0 then
               lut_input_addr1_s <= to_unsigned(0,bw_addr);
@@ -542,7 +546,8 @@ begin
     INJPLS          => injpls,
     EXTPLS          => extpls,
     BC0             => dcfeb_bc0,
-    RESYNC          => dcfeb_resync
+    RESYNC          => dcfeb_resync,
+    DIAGOUT         => dcfeb_diagout
   );
   
   -- VME simulation

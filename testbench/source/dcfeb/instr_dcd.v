@@ -71,13 +71,13 @@ module instr_dcd(
   assign rst_f = RST | CLR;
   
   always @(posedge DRCK or posedge RST) begin
-    if (RST)
-	   d <= 8'h00;
-	 else
+  if (RST)
+	  d <= 8'h00;
+	else
       if (SEL & SHIFT)
         d <= {TDI,d[7:1]};
-		else
-		  d <= d;
+	  else
+	    d <= d;
   end
   
   always @(posedge TCK or posedge rst_f) begin

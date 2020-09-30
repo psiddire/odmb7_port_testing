@@ -316,9 +316,12 @@ begin
 --####################################################################
 
   CAPTURE1 <= capture_tpusr;
-  DRCK1 <= ((USER1_sig and not tap_shift_dr and not capture_tpusr) or
-               (USER1_sig and shift_tpusr and TCK) or
-               (USER1_sig and capture_tpusr and TCK));
+  --DRCK1 <= ((USER1_sig and not tap_shift_dr and not capture_tpusr) or
+  --             (USER1_sig and shift_tpusr and TCK) or
+  --             (USER1_sig and capture_tpusr and TCK));            
+  DRCK1 <= '1' when (USER1_sig='1' and tap_shift_dr='0' and capture_tpusr='0') else
+           TCK when (USER1_sig='1' and (shift_tpusr='1' or  capture_tpusr='1')) else
+           '0';
 
   RESET1   <= tap_reset;
   RUNTEST1 <= tap_runtest;
@@ -328,9 +331,12 @@ begin
 --####################################################################
 
   CAPTURE2 <= capture_tpusr;
-  DRCK2 <= ((USER2_sig and not tap_shift_dr and not capture_tpusr) or
-               (USER2_sig and shift_tpusr and TCK) or
-               (USER2_sig and capture_tpusr and TCK));
+  --DRCK2 <= ((USER2_sig and not tap_shift_dr and not capture_tpusr) or
+  --             (USER2_sig and shift_tpusr and TCK) or
+  --             (USER2_sig and capture_tpusr and TCK));
+  DRCK2 <= '1' when (USER2_sig='1' and tap_shift_dr='0' and capture_tpusr='0') else
+           TCK when (USER2_sig='1' and (shift_tpusr='1' or  capture_tpusr='1')) else
+           '0';
 
   RESET2   <= tap_reset;
   RUNTEST2 <= tap_runtest;

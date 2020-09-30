@@ -36,7 +36,8 @@ entity dcfeb_v6 is
     INJPLS        : in std_logic;
     EXTPLS        : in std_logic;
     BC0           : in std_logic;
-    RESYNC        : in std_logic);
+    RESYNC        : in std_logic;
+    DIAGOUT       : out std_logic_vector(17 downto 0));
 end dcfeb_v6;
 
 
@@ -191,7 +192,7 @@ architecture dcfeb_v6_arch of dcfeb_v6 is
   signal tdo4                                           : std_logic := '0';
 
   --signals for counting pulses
-  signal injpls_prev, extpls_prev       : std_logic := '0';
+  signal injpls_prev, extpls_prev, bc0_prev, l1a_match_prev       : std_logic := '0';
   signal injpls_counter, extpls_counter, bc0_counter, l1a_match_counter : unsigned(11 downto 0) := (others=>'0');
 
 begin
@@ -204,38 +205,36 @@ begin
   --on KCU, just use P lines as signals
  
   --count pulses
-  pulse_counter : process (RESYNC, INJPLS, EXTPLS, BC0, L1A_MATCH)
+  pulse_counter : process (RESYNC, CLK)
   begin
-    if RESYNC'event and RESYNC='1' then
+    if RESYNC='1' then
       l1a_match_counter <= x"000";
       injpls_counter <= x"000";
       extpls_counter <= x"000";
       bc0_counter <= x"000";
+    elsif CLK'event and CLK='1' then
+      if INJPLS='1' and injpls_prev='0' then
+        injpls_counter <= injpls_counter + 1;
+      end if;
+      if EXTPLS='1' and extpls_prev='0' then
+        extpls_counter <= extpls_counter + 1;
+      end if;
+      if BC0='1' and bc0_prev='0' then
+        bc0_counter <= bc0_counter + 1;
+      end if;
+      if L1A_MATCH='1' and l1a_match_prev='0' then
+        l1a_match_counter <= l1a_match_counter + 1;
+      end if;
+      injpls_prev <= INJPLS;
+      extpls_prev <= EXTPLS;
+      bc0_prev <= BC0;
+      l1a_match_prev <= L1A_MATCH;
     end if;
-    if INJPLS'event and INJPLS='1' then
-      injpls_counter <= injpls_counter + 1;
-    end if;
-    if EXTPLS'event and EXTPLS='1' then
-      extpls_counter <= extpls_counter + 1;
-    end if;
-    if BC0'event and BC0='1' then
-      bc0_counter <= bc0_counter + 1;
-    end if;
-    if L1A_MATCH'event and L1A_MATCH='1' then
-      l1a_match_counter <= l1a_match_counter + 1;
-    end if;
-    
---    if CLK'event and CLK='1' then
---      if injpls='1' and injpls_prev='0' then
---        injpls_counter <= injpls_counter + 1;
---      end if;
---      if extpls='1' and extpls_prev='0' then
---        extpls_counter <= extpls_counter + 1;
---      end if;
---      injpls_prev <= injpls;
---      extpls_prev <= extpls;
---    end if;
   end process;
+  
+  --debugging
+  DIAGOUT(11 downto 0) <= std_logic_vector(injpls_counter);
+  DIAGOUT(17 downto 12) <= "000000";
 
   --currently not using data-generation functionality
 --  PMAP_dcfeb_data_gen : dcfeb_data_gen
