@@ -620,15 +620,15 @@ begin
     SPY_SDA         => SPY_SDA,
     SPY_SCL         => SPY_SCL,
     SPY_SD          => SPY_SD,
-    SPY_TDIS        => SPY_TDIS
+    SPY_TDIS        => SPY_TDIS,
     --KCU only signals
     -- ,
-    -- KCU_GTH_TXN_O   => GTH_TXN_O,
-    -- KCU_GTH_TXP_O   => GTH_TXP_O,
-    -- KCU_GTH_RXN_I   => GTH_RXN_I,
-    -- KCU_GTH_RXP_I   => GTH_RXP_I,
-    -- VME_DATA_IN     => vme_data_io_in,       --unused/open in real ODMB
-    -- VME_DATA_OUT    => vme_data_io_out       --unused/open in real ODMB
+     KCU_GTH_TXN_O   => GTH_TXN_O,
+     KCU_GTH_TXP_O   => GTH_TXP_O,
+     KCU_GTH_RXN_I   => GTH_RXN_I,
+     KCU_GTH_RXP_I   => GTH_RXP_I,
+     VME_DATA_IN     => vme_data_io_in,       --unused/open in real ODMB
+     VME_DATA_OUT    => vme_data_io_out       --unused/open in real ODMB
     );
    
   -- DCFEB simulation

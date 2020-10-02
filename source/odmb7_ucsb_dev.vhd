@@ -153,7 +153,7 @@ entity ODMB7_UCSB_DEV is
     SPY_SDA       : inout std_logic;
     SPY_SCL       : out std_logic;
     SPY_SD        : in std_logic;       -- Signal Detect
-    SPY_TDIS      : out std_logic       -- Transmitter Disable
+    SPY_TDIS      : out std_logic;       -- Transmitter Disable
 
     --------------------
     -- Other
@@ -164,27 +164,27 @@ entity ODMB7_UCSB_DEV is
     -- Test bench signals (not in ODMB)
     --------------------------------
     -- ;
-    -- TB_CLK160      : in std_logic;  --kcuonly
-    -- TB_CLK80       : in std_logic;  --kcuonly
-    -- TB_CLK40       : in std_logic;  --kcuonly
-    -- TB_CLK20       : in std_logic;  --kcuonly
-    -- TB_CLK10       : in std_logic   --kcuonly
+     TB_CLK160      : in std_logic;  --kcuonly
+     TB_CLK80       : in std_logic;  --kcuonly
+     TB_CLK40       : in std_logic;  --kcuonly
+     TB_CLK20       : in std_logic;  --kcuonly
+     TB_CLK10       : in std_logic;   --kcuonly
 
     --------------------------------
     -- KCU signals (not in ODMB)
     --------------------------------
     -- ; --kcuonly
-    -- VME_DATA_IN   : in  std_logic_vector (15 downto 0); --kcuonly
-    -- VME_DATA_OUT  : out std_logic_vector (15 downto 0) --kcuonly
+     VME_DATA_IN   : in  std_logic_vector (15 downto 0); --kcuonly
+     VME_DATA_OUT  : out std_logic_vector (15 downto 0); --kcuonly
 
     -- --------------------------------
     -- -- IBERT test signals for KCU (not in ODMB)
     -- --------------------------------
     -- ; --kcuonly
-    -- KCU_GTH_TXN_O : out std_logic_vector(15 downto 0); --kcuonly
-    -- KCU_GTH_TXP_O : out std_logic_vector(15 downto 0); --kcuonly
-    -- KCU_GTH_RXN_I : in std_logic_vector(15 downto 0); --kcuonly
-    -- KCU_GTH_RXP_I : in std_logic_vector(15 downto 0) --kcuonly
+     KCU_GTH_TXN_O : out std_logic_vector(15 downto 0); --kcuonly
+     KCU_GTH_TXP_O : out std_logic_vector(15 downto 0); --kcuonly
+     KCU_GTH_RXN_I : in std_logic_vector(15 downto 0); --kcuonly
+     KCU_GTH_RXP_I : in std_logic_vector(15 downto 0) --kcuonly
 
     );
 end ODMB7_UCSB_DEV;
@@ -582,13 +582,13 @@ begin
         );
   end generate clkgen_i;
 
-  -- clkgen_kcu : if not in_kcu105 generate --kcuonly
-  --   clk160 <= TB_CLK160; --kcuonly
-  --   clk80  <= TB_CLK80; --kcuonly
-  --   clk40  <= TB_CLK40; --kcuonly
-  --   clk20  <= TB_CLK20; --kcuonly
-  --   clk10  <= TB_CLK10; --kcuonly
-  -- end generate clkgen_kcu; --kcuonly
+   clkgen_kcu : if not in_kcu105 generate --kcuonly
+     clk160 <= TB_CLK160; --kcuonly
+     clk80  <= TB_CLK80; --kcuonly
+     clk40  <= TB_CLK40; --kcuonly
+     clk20  <= TB_CLK20; --kcuonly
+     clk10  <= TB_CLK10; --kcuonly
+   end generate clkgen_kcu; --kcuonly
 
   -- In first version of test firmware, we will want to generate everything from 40 MHz cms clock, likely with Clock Manager IP
   -- generate 2p5 clock 
@@ -608,10 +608,10 @@ begin
 
   -- FIXME: KCU only: multiplex vme_data_in and out lines together
   -- can't have internal IOBUFs on KCU
-  -- vme_data_kcu_i : if in_kcu105 generate --kcuonly
-  --   vme_data_in_buf <= VME_DATA_IN; --kcuonly
-  --   VME_DATA_OUT <= vme_data_out_buf; --kcuonly
-  -- end generate vme_data_kcu_i; --kcuonly
+   vme_data_kcu_i : if in_kcu105 generate --kcuonly
+     vme_data_in_buf <= VME_DATA_IN; --kcuonly
+     VME_DATA_OUT <= vme_data_out_buf; --kcuonly
+   end generate vme_data_kcu_i; --kcuonly
 
   --real board/simulation can have IOBUFs
   vme_data_simulation_i : if not in_kcu105 generate
@@ -831,10 +831,10 @@ begin
       );
 
   -- -- to simplify the datalines for KCU
-  -- KCU_GTH_TXN_O <= gth_txn_o; --kcuonly
-  -- KCU_GTH_TXP_O <= gth_txp_o; --kcuonly
-  -- gth_rxn_i <= KCU_GTH_RXN_I; --kcuonly
-  -- gth_rxp_i <= KCU_GTH_RXP_I; --kcuonly
+   KCU_GTH_TXN_O <= gth_txn_o; --kcuonly
+   KCU_GTH_TXP_O <= gth_txp_o; --kcuonly
+   gth_rxn_i <= KCU_GTH_RXN_I; --kcuonly
+   gth_rxp_i <= KCU_GTH_RXP_I; --kcuonly
 
   -- Real ODMB configs
   gth_rxp_i(10 downto 0)  <= DAQ_RX_P;

@@ -7,6 +7,6 @@ testbench/tb_project/tb_project.hw
 testbench/tb_project/tb_project.ip_user_files
 testbench/tb_project/tb_project.runs
 testbench/tb_project/tb_project.sim
-testbench/ip
+#testbench/ip
 TestBench_odmb7
 
