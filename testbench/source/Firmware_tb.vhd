@@ -261,6 +261,7 @@ architecture Behavioral of Firmware_tb is
   signal bck_prs_p, bck_prs_n : std_logic := '0';
   signal spy_tx_p, spy_tx_n : std_logic := '0';
   signal daq_spy_rx_p, daq_spy_rx_n : std_logic := '0';
+  signal daq_spy_sel : std_logic := '0';
 
   signal rx12_sda, rx12_scl : std_logic := '0';
   signal rx12_i2c_ena, rx12_cs_b, rx12_rst_b : std_logic := '0';
@@ -325,7 +326,7 @@ begin
   
   i_ila : ila
   port map(
-    clk => sysclk,   -- everything is clocked on 40 MHz or slower so to maximize useful buffer size use 40 MHz
+    clk => sysclkDouble, -- to keep the same clock as ibert
     probe0 => trig0,
     probe1 => data
   );
@@ -488,21 +489,24 @@ begin
     dcfeb_l1a_match <= l1a_match_p;
   end generate cfebjtag_conn_kcu_i;
   
-
+  SEL_SI570_CLK_O <= not daq_spy_sel;
+    
   -- IBERT ports re-mapping
-  DAQ_RX_P     <= GTH_RXP_I(10 downto 0);
-  DAQ_RX_N     <= GTH_RXN_I(10 downto 0);
-  DAQ_SPY_RX_P <= GTH_RXP_I(11);
-  DAQ_SPY_RX_N <= GTH_RXN_I(11);
-  BCK_PRS_P    <= GTH_RXP_I(12);
-  BCK_PRS_N    <= GTH_RXN_I(12);
-  B04_RX_P     <= GTH_RXP_I(15 downto 13);
-  B04_RX_N     <= GTH_RXN_I(15 downto 13);
+  optical_mapping_i : if not in_kcu105 generate
+    DAQ_RX_P     <= GTH_RXP_I(10 downto 0);
+    DAQ_RX_N     <= GTH_RXN_I(10 downto 0);
+    DAQ_SPY_RX_P <= GTH_RXP_I(11);
+    DAQ_SPY_RX_N <= GTH_RXN_I(11);
+    BCK_PRS_P    <= GTH_RXP_I(12);
+    BCK_PRS_N    <= GTH_RXN_I(12);
+    B04_RX_P     <= GTH_RXP_I(15 downto 13);
+    B04_RX_N     <= GTH_RXN_I(15 downto 13);
 
-  GTH_TXP_O(15 downto 12) <= DAQ_TX_P;
-  GTH_TXN_O(15 downto 12) <= DAQ_TX_N;
-  GTH_TXP_O(11)           <= SPY_TX_P;
-  GTH_TXN_O(11)           <= SPY_TX_N;
+    GTH_TXP_O(15 downto 12) <= DAQ_TX_P;
+    GTH_TXN_O(15 downto 12) <= DAQ_TX_N;
+    GTH_TXP_O(11)           <= SPY_TX_P;
+    GTH_TXN_O(11)           <= SPY_TX_N;
+  end generate optical_mapping_i;
 
 
   -- ODMB Firmware module
@@ -586,7 +590,7 @@ begin
     DAQ_RX_N        => DAQ_RX_N,
     DAQ_SPY_RX_P    => DAQ_SPY_RX_P,
     DAQ_SPY_RX_N    => DAQ_SPY_RX_N,
-    DAQ_SPY_SEL     => SEL_SI570_CLK_O,
+    DAQ_SPY_SEL     => daq_spy_sel,
     B04_RX_P        => B04_RX_P,
     B04_RX_N        => B04_RX_N,
     BCK_PRS_P       => BCK_PRS_P,
@@ -622,13 +626,13 @@ begin
     SPY_SD          => SPY_SD,
     SPY_TDIS        => SPY_TDIS
     --KCU only signals
-    -- ,
-    -- KCU_GTH_TXN_O   => GTH_TXN_O,
-    -- KCU_GTH_TXP_O   => GTH_TXP_O,
-    -- KCU_GTH_RXN_I   => GTH_RXN_I,
-    -- KCU_GTH_RXP_I   => GTH_RXP_I,
-    -- VME_DATA_IN     => vme_data_io_in,       --unused/open in real ODMB
-    -- VME_DATA_OUT    => vme_data_io_out       --unused/open in real ODMB
+    , --kcuonly
+    KCU_GTH_TXN_O   => GTH_TXN_O, --kcuonly
+    KCU_GTH_TXP_O   => GTH_TXP_O, --kcuonly
+    KCU_GTH_RXN_I   => GTH_RXN_I, --kcuonly
+    KCU_GTH_RXP_I   => GTH_RXP_I, --kcuonly
+    VME_DATA_IN     => vme_data_io_in, --kcuonly
+    VME_DATA_OUT    => vme_data_io_out --kcuonly
     );
    
   -- DCFEB simulation

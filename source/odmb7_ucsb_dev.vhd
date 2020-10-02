@@ -163,7 +163,7 @@ entity ODMB7_UCSB_DEV is
     --------------------------------
     -- Test bench signals (not in ODMB)
     --------------------------------
-    -- ;
+    -- ; --kcuonly
     -- TB_CLK160      : in std_logic;  --kcuonly
     -- TB_CLK80       : in std_logic;  --kcuonly
     -- TB_CLK40       : in std_logic;  --kcuonly
@@ -583,12 +583,12 @@ begin
   end generate clkgen_i;
 
   -- clkgen_kcu : if not in_kcu105 generate --kcuonly
-  --   clk160 <= TB_CLK160; --kcuonly
-  --   clk80  <= TB_CLK80; --kcuonly
-  --   clk40  <= TB_CLK40; --kcuonly
-  --   clk20  <= TB_CLK20; --kcuonly
-  --   clk10  <= TB_CLK10; --kcuonly
-  -- end generate clkgen_kcu; --kcuonly
+  -- clk160 <= TB_CLK160; --kcuonly
+  -- clk80  <= TB_CLK80; --kcuonly
+  -- clk40  <= TB_CLK40; --kcuonly
+  -- clk20  <= TB_CLK20; --kcuonly
+  -- clk10  <= TB_CLK10; --kcuonly
+-- end generate clkgen_kcu; --kcuonly
 
   -- In first version of test firmware, we will want to generate everything from 40 MHz cms clock, likely with Clock Manager IP
   -- generate 2p5 clock 
@@ -609,9 +609,9 @@ begin
   -- FIXME: KCU only: multiplex vme_data_in and out lines together
   -- can't have internal IOBUFs on KCU
   -- vme_data_kcu_i : if in_kcu105 generate --kcuonly
-  --   vme_data_in_buf <= VME_DATA_IN; --kcuonly
-  --   VME_DATA_OUT <= vme_data_out_buf; --kcuonly
-  -- end generate vme_data_kcu_i; --kcuonly
+  -- vme_data_in_buf <= VME_DATA_IN; --kcuonly
+  -- VME_DATA_OUT <= vme_data_out_buf; --kcuonly
+-- end generate vme_data_kcu_i; --kcuonly
 
   --real board/simulation can have IOBUFs
   vme_data_simulation_i : if not in_kcu105 generate
@@ -830,26 +830,28 @@ begin
       IB    => CLK_125_REF_N
       );
 
-  -- -- to simplify the datalines for KCU
+  -- to simplify the datalines for KCU
   -- KCU_GTH_TXN_O <= gth_txn_o; --kcuonly
   -- KCU_GTH_TXP_O <= gth_txp_o; --kcuonly
   -- gth_rxn_i <= KCU_GTH_RXN_I; --kcuonly
   -- gth_rxp_i <= KCU_GTH_RXP_I; --kcuonly
 
   -- Real ODMB configs
-  gth_rxp_i(10 downto 0)  <= DAQ_RX_P;
-  gth_rxn_i(10 downto 0)  <= DAQ_RX_N;
-  gth_rxp_i(11)           <= DAQ_SPY_RX_P;
-  gth_rxn_i(11)           <= DAQ_SPY_RX_N;
-  gth_rxp_i(12)           <= BCK_PRS_P;
-  gth_rxn_i(12)           <= BCK_PRS_N;
-  gth_rxp_i(15 downto 13) <= B04_RX_P;
-  gth_rxn_i(15 downto 13) <= B04_RX_N;
+  gth_mapping_i : if not in_kcu105 generate
+    gth_rxp_i(10 downto 0)  <= DAQ_RX_P;
+    gth_rxn_i(10 downto 0)  <= DAQ_RX_N;
+    gth_rxp_i(11)           <= DAQ_SPY_RX_P;
+    gth_rxn_i(11)           <= DAQ_SPY_RX_N;
+    gth_rxp_i(12)           <= BCK_PRS_P;
+    gth_rxn_i(12)           <= BCK_PRS_N;
+    gth_rxp_i(15 downto 13) <= B04_RX_P;
+    gth_rxn_i(15 downto 13) <= B04_RX_N;
 
-  DAQ_TX_P <= gth_txp_o(15 downto 12);
-  DAQ_TX_N <= gth_txn_o(15 downto 12);
-  SPY_TX_P <= gth_txp_o(11);
-  SPY_TX_N <= gth_txn_o(11);
+    DAQ_TX_P <= gth_txp_o(15 downto 12);
+    DAQ_TX_N <= gth_txn_o(15 downto 12);
+    SPY_TX_P <= gth_txp_o(11);
+    SPY_TX_N <= gth_txn_o(11);
+  end generate gth_mapping_i;
 
   -- DAQ_SPY_SEL <= '1';   -- will connect to sel_si570_clk in KCU
   vio_mon <= odmb_data & vme_data_out_buf;
@@ -858,7 +860,7 @@ begin
     port map (
       clk => clk80,                  -- same as IBERT
       probe_in0 => vio_mon,
-      probe_out0(0) => DAQ_SPY_SEL      -- default '1'
+      probe_out0(0) => DAQ_SPY_SEL   -- default '1', should be '0' for KCU
       );
 
   -- Possible options for the IBERT sysclk
@@ -881,7 +883,7 @@ begin
   --     O => gth_sysclk_i
   --     );
 
-  gth_sysclk_i <= CLK80;
+  gth_sysclk_i <= clk80;
 
   gth_qrefclk0_i(0) <= '0';
   gth_qrefclk1_i(0) <= '0';
