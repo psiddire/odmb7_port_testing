@@ -382,13 +382,13 @@ architecture Behavioral of ODMB7_UCSB_DEV is
       );
   end component;
 
-  component vio_top
-    port (
-      clk : in std_logic;
-      probe_in0 : in std_logic_vector(31 downto 0);
-      probe_out0 : out std_logic_vector(0 downto 0)
-      );
-  end component;
+--  component vio_top
+--    port (
+--      clk : in std_logic;
+--      probe_in0 : in std_logic_vector(31 downto 0);
+--      probe_out0 : out std_logic_vector(0 downto 0)
+--      );
+--  end component;
 
   component ibert_odmb7_gth
     PORT (
@@ -854,12 +854,12 @@ begin
   -- DAQ_SPY_SEL <= '1';   -- will connect to sel_si570_clk in KCU
   vio_mon <= odmb_data & vme_data_out_buf;
 
-  u_vio_top : vio_top
-    port map (
-      clk => clk80,                  -- same as IBERT
-      probe_in0 => vio_mon,
-      probe_out0(0) => DAQ_SPY_SEL      -- default '1'
-      );
+--  u_vio_top : vio_top
+--    port map (
+--      clk => clk80,                  -- same as IBERT
+--      probe_in0 => vio_mon,
+--      probe_out0(0) => DAQ_SPY_SEL      -- default '1'
+--      );
 
   -- Possible options for the IBERT sysclk
   
