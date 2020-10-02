@@ -23,7 +23,7 @@ add_files "../source/"
 
 # Add core firmware IPs
 add_files "../ip/$FPGA_TYPE/ibert_odmb7_gth/ibert_odmb7_gth.xci"
-#add_files "../ip/$FPGA_TYPE/clockManager/clockManager.xci"
+add_files "../ip/$FPGA_TYPE/clock_manager/clock_manager.xci"
 #add_files "../ip/$FPGA_TYPE/vio_top/vio_top.xci"
 
 # Add testbench IPs
