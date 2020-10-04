@@ -155,10 +155,10 @@ begin
 
   w_loopback    <= '1' when (CMDDEV = x"1100" and WRITER = '0') else '0';
   r_loopback    <= '1' when (CMDDEV = x"1100" and WRITER = '1') else '0';
-  w_txdiffctrl  <= '1' when (CMDDEV = x"1110" and WRITER = '0') else '0';
+  w_txdiffctrl  <= '1' when (CMDDEV = x"1110" and WRITER = '0') else '0'; -- obsolete
   r_txdiffctrl  <= '1' when (CMDDEV = x"1110" and WRITER = '1') else '0';
   r_dcfeb_done  <= '1' when (CMDDEV = x"1120" and WRITER = '1') else '0';
-  r_qpll_locked <= '1' when (CMDDEV = x"1124" and WRITER = '1') else '0';
+  r_qpll_locked <= '1' when (CMDDEV = x"1124" and WRITER = '1') else '0'; -- obsolete
 
   w_dcfeb_pulse <= '1' when (CMDDEV = x"1200" and WRITER = '0') else '0';
 
@@ -178,8 +178,10 @@ begin
   w_mask_pls <= '1' when (CMDDEV = x"140C" and WRITER = '0') else '0';
   r_mask_pls <= '1' when (CMDDEV = x"140C" and WRITER = '1') else '0';
 
-  r_odmb_data               <= '1' when (CMDDEV(12) = '1' and CMDDEV(3 downto 0) = x"C") else '0';
-  odmb_data_sel(7 downto 0) <= COMMAND(9 downto 2);
+  -- r_odmb_data               <= '1' when (CMDDEV(12) = '1' and CMDDEV(3 downto 0) = x"C") else '0';
+  -- odmb_data_sel(7 downto 0) <= COMMAND(9 downto 2);
+  r_odmb_data <= '1' when ((CMDDEV and x"100C") = x"100C" and CMDDEV /= x"140C" and WRITER = '1') else '0';
+  odmb_data_sel(7 downto 0) <= COMMAND(9 downto 2) when (r_odmb_data = '1') else x"1F";
 
 -- Resets
   PLS_FWRESET  : PULSE2FAST port map(FW_RESET, clk40, RST, w_odmb_rst);
@@ -302,31 +304,31 @@ begin
   TXDIFFCTRL <= txdiffctrl_inner;
 
 -- Reads
-  out_odmb_cal      <= "00" & x"00" & odmb_ctrl_inner(5 downto 0);
-  out_mux_data_path <= "000" & x"000" & odmb_ctrl_inner(7);
-  out_mux_trigger   <= "000" & x"000" & odmb_ctrl_inner(9);
-  out_mux_lvmb      <= "000" & x"000" & odmb_ctrl_inner(10);
-  out_odmb_ped      <= "00" & x"000" & odmb_ctrl_inner(14 downto 13);
-  out_cal_ped       <= "000" & x"000" & test_ped_inner;
-  out_txdiffctrl    <= x"000" & txdiffctrl_inner;
-  out_dcfeb_done    <= x"00" & '0' & dcfeb_done;
+  out_odmb_cal      <= x"00"  & "00"  & odmb_ctrl_inner(5 downto 0);
+  out_mux_data_path <= x"000" & "000" & odmb_ctrl_inner(7);
+  out_mux_trigger   <= x"000" & "000" & odmb_ctrl_inner(9);
+  out_mux_lvmb      <= x"000" & "000" & odmb_ctrl_inner(10);
+  out_odmb_ped      <= x"000" & "00"  & odmb_ctrl_inner(14 downto 13);
+  out_cal_ped       <= x"000" & "000" & test_ped_inner;
+  out_txdiffctrl    <= x"000" &         txdiffctrl_inner;
+  out_dcfeb_done    <= x"00"  & '0'   & dcfeb_done;
   out_qpll_locked   <= x"000" & "000" & qpll_locked;
 
-  OUTDATA <= out_odmb_cal when (r_odmb_cal = '1') else
-             out_mux_data_path when (r_mux_data_path = '1') else
-             out_mux_trigger   when (r_mux_trigger = '1') else
-             out_mux_lvmb      when (r_mux_lvmb = '1') else
-             out_mask_pls      when (r_mask_pls = '1') else
-             out_mask_l1a      when (r_mask_l1a = '1') else
-             out_odmb_ped      when (r_odmb_ped = '1') else
-             out_cal_ped       when (r_cal_ped = '1') else
-             out_tp_sel        when (r_tp_sel = '1') else
-             out_max_words_dcfeb        when (r_max_words_dcfeb = '1') else
-             out_loopback      when (r_loopback = '1') else
-             out_txdiffctrl    when (r_txdiffctrl = '1') else
-             out_dcfeb_done    when (r_dcfeb_done = '1') else
-             out_qpll_locked   when (r_qpll_locked = '1') else
-             odmb_data         when (r_odmb_data = '1') else
+  OUTDATA <= out_odmb_cal        when (r_odmb_cal = '1')        else
+             out_mux_data_path   when (r_mux_data_path = '1')   else
+             out_mux_trigger     when (r_mux_trigger = '1')     else
+             out_mux_lvmb        when (r_mux_lvmb = '1')        else
+             out_mask_pls        when (r_mask_pls = '1')        else
+             out_mask_l1a        when (r_mask_l1a = '1')        else
+             out_odmb_ped        when (r_odmb_ped = '1')        else
+             out_cal_ped         when (r_cal_ped = '1')         else
+             out_tp_sel          when (r_tp_sel = '1')          else
+             out_max_words_dcfeb when (r_max_words_dcfeb = '1') else
+             out_loopback        when (r_loopback = '1')        else
+             out_txdiffctrl      when (r_txdiffctrl = '1')      else
+             out_dcfeb_done      when (r_dcfeb_done = '1')      else
+             out_qpll_locked     when (r_qpll_locked = '1')     else
+             odmb_data           when (r_odmb_data = '1')       else
              (others => 'L');
 
   -- DTACK

@@ -233,7 +233,7 @@ begin
   end process;
   
   --debugging
-  DIAGOUT(11 downto 0) <= std_logic_vector(injpls_counter);
+  DIAGOUT(11 downto 0) <= std_logic_vector(extpls_counter);
   DIAGOUT(17 downto 12) <= "000000";
 
   --currently not using data-generation functionality

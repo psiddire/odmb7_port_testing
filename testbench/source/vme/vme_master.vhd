@@ -78,9 +78,9 @@ begin
   sysfail <= '1';
   lword   <= '1';
   ga      <= "101010";
-  am      <= "111010";
+  am      <= "111010";         -- mode 3A: A24 non previlege 
 
-  proc_dtack_timeout : process (clk, dtack_waiting)
+  proc_dtack_timeout : process (clk)
     variable dtack_timeout_counter  : unsigned(9 downto 0) := (others=> '0');
   begin
     if (rising_edge(clk)) then
@@ -156,7 +156,7 @@ begin
   end process;
 
 
-  fsm_comb_logic : process(vme_cmd, current_state, cnt_out, vme_wr, vme_addr, vme_wr_data, dtack, dtack_timeout)
+  fsm_comb_logic : process(vme_cmd, current_state, cnt_out, vme_wr, vme_addr, vme_wr_data, dtack, dtack_timeout, reg_wr, reg_rd)
 
   begin
     
@@ -170,6 +170,7 @@ begin
         ds0     <= '1';
         ds1     <= '1';
         d_load  <= '0';
+        dtack_waiting <= '0';
         if (vme_cmd = '1') then
           cnt_en     <= '1';
           cnt_res    <= '1';
@@ -193,6 +194,7 @@ begin
         d_load     <= '0';
         ad_load    <= '0';
         vme_cmd_rd <= '0';
+        dtack_waiting <= '0';
         if ((reg_wr = '1') or (reg_rd = '1')) then
           iack       <= '1';
           cnt_en     <= '1';
@@ -219,6 +221,7 @@ begin
         d_load     <= '0';
         ad_load    <= '0';
         vme_cmd_rd <= '0';
+        dtack_waiting <= '0';
         if (cnt_out = t1) then
           as         <= '0';
           cnt_en     <= '1';
@@ -256,6 +259,7 @@ begin
           ds1        <= '1';
           cnt_en     <= '1';
           cnt_res    <= '0';
+          dtack_waiting <= '0';
           next_state <= WR_AS_LOW;
         end if;
 
@@ -287,6 +291,7 @@ begin
         else
           cnt_en     <= '1';
           cnt_res    <= '1';
+          dtack_waiting <= '1';
           next_state <= WR_DS_LOW;
         end if;
 
@@ -303,6 +308,7 @@ begin
         ds1        <= '0';
         ad_load    <= '0';
         vme_cmd_rd <= '0';
+        dtack_waiting <= '0';
         if (cnt_out = t3) then
           as      <= '1';
           cnt_en  <= '1';
@@ -317,6 +323,7 @@ begin
           as         <= '0';
           cnt_en     <= '1';
           cnt_res    <= '0';
+          d_load     <= '0';
           next_state <= WR_DTACK_LOW;
         end if;
 
@@ -333,6 +340,7 @@ begin
         d_load     <= '0';
         ad_load    <= '0';
         vme_cmd_rd <= '0';
+        dtack_waiting <= '0';
         if (cnt_out = t4) then
           ds0        <= '1';
           ds1        <= '1';
@@ -362,6 +370,7 @@ begin
         d_load     <= '0';
         ad_load    <= '0';
         vme_cmd_rd <= '0';
+        dtack_waiting <= '0';
         if ((dtack = '1') or (dtack = 'H')) then
           cnt_en     <= '1';
           cnt_res    <= '1';
@@ -378,6 +387,7 @@ begin
         ds1     <= '1';
         d_load  <= '0';
         ad_load <= '0';
+        dtack_waiting <= '0';
         if (cnt_out = t5) then
           iack       <= '0';
           oe_b       <= '0';
@@ -413,6 +423,7 @@ begin
         vme_cmd_rd <= '1';
         cnt_en     <= '0';
         cnt_res    <= '0';
+        dtack_waiting <= '0';
         if ((vme_cmd = '1') and (vme_wr = '1')) then
           next_state <= WR_BEGIN;
         else
@@ -432,6 +443,7 @@ begin
         vme_cmd_rd <= '0';
         cnt_en     <= '0';
         cnt_res    <= '0';
+        dtack_waiting <= '0';
         next_state <= IDLE;
 
     end case;

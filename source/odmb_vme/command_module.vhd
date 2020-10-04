@@ -102,9 +102,7 @@ begin  --Architecture
   -- Generate DOE_B
   CE_DOE_B  <= '1' when TOVME_INNER_B = '0' and TIMER(7) = '0' else '0';
   CLR_DOE_B <= TOVME_INNER_B;
-  CB8CE_DOE : CB8CE port map (open, TIMER, open, SLOWCLK, CE_DOE_B, CLR_DOE_B);
-  -- component CB8CE port (CEO, Q, TC, C, CE, CLR, );
-  -- CB8CE(SLOWCLK, CE_DOE_B, CLR_DOE_B, dummy1, TIMER, dummy2, dummy3);
+  CB8CE_DOE : CB8CE port map (CEO => open, Q => TIMER, TC => open, C => SLOWCLK, CE => CE_DOE_B, CLR => CLR_DOE_B);
   DOE_B     <= TIMER(7);
 
   -- Generate VALIDGA
@@ -114,20 +112,21 @@ begin  --Architecture
   -- Generate OLDCRATE / Generate AMS / Generate VALIDAM / Generate GOODAM / Generate FASTCLK_NOT
   OLDCRATE <= '1' when CGA = "000000" else '0';
 
-  ILD_AM_GEN : for i in 0 to 5 generate
-  begin
-    ILD_AM : ILD port map(AMS(i), AM(i), AS);
-  end generate ILD_AM_GEN;
   VALIDAM     <= '1' when (AMS(0) /= AMS(1) and AMS(5 downto 3) = "111" and LWORD = '1') else '0';
   GOODAM      <= '1' when (AMS(0) /= AMS(1) and AMS(5 downto 3) = "111" and LWORD = '1') else '0';
   FASTCLK_NOT <= not FASTCLK;
 
-  -- Generate STROBE
-  ILD_ADRS_GEN : for i in 1 to 23 generate
+  -- Load ADR and AM upon receiving AS
+  process(FASTCLK, AS)
   begin
-    ILD_ADRS : ILD port map(ADRS_INNER(i), ADR(i), AS);
-  end generate ILD_ADRS_GEN;
-
+    if rising_edge(FASTCLK) then
+      if (AS = '1') then
+        AMS <= AM;
+        ADRS_INNER <= ADR;
+      end if;
+    end if;
+  end process;
+  
   BOARD_SEL_NEW <= '1' when (ADRS_INNER(23 downto 19) = CGA(4 downto 0))              else '0';
   PRE_BOARDENB  <= '1' when (BOARD_SEL_NEW = '1' and VALIDGA = '1')                   else '0';
   BROADCAST     <= '1' when (ADRS_INNER(23 downto 19) = "11111")                      else '0';
@@ -139,8 +138,8 @@ begin  --Architecture
   ASYNSTRB     <= '1' when (SYSOK = '1' and VALIDAM = '1' and BOARDENB = '1' and DS0 = '0' and DS1 = '0') else '0';
   ASYNSTRB_NOT <= not ASYNSTRB;
 
-  FDC_STROBE   : FDC port map(STROBE_TEMP1, FASTCLK, ASYNSTRB_NOT, ASYNSTRB);
-  FDC_1_STROBE : FDC_1 port map(STROBE_TEMP2, FASTCLK, ASYNSTRB_NOT, ASYNSTRB);
+  FDC_STROBE   : FDC port map(Q => STROBE_TEMP1, C => FASTCLK, CLR => ASYNSTRB_NOT, D => ASYNSTRB);
+  FDC_1_STROBE : FDC_1 port map(Q => STROBE_TEMP2, C => FASTCLK, CLR => ASYNSTRB_NOT, D => ASYNSTRB);
   STROBE <= '1' when (STROBE_TEMP1 = '1' and STROBE_TEMP2 = '1') else '0';
 
   -- Generate LED(1) / Generate LED(2)
@@ -208,17 +207,19 @@ entity ILD is
 
 end ILD;
 
-architecture Behavioral_ild of ILD is
-  signal q_tmp : std_logic := TO_X01(INIT);
+--architecture Behavioral_ild of ILD is
+--  signal q_tmp : std_logic := TO_X01(INIT);
 
-begin
-  Q <= q_tmp;
+--begin
+--  Q <= q_tmp;
 
-  process(D, G)
-  begin
-    if (G = '1') then
-      q_tmp <= D;
-    end if;
-  end process;
+--  process(D, G)
+--  begin
+--    if (G = '1') then
+--      q_tmp <= D;
+--    else
+--      q_tmp <= q_tmp;
+--    end if;
+--  end process;
 
-end Behavioral_ild;
+--end Behavioral_ild;

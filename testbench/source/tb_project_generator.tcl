@@ -28,7 +28,7 @@ set_property -name {xsim.simulate.custom_tcl} -value {../../../../source/Firmwar
 
 # add_files -norecurse "../tb_project/cfebjtag_tb_behav.wcfg"
 set_property SOURCE_SET sources_1 [get_filesets sim_1]
-add_files -fileset sim_1 -norecurse {../tb_project/cfebjtag_tb_behav.wcfg ../tb_project/vme_master_behav.wcfg}
+add_files -fileset sim_1 -norecurse {../diagnose/cfebjtag_tb_behav.wcfg ../diagnose/vme_master_behav.wcfg}
 # set_property xsim.view {my_tb_behav.wcfg my_tb_behav_1.wcfg my_tb_behav_2.wcfg} [get_filesets sim_1]
 
 # Set test bench as top module

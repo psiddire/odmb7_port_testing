@@ -204,7 +204,7 @@ begin
 --                      USER4_sig  <= '0';
       when IDCODE_INSTR =>
 --                      BYPASS_sig <= '0';
---                      USER1_sig  <= '0';
+        USER1_sig <= '0';
         USER2_sig <= '0';
 --                      USER3_sig  <= '0';
 --                      USER4_sig  <= '0';

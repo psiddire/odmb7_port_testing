@@ -290,6 +290,9 @@ begin
     probe0 => trig0,
     probe1 => data
   );
+  trig0(255 downto 54) <= (others => '0');
+  trig0(53 downto 50) <= std_logic_vector(lut_input_addr1_s);
+  trig0(49) <= extpls;
   trig0(48) <= injpls;
   trig0(47 downto 32) <= vme_data_io_out;
   trig0(31 downto 16) <= vme_data_io_in;
