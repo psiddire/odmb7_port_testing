@@ -113,7 +113,11 @@ entity ODMB_VME is
     TEST_LCT             : out std_logic;
     MASK_L1A             : out std_logic_vector (NCFEB downto 0);
     MASK_PLS             : out std_logic;
-    ODMB_CTRL            : out std_logic_vector(15 downto 0);
+    ODMB_CAL             : out std_logic;
+    MUX_DATA_PATH        : out std_logic;
+    MUX_TRIGGER          : out std_logic;
+    MUX_LVMB             : out std_logic;
+    ODMB_PED             : out std_logic_vector(1 downto 0);
     ODMB_DATA            : in std_logic_vector(15 downto 0);
     ODMB_DATA_SEL        : out std_logic_vector(7 downto 0);
 
@@ -188,43 +192,52 @@ architecture Behavioral of ODMB_VME is
       );    
     port (
       SLOWCLK : in std_logic;
-      CLK40   : in std_logic;
-      RST     : in std_logic;
-
-      DEVICE  : in std_logic;
-      STROBE  : in std_logic;
-      COMMAND : in std_logic_vector(9 downto 0);
-      WRITER  : in std_logic;
-
-      INDATA  : in  std_logic_vector(15 downto 0);
-      OUTDATA : out std_logic_vector(15 downto 0);
-
-      DTACK : out std_logic;
-
-      DCFEB_DONE  : in std_logic_vector(NCFEB downto 1);
-      QPLL_LOCKED : in std_logic;
-
-      OPT_RESET_PULSE : out std_logic;
-      L1A_RESET_PULSE : out std_logic;
-      FW_RESET        : out std_logic;
-      REPROG_B        : out std_logic;
-      TEST_INJ        : out std_logic;
-      TEST_PLS        : out std_logic;
-      TEST_PED        : out std_logic;
-      TEST_BC0        : out std_logic;
-      TEST_LCT        : out std_logic;
-      OTMB_LCT_RQST   : out std_logic;
-      OTMB_EXT_TRIG   : out std_logic;
-
-      MASK_L1A      : out std_logic_vector(NCFEB downto 0);
-      MASK_PLS      : out std_logic;
-      TP_SEL        : out std_logic_vector(15 downto 0);
-      MAX_WORDS_DCFEB        : out std_logic_vector(15 downto 0);
-      ODMB_CTRL     : out std_logic_vector(15 downto 0);
-      ODMB_DATA_SEL : out std_logic_vector(7 downto 0);
-      ODMB_DATA     : in  std_logic_vector(15 downto 0);
-      TXDIFFCTRL    : out std_logic_vector(3 downto 0);  -- Controls the TX voltage swing
-      LOOPBACK      : out std_logic_vector(2 downto 0)  -- For internal loopback tests
+        CLK40   : in std_logic;
+        RST     : in std_logic;
+    
+        DEVICE  : in std_logic;
+        STROBE  : in std_logic;
+        COMMAND : in std_logic_vector(9 downto 0);
+        WRITER  : in std_logic;
+    
+        INDATA  : in  std_logic_vector(15 downto 0);
+        OUTDATA : out std_logic_vector(15 downto 0);
+    
+        DTACK : out std_logic;
+    
+        DCFEB_DONE  : in std_logic_vector(NCFEB downto 1);
+    
+        --reset signals
+        OPT_RESET_PULSE : out std_logic;
+        L1A_RESET_PULSE : out std_logic;
+        FW_RESET        : out std_logic;
+        REPROG_B        : out std_logic;
+        
+        --pulses
+        TEST_INJ        : out std_logic;
+        TEST_PLS        : out std_logic;
+        TEST_LCT        : out std_logic;
+        TEST_BC0        : out std_logic;
+        OTMB_LCT_RQST   : out std_logic;
+        OTMB_EXT_TRIG   : out std_logic;
+        
+        --internal register outputs
+        ODMB_CAL      : out std_logic;
+        TP_SEL        : out std_logic_vector(15 downto 0);
+        MAX_WORDS_DCFEB : out std_logic_vector(15 downto 0);
+        LOOPBACK      : out std_logic_vector(2 downto 0);  -- For internal loopback tests
+        TXDIFFCTRL    : out std_logic_vector(3 downto 0);  -- Controls the TX voltage swing
+        MUX_DATA_PATH   : out std_logic;
+        MUX_TRIGGER     : out std_Logic;
+        MUX_LVMB        : out std_logic;
+        ODMB_PED        : out std_logic_vector(1 downto 0);
+        TEST_PED        : out std_logic;
+        MASK_L1A      : out std_logic_vector(NCFEB downto 0);
+        MASK_PLS      : out std_logic;
+        
+        --exernal registers
+        ODMB_DATA_SEL : out std_logic_vector(7 downto 0);
+        ODMB_DATA     : in  std_logic_vector(15 downto 0)
       );
   end component;
 
@@ -376,7 +389,6 @@ begin
       DTACK   => dtack_dev(3),
 
       DCFEB_DONE  => dcfeb_done,
-      QPLL_LOCKED => '1',         -- input: obsolete signal in OMDB7/5, can be removed
 
       OPT_RESET_PULSE => open,
       L1A_RESET_PULSE => L1A_RESET_PULSE,
@@ -394,7 +406,11 @@ begin
       MASK_L1A      => MASK_L1A,
       TP_SEL        => open,
       MAX_WORDS_DCFEB => open,
-      ODMB_CTRL     => ODMB_CTRL,
+      ODMB_CAL      => ODMB_CAL,
+      MUX_DATA_PATH => MUX_DATA_PATH,
+      MUX_TRIGGER   => MUX_TRIGGER,
+      MUX_LVMB      => MUX_LVMB,
+      ODMB_PED      => ODMB_PED,
       ODMB_DATA_SEL => ODMB_DATA_SEL,   -- output: <= COMMAND[9:2] directly
       ODMB_DATA     => ODMB_DATA,       -- input depend on ODMB_DATA_SEL
       TXDIFFCTRL    => open,      -- TX voltage swing, W 3110 is disabled: constant output x"8"

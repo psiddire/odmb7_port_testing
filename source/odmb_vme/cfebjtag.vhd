@@ -69,10 +69,10 @@ architecture CFEBJTAG_Arch of CFEBJTAG is
   signal dtack_rstjtag                                                          : std_logic;
   
   --Signals for new_strobe
-  signal new_strobe, ce_new_strobe, pre_new_strobe               : std_logic;
+  signal new_strobe, new_strobe_q, new_strobe_qq             : std_logic;
   
   --Signals for load
-  signal d1_load, d2_load, ce_load, clr_load, q_load, load, ce_qload      : std_logic;
+  signal d1_load, d2_load, ce_load, clr_load, q_load, load      : std_logic;
   
   --Signals for busy
   signal q_busy, d_busy, clr_busy, busy, busyp1                           : std_logic;
@@ -224,15 +224,14 @@ begin
   -- General signals for SHFT commands: new_strobe, load, busy, dtack
 
   -- Generate new_strobe, which is 1 only on the first clock cycle after a new strobe
-  ce_new_strobe <= new_strobe and STROBE;
-  pre_new_strobe <= not STROBE;
-  FDPE_new_strobe : FDPE port map (D => '0', C => SLOWCLK, CE => ce_new_strobe, PRE => pre_new_strobe, Q => new_strobe);
+  FDCE_new_strobe_q : FDCE port map (D => STROBE, C => SLOWCLK, CE => '1', CLR => RST, Q => new_strobe_q);
+  FDCE_new_strobe_qq : FDCE port map (D => new_strobe_q, C => SLOWCLK, CE => '1', CLR => RST, Q => new_strobe_qq);
+  new_strobe <= new_strobe_q and (not new_strobe_qq);
 
   -- Generate load on second clock cycle after new STROBE for DATASHFT and INSTSHFT commands IF not already busy with a JTAG command  
   d1_load  <= datashft or instshft;
   clr_load <= load or RST;
-  ce_qload <= new_strobe and STROBE;
-  FDCE_qload : FDCE port map(D => d1_load, C => SLOWCLK, CE => ce_qload, CLR => clr_load, Q => q_load);
+  FDCE_qload : FDCE port map(D => d1_load, C => SLOWCLK, CE => new_strobe, CLR => clr_load, Q => q_load);
   d2_load  <= '1' when (q_load = '1' and busy = '0') else '0';
   FDC_load : FDC port map(D => d2_load, C => SLOWCLK, CLR => RST, Q => load);
 

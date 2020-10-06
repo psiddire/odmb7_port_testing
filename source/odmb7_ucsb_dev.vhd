@@ -190,7 +190,11 @@ architecture Behavioral of ODMB7_UCSB_DEV is
       TEST_LCT             : out std_logic;
       MASK_L1A             : out std_logic_vector(NCFEB downto 0);
       MASK_PLS             : out std_logic;
-      ODMB_CTRL            : out std_logic_vector(15 downto 0);
+      ODMB_CAL             : out std_logic;
+      MUX_DATA_PATH        : out std_logic;
+      MUX_TRIGGER          : out std_logic;
+      MUX_LVMB             : out std_logic;
+      ODMB_PED             : out std_logic_vector(1 downto 0);
       ODMB_DATA            : in std_logic_vector(15 downto 0);
       ODMB_DATA_SEL        : out std_logic_vector(7 downto 0);
 
@@ -543,10 +547,9 @@ begin
   end process;
 
   dcfeb_initjtag_dd <= or_reduce(dcfeb_done_pulse);
-  -- FIXME: temporarily using clk40 so I don't have to wait an eternity, 10kHz in realistic design
-  DS_DCFEB_INITJTAG    : DELAY_SIGNAL generic map(240) port map(DOUT => dcfeb_initjtag_d, CLK => CLK40, NCYCLES => 240, DIN => dcfeb_initjtag_dd);
-  -- FIXME: temporarily using clk40 so I don't have to wait an eternity, 625kHz in realistic design
-  PULSE_DCFEB_INITJTAG : NPULSE2FAST port map(DOUT => dcfeb_initjtag, CLK_DOUT => clk625k, RST => '0', NPULSE => 5, DIN => dcfeb_initjtag_d);
+  -- FIXME: temporarily using clk625k and delay 10 because in simu VME commands come fast, real board has delay 240 and 10kHz clock
+  DS_DCFEB_INITJTAG    : DELAY_SIGNAL generic map(10) port map(DOUT => dcfeb_initjtag_d, CLK => clk625k, NCYCLES => 10, DIN => dcfeb_initjtag_dd);
+  PULSE_DCFEB_INITJTAG : NPULSE2FAST port map(DOUT => dcfeb_initjtag, CLK_DOUT => clk2p5, RST => '0', NPULSE => 5, DIN => dcfeb_initjtag_d);
 
   -------------------------------------------------------------------------------------------
   -- Handle Triggers
@@ -659,7 +662,11 @@ begin
       TEST_LCT => test_lct,
       MASK_L1A => mask_l1a,
       MASK_PLS => mask_pls,
-      ODMB_CTRL => odmb_ctrl_reg,
+      ODMB_CAL => odmb_ctrl_reg(0),
+      MUX_DATA_PATH => odmb_ctrl_reg(7),
+      MUX_TRIGGER => odmb_ctrl_reg(9),
+      MUX_LVMB => odmb_ctrl_reg(10),
+      ODMB_PED => odmb_ctrl_reg(14 downto 13),
       ODMB_DATA => odmb_data,
       ODMB_DATA_SEL => odmb_data_sel,
 

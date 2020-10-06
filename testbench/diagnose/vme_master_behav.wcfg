@@ -14,15 +14,15 @@
       </db_ref>
    </db_ref_list>
    <zoom_setting>
-      <ZoomStartTime time="114324800000fs"></ZoomStartTime>
-      <ZoomEndTime time="122174800001fs"></ZoomEndTime>
-      <Cursor1Time time="160000000000fs"></Cursor1Time>
+      <ZoomStartTime time="15900000000fs"></ZoomStartTime>
+      <ZoomEndTime time="49857287243fs"></ZoomEndTime>
+      <Cursor1Time time="80000000000fs"></Cursor1Time>
    </zoom_setting>
    <column_width_setting>
-      <NameColumnWidth column_width="110"></NameColumnWidth>
+      <NameColumnWidth column_width="94"></NameColumnWidth>
       <ValueColumnWidth column_width="66"></ValueColumnWidth>
    </column_width_setting>
-   <WVObjectSize size="67" />
+   <WVObjectSize size="66" />
    <wave_markers>
       <marker label="" time="669732" />
    </wave_markers>
@@ -70,18 +70,6 @@
       <obj_property name="ElementShortName">vme_oe_b</obj_property>
       <obj_property name="ObjectShortName">vme_oe_b</obj_property>
    </wvobject>
-   <wvobject type="array" fp_name="/Firmware_tb/odmb_i/MBV/DEV1_CFEBJTAG/qv_resetdone">
-      <obj_property name="ElementShortName">qv_resetdone[3:0]</obj_property>
-      <obj_property name="ObjectShortName">qv_resetdone[3:0]</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/MBV/DEV1_CFEBJTAG/resetdone">
-      <obj_property name="ElementShortName">resetdone</obj_property>
-      <obj_property name="ObjectShortName">resetdone</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/MBV/DEV1_CFEBJTAG/clr_resetjtag">
-      <obj_property name="ElementShortName">clr_resetjtag</obj_property>
-      <obj_property name="ObjectShortName">clr_resetjtag</obj_property>
-   </wvobject>
    <wvobject type="logic" fp_name="/Firmware_tb/dl_jtag_tck[2]">
       <obj_property name="ElementShortName">[2]</obj_property>
       <obj_property name="ObjectShortName">[2]</obj_property>
@@ -89,18 +77,6 @@
    <wvobject type="logic" fp_name="/Firmware_tb/dl_jtag_tms">
       <obj_property name="ElementShortName">dl_jtag_tms</obj_property>
       <obj_property name="ObjectShortName">dl_jtag_tms</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/MBV/DEV1_CFEBJTAG/q3_shdhead_tms">
-      <obj_property name="ElementShortName">q3_shdhead_tms</obj_property>
-      <obj_property name="ObjectShortName">q3_shdhead_tms</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/MBV/DEV1_CFEBJTAG/shdhead">
-      <obj_property name="ElementShortName">shdhead</obj_property>
-      <obj_property name="ObjectShortName">shdhead</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/MBV/DEV1_CFEBJTAG/dtack_rstjtag">
-      <obj_property name="ElementShortName">dtack_rstjtag</obj_property>
-      <obj_property name="ObjectShortName">dtack_rstjtag</obj_property>
    </wvobject>
    <wvobject type="logic" fp_name="/Firmware_tb/dl_jtag_tdi">
       <obj_property name="ElementShortName">dl_jtag_tdi</obj_property>
@@ -154,6 +130,30 @@
       <obj_property name="ElementShortName">clk20</obj_property>
       <obj_property name="ObjectShortName">clk20</obj_property>
    </wvobject>
+   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/clk625k">
+      <obj_property name="ElementShortName">clk625k</obj_property>
+      <obj_property name="ObjectShortName">clk625k</obj_property>
+   </wvobject>
+   <wvobject type="other" fp_name="/Firmware_tb/odmb_i/done_next_state[2]">
+      <obj_property name="ElementShortName">[2]</obj_property>
+      <obj_property name="ObjectShortName">[2]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/Firmware_tb/odmb_i/dcfeb_done_pulse">
+      <obj_property name="ElementShortName">dcfeb_done_pulse[7:1]</obj_property>
+      <obj_property name="ObjectShortName">dcfeb_done_pulse[7:1]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/dcfeb_initjtag_d">
+      <obj_property name="ElementShortName">dcfeb_initjtag_d</obj_property>
+      <obj_property name="ObjectShortName">dcfeb_initjtag_d</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/Firmware_tb/odmb_i/DS_DCFEB_INITJTAG/din_vector">
+      <obj_property name="ElementShortName">din_vector[10:0]</obj_property>
+      <obj_property name="ObjectShortName">din_vector[10:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/dcfeb_initjtag">
+      <obj_property name="ElementShortName">dcfeb_initjtag</obj_property>
+      <obj_property name="ObjectShortName">dcfeb_initjtag</obj_property>
+   </wvobject>
    <wvobject type="logic" fp_name="/Firmware_tb/resync_p">
       <obj_property name="ElementShortName">resync_p</obj_property>
       <obj_property name="ObjectShortName">resync_p</obj_property>
@@ -182,29 +182,9 @@
       <obj_property name="ElementShortName">ADRS_INNER[23:1]</obj_property>
       <obj_property name="ObjectShortName">ADRS_INNER[23:1]</obj_property>
    </wvobject>
-   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/MBV/COMMAND_PM/ASYNSTRB">
-      <obj_property name="ElementShortName">ASYNSTRB</obj_property>
-      <obj_property name="ObjectShortName">ASYNSTRB</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/MBV/COMMAND_PM/STROBE_TEMP1">
-      <obj_property name="ElementShortName">STROBE_TEMP1</obj_property>
-      <obj_property name="ObjectShortName">STROBE_TEMP1</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/MBV/COMMAND_PM/STROBE_TEMP2">
-      <obj_property name="ElementShortName">STROBE_TEMP2</obj_property>
-      <obj_property name="ObjectShortName">STROBE_TEMP2</obj_property>
-   </wvobject>
    <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/MBV/strobe">
       <obj_property name="ElementShortName">strobe</obj_property>
       <obj_property name="ObjectShortName">strobe</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/MBV/DEV1_CFEBJTAG/STROBE">
-      <obj_property name="ElementShortName">STROBE</obj_property>
-      <obj_property name="ObjectShortName">STROBE</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/MBV/DEV1_CFEBJTAG/q_load">
-      <obj_property name="ElementShortName">q_load</obj_property>
-      <obj_property name="ObjectShortName">q_load</obj_property>
    </wvobject>
    <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/MBV/DEV1_CFEBJTAG/load">
       <obj_property name="ElementShortName">load</obj_property>
@@ -217,6 +197,22 @@
    <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/MBV/DEV1_CFEBJTAG/clr_busy">
       <obj_property name="ElementShortName">clr_busy</obj_property>
       <obj_property name="ObjectShortName">clr_busy</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/odmbctrl_l1a">
+      <obj_property name="ElementShortName">odmbctrl_l1a</obj_property>
+      <obj_property name="ObjectShortName">odmbctrl_l1a</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/masked_l1a">
+      <obj_property name="ElementShortName">masked_l1a</obj_property>
+      <obj_property name="ObjectShortName">masked_l1a</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/Firmware_tb/odmb_i/odmbctrl_l1a_match">
+      <obj_property name="ElementShortName">odmbctrl_l1a_match[7:1]</obj_property>
+      <obj_property name="ObjectShortName">odmbctrl_l1a_match[7:1]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/Firmware_tb/odmb_i/masked_l1a_match">
+      <obj_property name="ElementShortName">masked_l1a_match[7:1]</obj_property>
+      <obj_property name="ObjectShortName">masked_l1a_match[7:1]</obj_property>
    </wvobject>
    <wvobject type="logic" fp_name="/Firmware_tb/vme_dtack">
       <obj_property name="ElementShortName">vme_dtack</obj_property>
