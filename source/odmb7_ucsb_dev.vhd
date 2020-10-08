@@ -13,6 +13,7 @@ use work.Firmware_pkg.all;     -- for switch between sim and synthesis
 
 entity ODMB7_UCSB_DEV is
   generic (
+    NREGS       : integer := 16;
     NCFEB       : integer range 1 to 7 := 7  -- Number of DCFEBS, 7 for ME1/1, 5
   );
   PORT (
@@ -201,11 +202,20 @@ architecture Behavioral of ODMB7_UCSB_DEV is
       --------------------
       -- VMECONFREGS Configuration signals for top level
       --------------------
-      LCT_L1A_DLY          : out std_logic_vector(5 downto 0);
-      INJ_DLY              : out std_logic_vector(4 downto 0);
-      EXT_DLY              : out std_logic_vector(4 downto 0);
-      CALLCT_DLY           : out std_logic_vector(3 downto 0);
-      CABLE_DLY            : out integer range 0 to 1;
+      LCT_L1A_DLY   : out std_logic_vector(5 downto 0);
+      CABLE_DLY     : out integer range 0 to 1;
+      OTMB_PUSH_DLY : out integer range 0 to 63;
+      ALCT_PUSH_DLY : out integer range 0 to 63;
+      BX_DLY        : out integer range 0 to 4095;
+      INJ_DLY       : out std_logic_vector(4 downto 0);
+      EXT_DLY       : out std_logic_vector(4 downto 0);
+      CALLCT_DLY    : out std_logic_vector(3 downto 0);
+      ODMB_ID      : out std_logic_vector(15 downto 0);
+      NWORDS_DUMMY : out std_logic_vector(15 downto 0);
+      KILL         : out std_logic_vector(NCFEB+2 downto 1);
+      CRATEID      : out std_logic_vector(7 downto 0);
+      CHANGE_REG_DATA      : in std_logic_vector(15 downto 0);
+      CHANGE_REG_INDEX     : in integer range 0 to NREGS;
 
       --------------------
       -- Other
@@ -349,6 +359,9 @@ architecture Behavioral of ODMB7_UCSB_DEV is
   signal callct_dly : std_logic_vector(3 downto 0) := (others => '0');
   signal cable_dly : integer range 0 to 1;
   signal odmb_ctrl_reg : std_logic_vector(15 downto 0) := (others => '0');
+  signal kill : std_logic_vector(NCFEB+2 downto 1) := (others => '0');
+  signal change_reg_data  : std_logic_vector(15 downto 0);
+  signal change_reg_index : integer range 0 to NREGS := NREGS;
 
   --------------------------------------
   -- ODMB VME<->ODMB CTRL signals
@@ -562,6 +575,10 @@ begin
   -------------------------------------------------------------------------------------------
   -- Handle Internal configuration signals
   -------------------------------------------------------------------------------------------
+  
+  --FIXME should change with bad_dcfeb_pulse and good_dcfeb_pulse
+  change_reg_data <= x"0" & "000" & kill(9) & kill(8) & kill(7 downto 1);
+  change_reg_index <= NREGS;
 
   -------------------------------------------------------------------------------------------
   -- Handle reset signals
@@ -671,10 +688,19 @@ begin
       ODMB_DATA_SEL => odmb_data_sel,
 
       LCT_L1A_DLY => lct_l1a_dly,
+      CABLE_DLY => cable_dly,
+      OTMB_PUSH_DLY => open,
+      ALCT_PUSH_DLY => open,
+      BX_DLY => open,
       INJ_DLY => inj_dly, 
       EXT_DLY => ext_dly, 
-      CALLCT_DLY => callct_dly, 
-      CABLE_DLY => cable_dly,
+      CALLCT_DLY => callct_dly,
+      ODMB_ID => open,
+      NWORDS_DUMMY => open,
+      KILL => kill,
+      CRATEID => open,
+      CHANGE_REG_DATA => change_reg_data,
+      CHANGE_REG_INDEX => change_reg_index,
 
       DIAGOUT  => DIAGOUT,
       RST      => reset

@@ -228,7 +228,7 @@ begin
   FDCE_new_strobe_qq : FDCE port map (D => new_strobe_q, C => SLOWCLK, CE => '1', CLR => RST, Q => new_strobe_qq);
   new_strobe <= new_strobe_q and (not new_strobe_qq);
 
-  -- Generate load on second clock cycle after new STROBE for DATASHFT and INSTSHFT commands IF not already busy with a JTAG command  
+  -- Generate load on third clock cycle after new STROBE for DATASHFT and INSTSHFT commands IF not already busy with a JTAG command  
   d1_load  <= datashft or instshft;
   clr_load <= load or RST;
   FDCE_qload : FDCE port map(D => d1_load, C => SLOWCLK, CE => new_strobe, CLR => clr_load, Q => q_load);

@@ -29,7 +29,8 @@ use work.Firmware_pkg.all;     -- for switch between sim and synthesis
 
 entity ODMB_VME is
   generic (
-    NCFEB       : integer range 1 to 7 := 7  -- Number of DCFEBS, 7 for ME1/1, 5
+    NCFEB       : integer range 1 to 7 := 7;  -- Number of DCFEBS, 7 for ME1/1, 5
+    NREGS       : integer := 16
   );
   PORT (
     --------------------
@@ -102,7 +103,7 @@ entity ODMB_VME is
     OTMB_RX : out std_logic_vector(5 downto 0);
 
     --------------------
-    -- VMEMON Configuration signals for top level
+    -- VMEMON Configuration signals for top level and input from top level
     --------------------
     FW_RESET             : out std_logic;
     L1A_RESET_PULSE      : out std_logic;
@@ -124,11 +125,20 @@ entity ODMB_VME is
     --------------------
     -- VMECONFREGS Configuration signals for top level
     --------------------
-    LCT_L1A_DLY          : out std_logic_vector(5 downto 0);
-    INJ_DLY              : out std_logic_vector(4 downto 0);
-    EXT_DLY              : out std_logic_vector(4 downto 0);
-    CALLCT_DLY           : out std_logic_vector(3 downto 0);
-    CABLE_DLY            : out integer range 0 to 1;
+    LCT_L1A_DLY   : out std_logic_vector(5 downto 0);
+    CABLE_DLY     : out integer range 0 to 1;
+    OTMB_PUSH_DLY : out integer range 0 to 63;
+    ALCT_PUSH_DLY : out integer range 0 to 63;
+    BX_DLY        : out integer range 0 to 4095;
+    INJ_DLY       : out std_logic_vector(4 downto 0);
+    EXT_DLY       : out std_logic_vector(4 downto 0);
+    CALLCT_DLY    : out std_logic_vector(3 downto 0);
+    ODMB_ID      : out std_logic_vector(15 downto 0);
+    NWORDS_DUMMY : out std_logic_vector(15 downto 0);
+    KILL         : out std_logic_vector(NCFEB+2 downto 1);
+    CRATEID      : out std_logic_vector(7 downto 0);
+    CHANGE_REG_DATA      : in std_logic_vector(15 downto 0);
+    CHANGE_REG_INDEX     : in integer range 0 to NREGS;
 
     --------------------
     -- Other
@@ -143,21 +153,103 @@ architecture Behavioral of ODMB_VME is
   constant bw_data  : integer := 16; -- data bit width
   constant num_dev  : integer := 9;  -- number of devices (exclude dev0)
 
-  component CONFREGS_DUMMY is
+--  component CONFREGS_DUMMY is
+--    port (
+--      SLOWCLK              : in std_logic;
+--      DEVICE               : in std_logic;
+--      STROBE               : in std_logic;
+--      COMMAND              : in std_logic_vector(9 downto 0);
+--      OUTDATA              : inout std_logic_vector(15 downto 0);
+--      DTACK                : out std_logic;
+--      LCT_L1A_DLY          : out std_logic_vector(5 downto 0);
+--      INJ_DLY              : out std_logic_vector(4 downto 0);
+--      EXT_DLY              : out std_logic_vector(4 downto 0);
+--      CALLCT_DLY           : out std_logic_vector(3 downto 0);
+--      CABLE_DLY            : out integer range 0 to 1
+--    );
+--  end component;
+  
+  component QSPI_DUMMY is
+    generic (
+      NREGS  : integer := 16
+      );
     port (
       SLOWCLK              : in std_logic;
-      DEVICE               : in std_logic;
-      STROBE               : in std_logic;
-      COMMAND              : in std_logic_vector(9 downto 0);
-      OUTDATA              : inout std_logic_vector(15 downto 0);
-      DTACK                : out std_logic;
-      LCT_L1A_DLY          : out std_logic_vector(5 downto 0);
-      INJ_DLY              : out std_logic_vector(4 downto 0);
-      EXT_DLY              : out std_logic_vector(4 downto 0);
-      CALLCT_DLY           : out std_logic_vector(3 downto 0);
-      CABLE_DLY            : out integer range 0 to 1
-    );
+      CLK                  : in std_logic;
+      RST                  : in std_logic;
+      BPI_CFG_UL_PULSE     : out std_logic;
+      BPI_CFG_DL_PULSE     : out std_logic;
+      BPI_CONST_UL_PULSE   : out std_logic;
+      BPI_CONST_DL_PULSE   : out std_logic;
+      CC_CFG_REG           : out std_logic_vector(15 downto 0);
+      BPI_CFG_BUSY         : out std_logic;
+      BPI_CONST_BUSY       : out std_logic;
+      CC_CFG_REG_WE        : out integer range 0 to NREGS;
+      CC_CONST_REG_WE      : out integer range 0 to NREGS;
+      BPI_CFG_REGS         : in cfg_regs_array;
+      BPI_CONST_REGS       : in cfg_regs_array
+      );
   end component;
+  
+  component VMECONFREGS is
+      generic (
+        NREGS  : integer := 16;             -- Number of Configuration registers
+        NCONST : integer := 16;             -- Number of Protected registers
+        NFEB   : integer := 7               -- Number of DCFEBs
+        );
+      port (
+        SLOWCLK : in std_logic;
+          CLK     : in std_logic;
+          RST     : in std_logic;
+      
+          DEVICE   : in  std_logic;
+          STROBE   : in  std_logic;
+          COMMAND  : in  std_logic_vector(9 downto 0);
+          WRITER   : in  std_logic;
+          DTACK    : out std_logic;
+          VME_AS_B : in  std_logic;
+      
+          INDATA  : in  std_logic_vector(15 downto 0);
+          OUTDATA : out std_logic_vector(15 downto 0);
+      
+      -- Configuration registers    
+          LCT_L1A_DLY   : out std_logic_vector(5 downto 0);
+          CABLE_DLY     : out integer range 0 to 1;
+          OTMB_PUSH_DLY : out integer range 0 to 63;
+          ALCT_PUSH_DLY : out integer range 0 to 63;
+          BX_DLY        : out integer range 0 to 4095;
+      
+          INJ_DLY    : out std_logic_vector(4 downto 0);
+          EXT_DLY    : out std_logic_vector(4 downto 0);
+          CALLCT_DLY : out std_logic_vector(3 downto 0);
+      
+          ODMB_ID      : out std_logic_vector(15 downto 0);
+          NWORDS_DUMMY : out std_logic_vector(15 downto 0);
+          KILL         : out std_logic_vector(NFEB+2 downto 1);
+          CRATEID      : out std_logic_vector(7 downto 0);
+      
+      -- From BPI_PORT
+          BPI_CFG_UL_PULSE   : in std_logic;
+          BPI_CFG_DL_PULSE   : in std_logic;
+          BPI_CONST_UL_PULSE : in std_logic;
+          BPI_CONST_DL_PULSE : in std_logic;
+      
+      -- From top level to change registers
+          CHANGE_REG_DATA  : in std_logic_vector(15 downto 0);
+          CHANGE_REG_INDEX : in integer range 0 to NREGS;
+      
+      -- From BPI_CTRL
+          CC_CFG_REG_IN : in std_logic_vector(15 downto 0);
+      
+      -- From/to BPI_CFG_CONTROLLER
+          BPI_CFG_BUSY    : in  std_logic;
+          BPI_CONST_BUSY  : in  std_logic;
+          CC_CFG_REG_WE   : in  integer range 0 to NREGS;
+          CC_CONST_REG_WE : in  integer range 0 to NREGS;
+          BPI_CFG_REGS    : out cfg_regs_array;
+          BPI_CONST_REGS  : out cfg_regs_array
+      );
+    end component;
 
   component CFEBJTAG is
     generic (
@@ -294,6 +386,21 @@ architecture Behavioral of ODMB_VME is
   signal dl_jtag_tdi_inner, dl_jtag_tms_inner : std_logic;
 
   signal cmd_adrs_inner : std_logic_vector(17 downto 2) := (others => '0');
+  
+  signal odmb_id_inner : std_logic_vector(15 downto 0);
+  
+  --temp bpi signals
+  signal bpi_cfg_ul_pulse_inner : std_logic := '0';
+  signal bpi_cfg_dl_pulse_inner : std_logic := '0';
+  signal bpi_const_ul_pulse_inner : std_logic := '0';
+  signal bpi_const_dl_pulse_inner : std_logic := '0';
+  signal cc_cfg_reg_in : std_logic_vector(15 downto 0) := (others => '0');
+  signal bpi_cfg_busy : std_logic := '0';
+  signal bpi_const_busy : std_logic := '0';
+  signal cc_cfg_reg_we : integer range 0 to NREGS := 0;
+  signal cc_const_reg_we : integer range 0 to NREGS := 0;
+  signal const_regs_inner       : cfg_regs_array;
+  signal cfg_regs_inner         : cfg_regs_array;
 
 begin
 
@@ -320,6 +427,11 @@ begin
   --Handle DTACK
   PULLUP_vme_dtack : PULLUP port map (O => VME_DTACK_B);
   VME_DTACK_B <= not or_reduce(dtack_dev);
+  
+  ----------------------------------
+  -- misc
+  ----------------------------------
+  ODMB_ID <= odmb_id_inner;
 
   ----------------------------------
   -- debugging
@@ -329,21 +441,6 @@ begin
   ----------------------------------
   -- sub-modules
   ----------------------------------
-
-  DEV4_DUMMY : CONFREGS_DUMMY
-    port map (
-          SLOWCLK => clk2p5,
-          DEVICE  => device(4),
-          STROBE  => strobe,
-          COMMAND => cmd,
-          OUTDATA => outdata_dev(4),
-          DTACK => dtack_dev(4),
-          LCT_L1A_DLY => LCT_L1A_DLY,
-          INJ_DLY => INJ_DLY, 
-          EXT_DLY => EXT_DLY, 
-          CALLCT_DLY => CALLCT_DLY,
-          CABLE_DLY => CABLE_DLY
-    );
 
   DEV1_CFEBJTAG : CFEBJTAG
     generic map (NCFEB => NCFEB)
@@ -416,6 +513,65 @@ begin
       TXDIFFCTRL    => open,      -- TX voltage swing, W 3110 is disabled: constant output x"8"
       LOOPBACK      => open       -- For internal loopback tests, bbb for W 3100 bbb
       );
+      
+--  DEV4_DUMMY : CONFREGS_DUMMY
+--    port map (
+--      SLOWCLK => clk2p5,
+--      DEVICE  => device(4),
+--      STROBE  => strobe,
+--      COMMAND => cmd,
+--      OUTDATA => outdata_dev(4),
+--      DTACK => dtack_dev(4),
+--      LCT_L1A_DLY => LCT_L1A_DLY,
+--      INJ_DLY => INJ_DLY, 
+--      EXT_DLY => EXT_DLY, 
+--      CALLCT_DLY => CALLCT_DLY,
+--      CABLE_DLY => CABLE_DLY
+--    );
+  
+  DEV4_VMECONFREGS : VMECONFREGS
+      port map (
+        SLOWCLK => CLK2P5,
+        CLK => CLK40,
+        RST => RST, 
+        DEVICE  => device(4),
+        STROBE  => strobe,
+        COMMAND => cmd,
+        WRITER => VME_WRITE_B,
+        DTACK => dtack_dev(4),
+        VME_AS_B => VME_AS_B, 
+        INDATA => VME_DATA_IN,
+        OUTDATA => outdata_dev(4),
+        
+        LCT_L1A_DLY => LCT_L1A_DLY,
+        CABLE_DLY => CABLE_DLY,
+        OTMB_PUSH_DLY => OTMB_PUSH_DLY, 
+        ALCT_PUSH_DLY => ALCT_PUSH_DLY,
+        BX_DLY => BX_DLY, 
+        INJ_DLY => INJ_DLY, 
+        EXT_DLY => EXT_DLY, 
+        CALLCT_DLY => CALLCT_DLY,
+        ODMB_ID => odmb_id_inner,
+        NWORDS_DUMMY => NWORDS_DUMMY,
+        KILL => KILL,
+        CRATEID => CRATEID,
+        
+        CHANGE_REG_DATA  => CHANGE_REG_DATA,
+        CHANGE_REG_INDEX => CHANGE_REG_INDEX,
+        
+        BPI_CFG_UL_PULSE   => bpi_cfg_ul_pulse_inner,
+        BPI_CFG_DL_PULSE   => bpi_cfg_dl_pulse_inner,
+        BPI_CONST_UL_PULSE => bpi_const_ul_pulse_inner,
+        BPI_CONST_DL_PULSE => bpi_const_dl_pulse_inner,
+        CC_CFG_REG_IN => cc_cfg_reg_in,
+        BPI_CONST_BUSY  => bpi_const_busy,
+        CC_CONST_REG_WE => cc_const_reg_we,
+        BPI_CFG_BUSY    => bpi_cfg_busy,
+        CC_CFG_REG_WE   => cc_cfg_reg_we,
+        
+        BPI_CONST_REGS  => const_regs_inner,
+        BPI_CFG_REGS    => cfg_regs_inner
+      );      
 
   COMMAND_PM : COMMAND_MODULE
     port map (
@@ -442,6 +598,25 @@ begin
       DIAGOUT => diagout_buf,
       LED     => led_command
       );
+      
+  QSPI_DUMMY_I : QSPI_DUMMY
+    generic map (NREGS => NREGS)
+    port map (
+      SLOWCLK => CLK2P5,
+      CLK => CLK40,
+      RST => RST, 
+      BPI_CFG_UL_PULSE   => bpi_cfg_ul_pulse_inner,
+      BPI_CFG_DL_PULSE   => bpi_cfg_dl_pulse_inner,
+      BPI_CONST_UL_PULSE => bpi_const_ul_pulse_inner,
+      BPI_CONST_DL_PULSE => bpi_const_dl_pulse_inner,
+      CC_CFG_REG => cc_cfg_reg_in,
+      BPI_CONST_BUSY  => bpi_const_busy,
+      CC_CONST_REG_WE => cc_const_reg_we,
+      BPI_CFG_BUSY    => bpi_cfg_busy,
+      CC_CFG_REG_WE   => cc_cfg_reg_we,
+      BPI_CFG_REGS => cfg_regs_inner,
+      BPI_CONST_REGS => const_regs_inner
+    );
 
 
 end Behavioral;
