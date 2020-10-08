@@ -114,6 +114,35 @@ architecture Behavioral of Firmware_tb is
     douta : out std_logic_vector(bw_input2-1 downto 0) := (others => '0')
   );
   end component;
+  
+  -- VIO signals
+--  ENTITY vio_input IS
+--  PORT (
+--  CLK : IN STD_LOGIC;
+  
+--  probe_out0 : OUT STD_LOGIC_VECTOR(0 DOWNTO 0) := (others => '0');
+--  probe_out1 : OUT STD_LOGIC_VECTOR(0 DOWNTO 0) := (others => '0') ;
+--  probe_out2 : OUT STD_LOGIC_VECTOR(15 DOWNTO 0) := (others => '0') ;
+--  probe_out3 : OUT STD_LOGIC_VECTOR(15 DOWNTO 0) := (others => '0')
+--  );
+--  END vio_input;
+
+  component vio_input is
+  port (
+    CLK : in std_logic;
+    probe_out0 : out std_logic_vector(0 downto 0); --don't ask me why, but it complains about being std_logic
+    probe_out1 : out std_logic_vector(0 downto 0); --"
+    probe_out2 : out std_logic_vector(15 downto 0);
+    probe_out3 : out std_logic_vector(15 downto 0)
+  );
+  end component;
+  signal use_vio_input_vector : std_logic_vector(0 downto 0) := "0";
+  signal vio_issue_vme_cmd_vector : std_logic_vector(0 downto 0) := "0";
+  signal use_vio_input : std_logic := '0';
+  signal vio_issue_vme_cmd : std_logic := '0';
+  signal vio_issue_vme_cmd_q : std_logic := '0';
+  signal vio_vme_addr : std_logic_vector(15 downto 0) := x"0000";
+  signal vio_vme_data : std_logic_vector(15 downto 0) := x"0000";
 
   -- Clock signals
   signal clk_in_buf : std_logic := '0';
@@ -321,7 +350,19 @@ begin
             addra=> std_logic_vector(lut_input_addr2_s),
             douta=> lut_input2_dout_c
           );
-
+          
+  -- Input VIO
+  vio_input_i: vio_input
+    port map(
+              CLK => sysclk,
+              PROBE_OUT0 => use_vio_input_vector,
+              PROBE_OUT1 => vio_issue_vme_cmd_vector,
+              PROBE_OUT2 => vio_vme_addr,
+              PROBE_OUT3 => vio_vme_data
+            );
+  use_vio_input <= use_vio_input_vector(0);
+  vio_issue_vme_cmd <= vio_issue_vme_cmd_vector(0);
+            
   -- Process to generate counter and initialization
   startGenerator_i: process (sysclk) is
   begin
@@ -342,43 +383,60 @@ begin
     end if;
   end process;
 
-  -- Process to read input from LUTs and give to VME 
+  -- Process to read input from LUTs or VIO and give to VME 
   inputGenerator_i: process (sysclk) is
     variable init_input1: unsigned(bw_fifo-3 downto 0):= (others => '0');
     variable init_input2: unsigned(bw_fifo-3 downto 0):= (others => '1');
   begin
     if sysclk'event and sysclk='1' then
       if init_done = '1' then
-        if waitCounter = 0  then
-          if cack = '1' then
-            inputCounter <= inputCounter + 1;
-            waitCounter <= "1100000000";
-            -- Initalize lut_input_addr_s
-            if inputCounter = 0 then
-              lut_input_addr1_s <= to_unsigned(0,bw_addr);
-              lut_input_addr2_s <= to_unsigned(0,bw_addr);
+        if (use_vio_input = '0') then
+          --handle LUT input
+          if waitCounter = 0  then
+            if cack = '1' then
+              inputCounter <= inputCounter + 1;
+              waitCounter <= "1100000000";
+              -- Initalize lut_input_addr_s
+              if inputCounter = 0 then
+                lut_input_addr1_s <= to_unsigned(0,bw_addr);
+                lut_input_addr2_s <= to_unsigned(0,bw_addr);
+                cmddev <= std_logic_vector(init_input1);
+                input_dav <= '0';
+              else
+                if lut_input_addr1_s = bw_addr_entries-1 then
+                  lut_input_addr1_s <= x"0";
+                  lut_input_addr2_s <= x"0";
+                else 
+                  lut_input_addr1_s <= lut_input_addr1_s + 1;
+                  lut_input_addr2_s <= lut_input_addr2_s + 1;
+                end if;
+                cmddev <= lut_input1_dout_c;
+                vme_data_in <= lut_input2_dout_c;
+                input_dav <= '1';
+              end if;
+            else
               cmddev <= std_logic_vector(init_input1);
               input_dav <= '0';
-            else
-              if lut_input_addr1_s = bw_addr_entries-1 then
-                lut_input_addr1_s <= x"0";
-                lut_input_addr2_s <= x"0";
-              else 
-                lut_input_addr1_s <= lut_input_addr1_s + 1;
-                lut_input_addr2_s <= lut_input_addr2_s + 1;
-              end if;
-              cmddev <= lut_input1_dout_c;
-              vme_data_in <= lut_input2_dout_c;
+            end if;
+          else
+            cmddev <= std_logic_vector(init_input1);
+            input_dav <= '0';
+            waitCounter <= waitCounter - 1;
+          end if;
+        else
+          --handle VIO input
+          if (cack = '1') then
+            --allow new commands to be issued
+            vio_issue_vme_cmd_q <= vio_issue_vme_cmd;
+            if (vio_issue_vme_cmd = '1' and vio_issue_vme_cmd_q = '0') then
+              cmddev <= vio_vme_addr;
+              vme_data_in <= vio_vme_data;
               input_dav <= '1';
             end if;
           else
             cmddev <= std_logic_vector(init_input1);
             input_dav <= '0';
           end if;
-        else
-          cmddev <= std_logic_vector(init_input1);
-          input_dav <= '0';
-          waitCounter <= waitCounter - 1;
         end if;
       else
         inputCounter <= to_unsigned(0,bw_count);

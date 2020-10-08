@@ -27,7 +27,6 @@ entity VMECONFREGS is
     COMMAND  : in  std_logic_vector(9 downto 0);
     WRITER   : in  std_logic;
     DTACK    : out std_logic;
-    VME_AS_B : in  std_logic;
 
     INDATA  : in  std_logic_vector(15 downto 0);
     OUTDATA : out std_logic_vector(15 downto 0);
@@ -48,26 +47,20 @@ entity VMECONFREGS is
     KILL         : out std_logic_vector(NFEB+2 downto 1);
     CRATEID      : out std_logic_vector(7 downto 0);
 
--- From BPI_PORT
-    BPI_CFG_UL_PULSE   : in std_logic;
-    BPI_CFG_DL_PULSE   : in std_logic;
-    BPI_CONST_UL_PULSE : in std_logic;
-    BPI_CONST_DL_PULSE : in std_logic;
-
 -- From ODMB_UCSB_V2 to change registers
     CHANGE_REG_DATA  : in std_logic_vector(15 downto 0);
     CHANGE_REG_INDEX : in integer range 0 to NREGS;
 
--- From BPI_CTRL
-    CC_CFG_REG_IN : in std_logic_vector(15 downto 0);
-
--- From/to BPI_CFG_CONTROLLER
-    BPI_CFG_BUSY    : in  std_logic;
-    BPI_CONST_BUSY  : in  std_logic;
-    CC_CFG_REG_WE   : in  integer range 0 to NREGS;
-    CC_CONST_REG_WE : in  integer range 0 to NREGS;
-    BPI_CFG_REGS    : out cfg_regs_array;
-    BPI_CONST_REGS  : out cfg_regs_array
+-- To/From QSPI Interface
+    QSPI_CFG_UL_PULSE   : in std_logic;
+    QSPI_CONST_UL_PULSE : in std_logic;
+    QSPI_REG_IN : in std_logic_vector(15 downto 0);
+    QSPI_CFG_BUSY    : in  std_logic;
+    QSPI_CONST_BUSY  : in  std_logic;
+    QSPI_CFG_REG_WE   : in  integer range 0 to NREGS;
+    QSPI_CONST_REG_WE : in  integer range 0 to NREGS;
+    QSPI_CFG_REGS    : out cfg_regs_array;
+    QSPI_CONST_REGS  : out cfg_regs_array
     );
 end VMECONFREGS;
 
@@ -112,40 +105,47 @@ architecture VMECONFREGS_Arch of VMECONFREGS is
   signal const_reg_we, vme_const_reg_we      : integer range 0 to NREGS;
   signal const_reg_in                        : std_logic_vector(15 downto 0) := (others => '0');
 
-  signal cmddev                     : std_logic_vector (15 downto 0);
-  signal dd_dtack, d_dtack, q_dtack : std_logic := '0';
+  signal cmddev                                 : std_logic_vector (15 downto 0);
+  signal dd_dtack, d_dtack, q_dtack, ce_d_dtack : std_logic := '0';
 
   signal w_mask_vme, r_mask_vme     : std_logic;
   signal mask_vme                   : std_logic_vector(NCONST downto 0)   := (others => '0');
 
 begin
 
+  --Decode command
   cmddev    <= "000" & DEVICE & COMMAND & "00";
   bit_const <= or_reduce(cmddev(11 downto 8));
 
-  do_cfg     <= '1' when ((cmddev and x"1F00") = x"1000")                               else '0';
-  do_const   <= '1' when ((cmddev and x"10FF") = x"1000" and bit_const = '1')           else '0';
-  w_mask_vme <= '1' when (cmddev = x"1FFC" and WRITER = '0' and able_write_const = '1') else '0';
-  r_mask_vme <= '1' when (cmddev = x"1FFC" and WRITER = '1')                            else '0';
+  do_cfg     <= '1' when ((cmddev and x"1F00") = x"1000")                                                else '0'; --0x40YZ
+  do_const   <= '1' when ((cmddev and x"10FF") = x"1000" and bit_const = '1')                            else '0'; --0x4Y00 where Y /= 0
+  w_mask_vme <= '1' when (cmddev = x"1FFC" and WRITER = '0' and able_write_const = '1' and STROBE = '1') else '0';
+  r_mask_vme <= '1' when (cmddev = x"1FFC" and WRITER = '1')                                             else '0';
 
--- Write MASK_VME
-  GEN_MASK_VME : for i in 0 to NCONST-1 generate
-  begin
-    fd_w_mask_vme : fdce port map(Q => mask_vme(i), C => STROBE, CE => w_mask_vme, CLR => RST, D => INDATA(i));
-  end generate GEN_MASK_VME;
-
-
--- Set write enables and output data
   cfg_reg_index <= to_integer(unsigned(cmddev(5 downto 2)));
 
   const_reg_index_p1 <= to_integer(unsigned(cmddev(11 downto 8)));
   const_reg_index    <= const_reg_index_p1 - 1 when const_reg_index_p1 > 0 else NCONST;
 
+
+
+
+  -- Write MASK_VME (0x4FFC)
+  GEN_MASK_VME : for i in 0 to NCONST-1 generate
+  begin
+    fd_w_mask_vme : fdce port map(Q => mask_vme(i), C => CLK, CE => w_mask_vme, CLR => RST, D => INDATA(i));
+  end generate GEN_MASK_VME;
+
+
+
+
+  -- Output for read commands (R 0x40YZ and R 0x4Y00) and output data to top level
   OUTDATA <= mask_vme(15 downto 0) when r_mask_vme = '1' else
              const_regs(const_reg_index) when do_const = '1' else
              cfg_regs(cfg_reg_index) and cfg_reg_mask(cfg_reg_index);
-  BPI_CFG_REGS   <= cfg_regs;
-  BPI_CONST_REGS <= const_regs;
+
+  QSPI_CFG_REGS   <= cfg_regs;
+  QSPI_CONST_REGS <= const_regs;
 
   LCT_L1A_DLY   <= cfg_regs(0)(5 downto 0);                          -- 0x4000
   OTMB_PUSH_DLY <= to_integer(unsigned(cfg_regs(1)(5 downto 0)));    -- 0x4004
@@ -162,17 +162,19 @@ begin
 
   ODMB_ID <= const_regs(0)(15 downto 0);  -- 0x4100
 
-  -- Writing configuration registers when vme_cfg_reg_we or CC_CFG_REG_WE are
-  -- not NREGS
-  do_cfg_we      <= do_cfg and not WRITER and not VME_AS_B and not BPI_CFG_BUSY;
-  PULSE_CFGWE : PULSE2FAST port map(do_cfg_we_q, CLK, RST, do_cfg_we);
+
+
+
+  -- Write configuration registers (W 0x40YZ or top level signal) when vme_cfg_reg_we or CC_CFG_REG_WE are not NREGS
+  do_cfg_we      <= do_cfg and not WRITER and STROBE and not QSPI_CFG_BUSY;
+  PULSE_CFGWE : PULSE2FAST port map(DOUT => do_cfg_we_q, CLK_DOUT => CLK, RST => RST, DIN => do_cfg_we);
   vme_cfg_reg_we <= cfg_reg_index when do_cfg_we_q = '1' else NREGS;
 
   cfg_reg_we <= CHANGE_REG_INDEX when CHANGE_REG_INDEX < NREGS else
-                CC_CFG_REG_WE when BPI_CFG_UL_PULSE = '1' else
+                QSPI_CFG_REG_WE when QSPI_CFG_UL_PULSE = '1' else
                 vme_cfg_reg_we;
   cfg_reg_in <= CHANGE_REG_DATA when CHANGE_REG_INDEX < NREGS else
-                CC_CFG_REG_IN when BPI_CFG_UL_PULSE = '1' else
+                QSPI_REG_IN when QSPI_CFG_UL_PULSE = '1' else
                 INDATA;
 
   cfg_reg_proc : process (RST, CLK, cfg_reg_we, cfg_reg_in, cfg_regs)
@@ -202,13 +204,16 @@ begin
     end generate GEN_TRIPLEBITS;
   end generate GEN_CFG_TRIPLEVOTING;
 
-  -- Writing protected registers
-  do_const_we      <= do_const and not WRITER and not VME_AS_B and not BPI_CONST_BUSY and mask_vme(const_reg_index);
-  PULSE_CONSTWE : PULSE2FAST port map(do_const_we_q, CLK, RST, do_const_we);
+
+
+
+  -- Writing protected registers (W 0x4Y00)
+  do_const_we      <= do_const and not WRITER and STROBE and not QSPI_CONST_BUSY and mask_vme(const_reg_index);
+  PULSE_CONSTWE : PULSE2FAST port map(DOUT => do_const_we_q, CLK_DOUT => CLK, RST => RST, DIN => do_const_we);
   vme_const_reg_we <= const_reg_index when do_const_we_q = '1' else NCONST;
 
-  const_reg_we <= vme_const_reg_we when (BPI_CONST_UL_PULSE = '0') else cc_const_reg_we;
-  const_reg_in <= INDATA           when (BPI_CONST_UL_PULSE = '0') else cc_cfg_reg_in;
+  const_reg_we <= vme_const_reg_we when (QSPI_CONST_UL_PULSE = '0') else QSPI_CONST_REG_WE;
+  const_reg_in <= INDATA           when (QSPI_CONST_UL_PULSE = '0') else QSPI_REG_IN;
 
   const_reg_proc : process (RST, CLK, const_reg_we, const_reg_in, const_regs)
   begin
@@ -237,10 +242,13 @@ begin
     end generate GEN_TRIPLEBITS;
   end generate GEN_CONST_TRIPLEVOTING;
 
--- DTACK
-  dd_dtack <= STROBE and DEVICE;
-  FD_D_DTACK : FDC port map(d_dtack, dd_dtack, q_dtack, '1');
-  FD_Q_DTACK : FD port map(q_dtack, SLOWCLK, d_dtack);
+
+
+
+  -- DTACK: always just issue on second SLOWCLK edge after STROBE
+  ce_d_dtack <= STROBE and DEVICE;
+  FD_D_DTACK : FDCE port map(Q => d_dtack, C => SLOWCLK, CE => ce_d_dtack, CLR => q_dtack, D => '1');
+  FD_Q_DTACK : FD port map(Q => q_dtack, C => SLOWCLK, D => d_dtack);
   DTACK    <= q_dtack;
 
 end VMECONFREGS_Arch;

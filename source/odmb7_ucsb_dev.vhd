@@ -576,7 +576,7 @@ begin
   -- Handle Internal configuration signals
   -------------------------------------------------------------------------------------------
   
-  --FIXME should change with bad_dcfeb_pulse and good_dcfeb_pulse
+  --FIXME should change with bad_dcfeb_pulse and good_dcfeb_pulse, currently, KILL must be updated manually via VME command
   change_reg_data <= x"0" & "000" & kill(9) & kill(8) & kill(7 downto 1);
   change_reg_index <= NREGS;
 

@@ -207,7 +207,6 @@ architecture Behavioral of ODMB_VME is
           COMMAND  : in  std_logic_vector(9 downto 0);
           WRITER   : in  std_logic;
           DTACK    : out std_logic;
-          VME_AS_B : in  std_logic;
       
           INDATA  : in  std_logic_vector(15 downto 0);
           OUTDATA : out std_logic_vector(15 downto 0);
@@ -228,26 +227,20 @@ architecture Behavioral of ODMB_VME is
           KILL         : out std_logic_vector(NFEB+2 downto 1);
           CRATEID      : out std_logic_vector(7 downto 0);
       
-      -- From BPI_PORT
-          BPI_CFG_UL_PULSE   : in std_logic;
-          BPI_CFG_DL_PULSE   : in std_logic;
-          BPI_CONST_UL_PULSE : in std_logic;
-          BPI_CONST_DL_PULSE : in std_logic;
-      
-      -- From top level to change registers
+      -- From ODMB_UCSB_V2 to change registers
           CHANGE_REG_DATA  : in std_logic_vector(15 downto 0);
           CHANGE_REG_INDEX : in integer range 0 to NREGS;
       
-      -- From BPI_CTRL
-          CC_CFG_REG_IN : in std_logic_vector(15 downto 0);
-      
-      -- From/to BPI_CFG_CONTROLLER
-          BPI_CFG_BUSY    : in  std_logic;
-          BPI_CONST_BUSY  : in  std_logic;
-          CC_CFG_REG_WE   : in  integer range 0 to NREGS;
-          CC_CONST_REG_WE : in  integer range 0 to NREGS;
-          BPI_CFG_REGS    : out cfg_regs_array;
-          BPI_CONST_REGS  : out cfg_regs_array
+      -- To/From QSPI Interface
+          QSPI_CFG_UL_PULSE   : in std_logic;
+          QSPI_CONST_UL_PULSE : in std_logic;
+          QSPI_REG_IN : in std_logic_vector(15 downto 0);
+          QSPI_CFG_BUSY    : in  std_logic;
+          QSPI_CONST_BUSY  : in  std_logic;
+          QSPI_CFG_REG_WE   : in  integer range 0 to NREGS;
+          QSPI_CONST_REG_WE : in  integer range 0 to NREGS;
+          QSPI_CFG_REGS    : out cfg_regs_array;
+          QSPI_CONST_REGS  : out cfg_regs_array
       );
     end component;
 
@@ -390,15 +383,15 @@ architecture Behavioral of ODMB_VME is
   signal odmb_id_inner : std_logic_vector(15 downto 0);
   
   --temp bpi signals
-  signal bpi_cfg_ul_pulse_inner : std_logic := '0';
-  signal bpi_cfg_dl_pulse_inner : std_logic := '0';
-  signal bpi_const_ul_pulse_inner : std_logic := '0';
-  signal bpi_const_dl_pulse_inner : std_logic := '0';
-  signal cc_cfg_reg_in : std_logic_vector(15 downto 0) := (others => '0');
-  signal bpi_cfg_busy : std_logic := '0';
-  signal bpi_const_busy : std_logic := '0';
-  signal cc_cfg_reg_we : integer range 0 to NREGS := 0;
-  signal cc_const_reg_we : integer range 0 to NREGS := 0;
+  signal qspi_cfg_ul_pulse_inner : std_logic := '0';
+  signal qspi_cfg_dl_pulse_inner : std_logic := '0';
+  signal qspi_const_ul_pulse_inner : std_logic := '0';
+  signal qspi_const_dl_pulse_inner : std_logic := '0';
+  signal qspi_reg_in : std_logic_vector(15 downto 0) := (others => '0');
+  signal qspi_cfg_busy : std_logic := '0';
+  signal qspi_const_busy : std_logic := '0';
+  signal qspi_cfg_reg_we : integer range 0 to NREGS := 0;
+  signal qspi_const_reg_we : integer range 0 to NREGS := 0;
   signal const_regs_inner       : cfg_regs_array;
   signal cfg_regs_inner         : cfg_regs_array;
 
@@ -539,7 +532,6 @@ begin
         COMMAND => cmd,
         WRITER => VME_WRITE_B,
         DTACK => dtack_dev(4),
-        VME_AS_B => VME_AS_B, 
         INDATA => VME_DATA_IN,
         OUTDATA => outdata_dev(4),
         
@@ -559,18 +551,16 @@ begin
         CHANGE_REG_DATA  => CHANGE_REG_DATA,
         CHANGE_REG_INDEX => CHANGE_REG_INDEX,
         
-        BPI_CFG_UL_PULSE   => bpi_cfg_ul_pulse_inner,
-        BPI_CFG_DL_PULSE   => bpi_cfg_dl_pulse_inner,
-        BPI_CONST_UL_PULSE => bpi_const_ul_pulse_inner,
-        BPI_CONST_DL_PULSE => bpi_const_dl_pulse_inner,
-        CC_CFG_REG_IN => cc_cfg_reg_in,
-        BPI_CONST_BUSY  => bpi_const_busy,
-        CC_CONST_REG_WE => cc_const_reg_we,
-        BPI_CFG_BUSY    => bpi_cfg_busy,
-        CC_CFG_REG_WE   => cc_cfg_reg_we,
+        QSPI_CFG_UL_PULSE   => qspi_cfg_ul_pulse_inner,
+        QSPI_CONST_UL_PULSE   => qspi_const_ul_pulse_inner,
+        QSPI_REG_IN => qspi_reg_in,
+        QSPI_CONST_BUSY  => qspi_const_busy,
+        QSPI_CONST_REG_WE => qspi_const_reg_we,
+        QSPI_CFG_BUSY    => qspi_cfg_busy,
+        QSPI_CFG_REG_WE   => qspi_cfg_reg_we,
         
-        BPI_CONST_REGS  => const_regs_inner,
-        BPI_CFG_REGS    => cfg_regs_inner
+        QSPI_CONST_REGS  => const_regs_inner,
+        QSPI_CFG_REGS    => cfg_regs_inner
       );      
 
   COMMAND_PM : COMMAND_MODULE
@@ -605,15 +595,15 @@ begin
       SLOWCLK => CLK2P5,
       CLK => CLK40,
       RST => RST, 
-      BPI_CFG_UL_PULSE   => bpi_cfg_ul_pulse_inner,
-      BPI_CFG_DL_PULSE   => bpi_cfg_dl_pulse_inner,
-      BPI_CONST_UL_PULSE => bpi_const_ul_pulse_inner,
-      BPI_CONST_DL_PULSE => bpi_const_dl_pulse_inner,
-      CC_CFG_REG => cc_cfg_reg_in,
-      BPI_CONST_BUSY  => bpi_const_busy,
-      CC_CONST_REG_WE => cc_const_reg_we,
-      BPI_CFG_BUSY    => bpi_cfg_busy,
-      CC_CFG_REG_WE   => cc_cfg_reg_we,
+      BPI_CFG_UL_PULSE   => qspi_cfg_ul_pulse_inner,
+      BPI_CFG_DL_PULSE   => qspi_cfg_dl_pulse_inner,
+      BPI_CONST_UL_PULSE => qspi_const_ul_pulse_inner,
+      BPI_CONST_DL_PULSE => qspi_const_dl_pulse_inner,
+      CC_CFG_REG => qspi_reg_in,
+      BPI_CONST_BUSY  => qspi_const_busy,
+      CC_CONST_REG_WE => qspi_const_reg_we,
+      BPI_CFG_BUSY    => qspi_cfg_busy,
+      CC_CFG_REG_WE   => qspi_cfg_reg_we,
       BPI_CFG_REGS => cfg_regs_inner,
       BPI_CONST_REGS => const_regs_inner
     );
