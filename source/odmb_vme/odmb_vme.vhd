@@ -458,7 +458,7 @@ begin
       TMS       => dl_jtag_tms_inner,
       FEBTDO    => DCFEB_TDO,
 
-      DIAGOUT => open,
+      DIAGOUT => diagout_buf,
       LED     => led_cfebjtag
       );
 
@@ -585,7 +585,7 @@ begin
       STROBE  => strobe,
       COMMAND => cmd,
       ADRS    => cmd_adrs_inner,
-      DIAGOUT => diagout_buf,
+      DIAGOUT => open,
       LED     => led_command
       );
       

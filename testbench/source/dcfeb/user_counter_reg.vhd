@@ -15,7 +15,8 @@ entity user_counter_reg is
 
   port(
 
-    DRCK : in std_logic;      --Data Reg Clock
+    TCK : in std_logic;       --TCK clock
+    DRCK_EN : in std_logic;   --Data Reg Clock enable
     FSEL_3A : in std_logic;   --3A (L1AMATCH counter) function select
     FSEL_3B : in std_logic;   --3B (INJPLS counter) function select
     FSEL_3C : in std_logic;   --3C (EXTPLS counter) function select
@@ -42,41 +43,42 @@ architecture user_counter_reg_arch of user_counter_reg is
 begin
 
   TDO <= (ce_injpls or ce_extpls or ce_l1amatch or ce_bc0) and d(0);
-  ce_l1amatch <= SEL and FSEL_3A and (CAPTURE or SHIFT);
-  ce_injpls <= SEL and FSEL_3B and (CAPTURE or SHIFT);
-  ce_extpls <= SEL and FSEL_3C and (CAPTURE or SHIFT);
-  ce_bc0 <= SEL and FSEL_3D and (CAPTURE or SHIFT);
+  ce_l1amatch <= SEL and DRCK_EN and FSEL_3A and (CAPTURE or SHIFT);
+  ce_injpls <= SEL and DRCK_EN and FSEL_3B and (CAPTURE or SHIFT);
+  ce_extpls <= SEL and DRCK_EN and FSEL_3C and (CAPTURE or SHIFT);
+  ce_bc0 <= SEL and DRCK_EN and FSEL_3D and (CAPTURE or SHIFT);
 
   --d_shift_i : process (DRCK, RST, ce_injpls, ce_extpls, CAPTURE, SHIFT) is
-  d_shift_i : process (DRCK, RST) is
+  d_shift_i : process (TCK, RST) is
   begin
     if RST='1' then
       d <= x"000";
-    end if;
-    if DRCK'event and DRCK='1' then
-      if ce_l1amatch='1' then
-        if CAPTURE='1' then
-          d <= std_logic_vector(L1A_MATCH_COUNTER);
-        elsif SHIFT='1' then
-          d <= TDI & d(11 downto 1);
-        end if;
-      elsif ce_injpls='1' then
-        if CAPTURE='1' then
-          d <= std_logic_vector(INJPLS_COUNTER);
-        elsif SHIFT='1' then
-          d <= TDI & d(11 downto 1);
-        end if;
-      elsif ce_extpls='1' then
-        if CAPTURE='1' then
-          d <= std_logic_vector(EXTPLS_COUNTER);
-        elsif SHIFT='1' then
-          d <= TDI & d(11 downto 1);
-        end if;
-      elsif ce_bc0='1' then
-        if CAPTURE='1' then
-          d <= std_logic_vector(BC0_COUNTER);
-        elsif SHIFT='1' then
-          d <= TDI & d(11 downto 1);
+    else
+      if rising_edge(TCK) then
+        if ce_l1amatch='1' then
+          if CAPTURE='1' then
+            d <= std_logic_vector(L1A_MATCH_COUNTER);
+          elsif SHIFT='1' then
+            d <= TDI & d(11 downto 1);
+          end if;
+        elsif ce_injpls='1' then
+          if CAPTURE='1' then
+            d <= std_logic_vector(INJPLS_COUNTER);
+          elsif SHIFT='1' then
+            d <= TDI & d(11 downto 1);
+          end if;
+        elsif ce_extpls='1' then
+          if CAPTURE='1' then
+            d <= std_logic_vector(EXTPLS_COUNTER);
+          elsif SHIFT='1' then
+            d <= TDI & d(11 downto 1);
+          end if;
+        elsif ce_bc0='1' then
+          if CAPTURE='1' then
+            d <= std_logic_vector(BC0_COUNTER);
+          elsif SHIFT='1' then
+            d <= TDI & d(11 downto 1);
+          end if;
         end if;
       end if;
     end if;

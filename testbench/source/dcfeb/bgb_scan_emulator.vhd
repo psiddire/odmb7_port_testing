@@ -18,7 +18,7 @@ entity BGB_BSCAN_emulator is
     IR : out std_logic_vector(9 downto 0);
 
     CAPTURE1 : out std_ulogic := 'H';
-    DRCK1    : out std_ulogic := 'H';
+    DRCK1_EN : out std_ulogic := 'H';
     RESET1   : out std_ulogic := 'H';
     SEL1     : out std_ulogic := 'L';
     SHIFT1   : out std_ulogic := 'L';
@@ -27,7 +27,7 @@ entity BGB_BSCAN_emulator is
     TDO1     : in  std_ulogic;
 
     CAPTURE2 : out std_ulogic := 'H';
-    DRCK2    : out std_ulogic := 'H';
+    DRCK2_EN : out std_ulogic := 'H';
     RESET2   : out std_ulogic := 'H';
     SEL2     : out std_ulogic := 'L';
     SHIFT2   : out std_ulogic := 'L';
@@ -319,9 +319,10 @@ begin
   --DRCK1 <= ((USER1_sig and not tap_shift_dr and not capture_tpusr) or
   --             (USER1_sig and shift_tpusr and TCK) or
   --             (USER1_sig and capture_tpusr and TCK));            
-  DRCK1 <= '1' when (USER1_sig='1' and tap_shift_dr='0' and capture_tpusr='0') else
-           TCK when (USER1_sig='1' and (shift_tpusr='1' or  capture_tpusr='1')) else
-           '0';
+  --DRCK1 <= '1' when (USER1_sig='1' and tap_shift_dr='0' and capture_tpusr='0') else
+  --         TCK when (USER1_sig='1' and (shift_tpusr='1' or  capture_tpusr='1')) else
+  --         '0';           
+  DRCK1_EN <= '1' when (USER1_sig='1' and (shift_tpusr='1' or capture_tpusr='1')) else '0';
 
   RESET1   <= tap_reset;
   RUNTEST1 <= tap_runtest;
@@ -334,9 +335,10 @@ begin
   --DRCK2 <= ((USER2_sig and not tap_shift_dr and not capture_tpusr) or
   --             (USER2_sig and shift_tpusr and TCK) or
   --             (USER2_sig and capture_tpusr and TCK));
-  DRCK2 <= '1' when (USER2_sig='1' and tap_shift_dr='0' and capture_tpusr='0') else
-           TCK when (USER2_sig='1' and (shift_tpusr='1' or  capture_tpusr='1')) else
-           '0';
+  --DRCK2 <= '1' when (USER2_sig='1' and tap_shift_dr='0' and capture_tpusr='0') else
+  --         TCK when (USER2_sig='1' and (shift_tpusr='1' or  capture_tpusr='1')) else
+  --         '0';
+  DRCK2_EN <= '1' when (USER2_sig='1' and (shift_tpusr='1' or capture_tpusr='1')) else '0';
 
   RESET2   <= tap_reset;
   RUNTEST2 <= tap_runtest;

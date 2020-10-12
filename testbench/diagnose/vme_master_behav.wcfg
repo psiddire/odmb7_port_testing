@@ -14,15 +14,15 @@
       </db_ref>
    </db_ref_list>
    <zoom_setting>
-      <ZoomStartTime time="15900000000fs"></ZoomStartTime>
-      <ZoomEndTime time="49857287243fs"></ZoomEndTime>
-      <Cursor1Time time="80000000000fs"></Cursor1Time>
+      <ZoomStartTime time="170571825000fs"></ZoomStartTime>
+      <ZoomEndTime time="202521825001fs"></ZoomEndTime>
+      <Cursor1Time time="194292930000fs"></Cursor1Time>
    </zoom_setting>
    <column_width_setting>
-      <NameColumnWidth column_width="94"></NameColumnWidth>
+      <NameColumnWidth column_width="86"></NameColumnWidth>
       <ValueColumnWidth column_width="66"></ValueColumnWidth>
    </column_width_setting>
-   <WVObjectSize size="66" />
+   <WVObjectSize size="69" />
    <wave_markers>
       <marker label="" time="669732" />
    </wave_markers>
@@ -65,6 +65,10 @@
    <wvobject type="array" fp_name="/Firmware_tb/vme_data_io_out_buf">
       <obj_property name="ElementShortName">vme_data_io_out_buf[15:0]</obj_property>
       <obj_property name="ObjectShortName">vme_data_io_out_buf[15:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/Firmware_tb/vc_cmd">
+      <obj_property name="ElementShortName">vc_cmd</obj_property>
+      <obj_property name="ObjectShortName">vc_cmd</obj_property>
    </wvobject>
    <wvobject type="logic" fp_name="/Firmware_tb/vme_oe_b">
       <obj_property name="ElementShortName">vme_oe_b</obj_property>
@@ -234,13 +238,13 @@
       <obj_property name="ElementShortName">tdo_f3a3b3c3d</obj_property>
       <obj_property name="ObjectShortName">tdo_f3a3b3c3d</obj_property>
    </wvobject>
+   <wvobject type="logic" fp_name="/Firmware_tb/dcfeb_i/PMAP_COUNTERS/TDO">
+      <obj_property name="ElementShortName">TDO</obj_property>
+      <obj_property name="ObjectShortName">TDO</obj_property>
+   </wvobject>
    <wvobject type="array" fp_name="/Firmware_tb/dcfeb_i/PMAP_COUNTERS/d">
       <obj_property name="ElementShortName">d[11:0]</obj_property>
       <obj_property name="ObjectShortName">d[11:0]</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/Firmware_tb/dcfeb_i/PMAP_COUNTERS/DRCK">
-      <obj_property name="ElementShortName">DRCK</obj_property>
-      <obj_property name="ObjectShortName">DRCK</obj_property>
    </wvobject>
    <wvobject type="logic" fp_name="/Firmware_tb/dcfeb_i/PMAP_BSCAN/shift_tpusr">
       <obj_property name="ElementShortName">shift_tpusr</obj_property>
@@ -253,6 +257,14 @@
    <wvobject type="logic" fp_name="/Firmware_tb/dcfeb_i/PMAP_COUNTERS/ce_l1amatch">
       <obj_property name="ElementShortName">ce_l1amatch</obj_property>
       <obj_property name="ObjectShortName">ce_l1amatch</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/Firmware_tb/dcfeb_i/PMAP_COUNTERS/SHIFT">
+      <obj_property name="ElementShortName">SHIFT</obj_property>
+      <obj_property name="ObjectShortName">SHIFT</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/Firmware_tb/dcfeb_i/PMAP_COUNTERS/CAPTURE">
+      <obj_property name="ElementShortName">CAPTURE</obj_property>
+      <obj_property name="ObjectShortName">CAPTURE</obj_property>
    </wvobject>
    <wvobject type="logic" fp_name="/Firmware_tb/dcfeb_i/PMAP_COUNTERS/ce_injpls">
       <obj_property name="ElementShortName">ce_injpls</obj_property>

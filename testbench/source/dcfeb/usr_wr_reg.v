@@ -23,13 +23,13 @@
 // Additional Comments: 
 //
 //////////////////////////////////////////////////////////////////////////////////
-module user_wr_reg(TCK, DRCK, FSEL, SEL, TDI, DSY_IN, SHIFT, UPDATE, RST, DSY_CHAIN, PO, TDO, DSY_OUT);
+module user_wr_reg(TCK, DRCK_EN, FSEL, SEL, TDI, DSY_IN, SHIFT, UPDATE, RST, DSY_CHAIN, PO, TDO, DSY_OUT);
   
   parameter width = 16;
   parameter def_value = 16'h00;
 
   input TCK;         // TCK for update register
-  input DRCK;        // Data Reg Clock
+  input DRCK_EN;        // Data Reg Clock
   input FSEL;        // Function select
   input SEL;         // User mode active
   input TDI;         // Serial Test Data In
@@ -49,9 +49,9 @@ module user_wr_reg(TCK, DRCK, FSEL, SEL, TDI, DSY_IN, SHIFT, UPDATE, RST, DSY_CH
   assign TDO     = FSEL & d[0];
   assign DSY_OUT = DSY_CHAIN & d[0];
   assign din     = DSY_CHAIN ? DSY_IN : TDI;
-  assign ce      = SHIFT & SEL & (FSEL | DSY_CHAIN);
+  assign ce      = SHIFT & SEL & (FSEL | DSY_CHAIN) & DRCK_EN;
   
-  always @(posedge DRCK or posedge RST) begin // intermediate shift register
+  always @(posedge TCK or posedge RST) begin // intermediate shift register
     if(RST)
 	   d <= def_value;           // default
     else

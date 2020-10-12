@@ -148,7 +148,7 @@ begin
 
   -- Handle SELCFEB command (0x1020)
   -- Write SELFEB when SELCFEB=1 on first clock cycle after strobe. (The JTAG initialization should be broadcast)
-  rst_init <= RST or initjtags;
+  rst_init <= RST or INITJTAGS;
   ce_selfeb <= selcfeb and STROBE;
   FDPE_selfeb1 : FDPE port map(D => INDATA(0), C => SLOWCLK, CE => ce_selfeb, PRE => rst_init, Q => selfeb(1));
   FDPE_selfeb2 : FDPE port map(D => INDATA(1), C => SLOWCLK, CE => ce_selfeb, PRE => rst_init, Q => selfeb(2));
@@ -410,24 +410,9 @@ begin
   LED <= CE_SHIHEAD_TMS;  
 
   -- generate DIAGOUT
-  DIAGOUT(0)  <= '0';
-  DIAGOUT(1)  <= Q_LOAD;
-  DIAGOUT(2)  <= '0';
-  DIAGOUT(3)  <= CLR_BUSY;
-  DIAGOUT(4)  <= '0';
-  DIAGOUT(5)  <= DONETAIL;
-  DIAGOUT(6)  <= DONEDATA(1);
-  DIAGOUT(7)  <= QV_DONEDATA(0);
-  DIAGOUT(8) <= QV_DONETAIL(0);
-  DIAGOUT(9) <= '0';
-  DIAGOUT(10) <= CE_SHIFT1;
-  DIAGOUT(11) <= STROBE;
-  DIAGOUT(12) <= TDO;
-  DIAGOUT(13) <= LOAD;
-  DIAGOUT(14)  <= BUSY;
-  DIAGOUT(15)  <= BUSYP1;
-  DIAGOUT(16)  <= READTDO;
-  DIAGOUT(17)  <= RDTDODK;
-
+  DIAGOUT(6 downto 0)  <= selfeb(7 downto 1);
+  DIAGOUT(7) <= RST;
+  DIAGOUT(8) <= INITJTAGS;
+  DIAGOUT(17 downto 9)  <= (others => '0');
 
 end CFEBJTAG_Arch;

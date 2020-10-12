@@ -377,6 +377,12 @@ architecture Behavioral of ODMB7_UCSB_DEV is
   signal reset : std_logic := '0';
 
   --------------------------------------
+  -- Debug signals
+  --------------------------------------
+
+  signal diagout_inner : std_logic_vector(17 downto 0) := (others => '0');
+
+  --------------------------------------
   -- Data readout signals
   --------------------------------------
   signal odmb_data : std_logic_vector(15 downto 0) := (others => '0');
@@ -560,7 +566,7 @@ begin
   end process;
 
   dcfeb_initjtag_dd <= or_reduce(dcfeb_done_pulse);
-  -- FIXME: temporarily using clk625k and delay 10 because in simu VME commands come fast, real board has delay 240 and 10kHz clock
+  -- FIXME: currently doesn't do anything because state machine pulses dcfeb_done_pulse for 1 40 MHz clock cycle, 10kHz on real board
   DS_DCFEB_INITJTAG    : DELAY_SIGNAL generic map(10) port map(DOUT => dcfeb_initjtag_d, CLK => clk625k, NCYCLES => 10, DIN => dcfeb_initjtag_dd);
   PULSE_DCFEB_INITJTAG : NPULSE2FAST port map(DOUT => dcfeb_initjtag, CLK_DOUT => clk2p5, RST => '0', NPULSE => 5, DIN => dcfeb_initjtag_d);
 
@@ -594,6 +600,17 @@ begin
   pon_rst_reg    <= pon_rst_reg(30 downto 0) & '0' when rising_edge(clk40) else
                     pon_rst_reg;
   pon_reset <= pon_rst_reg(31);
+  
+  -------------------------------------------------------------------------------------------
+  -- Debug
+  -------------------------------------------------------------------------------------------
+
+  DIAGOUT(8 downto 0) <= diagout_inner(8 downto 0);
+  DIAGOUT(9) <= reset;
+  DIAGOUT(10) <= RST;
+  DIAGOUT(11) <= fw_rst_reg(31);
+  DIAGOUT(12) <= pon_rst_reg(31);
+  DIAGOUT(17 downto 13) <= (others => '0');
 
   -------------------------------------------------------------------------------------------
   -- Handle data readout
@@ -702,7 +719,7 @@ begin
       CHANGE_REG_DATA => change_reg_data,
       CHANGE_REG_INDEX => change_reg_index,
 
-      DIAGOUT  => DIAGOUT,
+      DIAGOUT  => diagout_inner,
       RST      => reset
       );
 

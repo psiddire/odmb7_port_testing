@@ -131,7 +131,7 @@ architecture Behavioral of Firmware_tb is
   port (
     CLK : in std_logic;
     probe_out0 : out std_logic_vector(0 downto 0); --don't ask me why, but it complains about being std_logic
-    probe_out1 : out std_logic_vector(0 downto 0); --"
+    probe_out1 : out std_logic_vector(0 downto 0); --" (vivado 2017.2)
     probe_out2 : out std_logic_vector(15 downto 0);
     probe_out3 : out std_logic_vector(15 downto 0)
   );
@@ -141,6 +141,7 @@ architecture Behavioral of Firmware_tb is
   signal use_vio_input : std_logic := '0';
   signal vio_issue_vme_cmd : std_logic := '0';
   signal vio_issue_vme_cmd_q : std_logic := '0';
+  signal vio_issue_vme_cmd_qq : std_logic := '0';
   signal vio_vme_addr : std_logic_vector(15 downto 0) := x"0000";
   signal vio_vme_data : std_logic_vector(15 downto 0) := x"0000";
 
@@ -170,10 +171,13 @@ architecture Behavioral of Firmware_tb is
 
   -- VME signals
   -- Simulation (PC) -> VME
+  attribute mark_debug : string;
   signal vme_data_in      : std_logic_vector (15 downto 0) := (others => '0');
   signal rstn             : std_logic := '1';
   signal vc_cmd           : std_logic := '0';
+  signal vc_cmd_q         : std_logic := '0';
   signal vc_cmd_rd        : std_logic := '0';
+  signal vc_cmd_rd_q      : std_logic := '0';
   signal vc_addr          : std_logic_vector(23 downto 1) := (others => '0');
   signal vc_rd            : std_logic := '0';
   signal vc_rd_data       : std_logic_vector(15 downto 0) := (others => '0');
@@ -270,8 +274,10 @@ architecture Behavioral of Firmware_tb is
   --signals for generating input to VME
   signal input_dav : std_logic := '0';
   signal cmddev    : std_logic_vector(15 downto 0) := (others=> '0');
+  attribute mark_debug of cmddev : signal is "true";
   signal nextcmd   : std_logic := '1';
   signal cack      : std_logic := 'H';
+  attribute mark_debug of cack : signal is "true";
   signal cack_reg  : std_logic := 'H';
   signal cack_i  : std_logic := '1';
 
@@ -319,7 +325,9 @@ begin
     probe0 => trig0,
     probe1 => data
   );
-  trig0(255 downto 54) <= (others => '0');
+  trig0(255 downto 73) <= (others => '0');
+  trig0(72 downto 55) <= diagout;
+  trig0(54) <= vc_cmd;
   trig0(53 downto 50) <= std_logic_vector(lut_input_addr1_s);
   trig0(49) <= extpls;
   trig0(48) <= injpls;
@@ -327,6 +335,10 @@ begin
   trig0(31 downto 16) <= vme_data_io_in;
   trig0(15 downto 0) <= cmddev;
   --
+  data(4095 downto 101) <= (others => '0');
+  data(100) <= rst_global;
+  data(99) <= cack;
+  data(98) <= vc_cmd;
   data(97 downto 80) <= dcfeb_diagout;
   data(79 downto 64) <= vme_data_io_out;
   data(63 downto 48) <= vme_data_io_in;
@@ -366,19 +378,21 @@ begin
   -- Process to generate counter and initialization
   startGenerator_i: process (sysclk) is
   begin
-    if sysclk'event and sysclk='1' then
-      startCounter <= startCounter + 1;
-      -- Set the intime to 1 only after 7 clk cycles
-      if startCounter = 0 then
-        rst_global <= '1';
-      elsif startCounter = 1 then
-        rst_global <= '0';
-        init_done <= '0';
-      elsif startCounter = 6 then
-        dcfeb_initjtag <= '1';
-      elsif startCounter = 7 then
-        dcfeb_initjtag <= '0';
-        init_done <= '1';
+    if rising_edge(sysclk) then
+      if (init_done = '0') then
+        startCounter <= startCounter + 1;
+        -- Set the intime to 1 only after 7 clk cycles
+        if startCounter = 0 then
+          rst_global <= '1';
+        elsif startCounter = 1 then
+          rst_global <= '0';
+          init_done <= '0';
+        elsif startCounter = 6 then
+          dcfeb_initjtag <= '1';
+        elsif startCounter = 7 then
+          dcfeb_initjtag <= '0';
+          init_done <= '1';
+        end if;
       end if;
     end if;
   end process;
@@ -425,18 +439,20 @@ begin
           end if;
         else
           --handle VIO input
-          if (cack = '1') then
-            --allow new commands to be issued
-            vio_issue_vme_cmd_q <= vio_issue_vme_cmd;
-            if (vio_issue_vme_cmd = '1' and vio_issue_vme_cmd_q = '0') then
-              cmddev <= vio_vme_addr;
-              vme_data_in <= vio_vme_data;
-              input_dav <= '1';
-            end if;
-          else
+          if (vio_issue_vme_cmd = '1' and vio_issue_vme_cmd_q = '0') then
+            --rising vio edge
+            cmddev <= vio_vme_addr;
+            vme_data_in <= vio_vme_data;
+          elsif (vio_issue_vme_cmd_q = '1' and vio_issue_vme_cmd_qq = '0') then
+            --next clock cycle, stop sending pulse
             cmddev <= std_logic_vector(init_input1);
-            input_dav <= '0';
+            vme_data_in <= vme_data_in;
+          else
+            cmddev <= cmddev;
+            vme_data_in <= vme_data_in;
           end if;
+          vio_issue_vme_cmd_q <= vio_issue_vme_cmd;
+          vio_issue_vme_cmd_qq <= vio_issue_vme_cmd_q;     
         end if;
       else
         inputCounter <= to_unsigned(0,bw_count);
@@ -539,7 +555,6 @@ begin
     VME_CLK_B       => vme_clk_b,
     KUS_VME_OE_B    => kus_vme_oe_b,
     KUS_VME_DIR_B   => vme_dir_b,
-    DIAGOUT         => diagout,
     DCFEB_TCK_P     => dcfeb_tck_p,
     DCFEB_TCK_N     => dcfeb_tck_n,
     DCFEB_TMS_P     => dcfeb_tms_p,
@@ -578,6 +593,7 @@ begin
     OTMB_TX         => otmb_tx,
     OTMB_RX         => otmb_rx,
     --KCU only signals
+    DIAGOUT        => diagout,
     VME_DATA_IN    => vme_data_io_in,        --unused/open in real ODMB
     VME_DATA_OUT   => vme_data_io_out       --unused/open in real ODMB
     );

@@ -54,7 +54,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 module instr_dcd(
   input TCK,
-  input DRCK,
+  input DRCK_EN,
   input SEL,
   input TDI,
   input UPDATE,
@@ -70,11 +70,11 @@ module instr_dcd(
   assign TDO = d[0];
   assign rst_f = RST | CLR;
   
-  always @(posedge DRCK or posedge RST) begin
+  always @(posedge TCK or posedge RST) begin
   if (RST)
 	  d <= 8'h00;
 	else
-      if (SEL & SHIFT)
+      if (DRCK_EN & SEL & SHIFT)
         d <= {TDI,d[7:1]};
 	  else
 	    d <= d;
