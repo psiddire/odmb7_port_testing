@@ -139,6 +139,21 @@ entity ODMB_VME is
     CRATEID      : out std_logic_vector(7 downto 0);
     CHANGE_REG_DATA      : in std_logic_vector(15 downto 0);
     CHANGE_REG_INDEX     : in integer range 0 to NREGS;
+    
+    --------------------
+    -- signals to/from QSPI_CTRL
+    --------------------   
+    QSPI_START_INFO      : out std_logic;
+    QSPI_START_WRITE     : out std_logic;
+    QSPI_START_READ      : out std_logic;
+    QSPI_START_READ_FIFO : out std_logic;
+    QSPI_CMD_INDEX       : out std_logic_vector(3 downto 0);
+    QSPI_READ_ADDR       : out std_logic_vector(31 downto 0);
+    QSPI_WD_LIMIT        : out std_logic_vector(31 downto 0);
+    QSPI_STARTADDR       : out std_logic_vector(31 downto 0);
+    QSPI_PAGECOUNT       : out std_logic_vector(16 downto 0);
+    QSPI_SECTORCOUNT     : out std_logic_vector(13 downto 0);
+    QSPI_FIFO_OUT        : in std_logic_vector(15 downto 0);
 
     --------------------
     -- Other
@@ -168,28 +183,6 @@ architecture Behavioral of ODMB_VME is
 --      CABLE_DLY            : out integer range 0 to 1
 --    );
 --  end component;
-  
-  component QSPI_DUMMY is
-    generic (
-      NREGS  : integer := 16
-      );
-    port (
-      SLOWCLK              : in std_logic;
-      CLK                  : in std_logic;
-      RST                  : in std_logic;
-      BPI_CFG_UL_PULSE     : out std_logic;
-      BPI_CFG_DL_PULSE     : out std_logic;
-      BPI_CONST_UL_PULSE   : out std_logic;
-      BPI_CONST_DL_PULSE   : out std_logic;
-      CC_CFG_REG           : out std_logic_vector(15 downto 0);
-      BPI_CFG_BUSY         : out std_logic;
-      BPI_CONST_BUSY       : out std_logic;
-      CC_CFG_REG_WE        : out integer range 0 to NREGS;
-      CC_CONST_REG_WE      : out integer range 0 to NREGS;
-      BPI_CFG_REGS         : in cfg_regs_array;
-      BPI_CONST_REGS       : in cfg_regs_array
-      );
-  end component;
   
   component VMECONFREGS is
       generic (
@@ -322,7 +315,50 @@ architecture Behavioral of ODMB_VME is
         
         --exernal registers
         ODMB_DATA_SEL : out std_logic_vector(7 downto 0);
-        ODMB_DATA     : in  std_logic_vector(15 downto 0)
+        ODMB_DATA     : in  std_logic_vector(15 downto 0)      
+      );
+  end component;
+  
+  component QSPI_DUMMY is
+    generic (
+      NREGS  : integer := 16
+      );
+    port (
+      SLOWCLK              : in std_logic;
+      CLK                  : in std_logic;
+      RST                  : in std_logic;
+      --VME signals
+      DEVICE               : in  std_logic;
+      STROBE               : in  std_logic;
+      COMMAND              : in  std_logic_vector(9 downto 0);
+      WRITER               : in  std_logic;
+      DTACK                : out std_logic;
+      INDATA               : in  std_logic_vector(15 downto 0);
+      OUTDATA              : out std_logic_vector(15 downto 0);
+      --CONFREGS signals
+      QSPI_CFG_UL_PULSE     : out std_logic;
+      QSPI_CFG_DL_PULSE     : out std_logic;
+      QSPI_CONST_UL_PULSE   : out std_logic;
+      QSPI_CONST_DL_PULSE   : out std_logic;
+      QSPI_UL_REG           : out std_logic_vector(15 downto 0);
+      QSPI_CFG_BUSY         : out std_logic;
+      QSPI_CONST_BUSY       : out std_logic;
+      QSPI_CFG_REG_WE       : out integer range 0 to NREGS;
+      QSPI_CONST_REG_WE     : out integer range 0 to NREGS;
+      QSPI_CFG_REGS         : in cfg_regs_array;
+      QSPI_CONST_REGS       : in cfg_regs_array;
+      --signals to/from QSPI_CTRL
+      QSPI_START_INFO      : out std_logic;
+      QSPI_START_WRITE     : out std_logic;
+      QSPI_START_READ      : out std_logic;
+      QSPI_START_READ_FIFO : out std_logic;
+      QSPI_CMD_INDEX       : out std_logic_vector(3 downto 0);
+      QSPI_READ_ADDR       : out std_logic_vector(31 downto 0);
+      QSPI_WD_LIMIT        : out std_logic_vector(31 downto 0);
+      QSPI_STARTADDR       : out std_logic_vector(31 downto 0);
+      QSPI_PAGECOUNT       : out std_logic_vector(16 downto 0);
+      QSPI_SECTORCOUNT     : out std_logic_vector(13 downto 0);
+      QSPI_FIFO_OUT        : in std_logic_vector(15 downto 0)
       );
   end component;
 
@@ -410,8 +446,11 @@ begin
   VME_OE_B  <= doe_b;
   VME_DIR_B <= tovme_b;
 
+  outdata_dev(0) <= (others => '0');
+  outdata_dev(2) <= (others => '0');
+  outdata_dev(5) <= (others => '0');
   -- This will not be needed when all devs are ready --devtmp
-  GEN_OUTDATA_DEV : for dev in 5 to num_dev generate --devtmp
+  GEN_OUTDATA_DEV : for dev in 7 to num_dev generate --devtmp
     outdata_dev(dev) <= (others => '0');             --devtmp
   end generate GEN_OUTDATA_DEV;                      --devtmp
   idx_dev <= to_integer(unsigned(cmd_adrs_inner(15 downto 12)));
@@ -506,21 +545,6 @@ begin
       TXDIFFCTRL    => open,      -- TX voltage swing, W 3110 is disabled: constant output x"8"
       LOOPBACK      => open       -- For internal loopback tests, bbb for W 3100 bbb
       );
-      
---  DEV4_DUMMY : CONFREGS_DUMMY
---    port map (
---      SLOWCLK => clk2p5,
---      DEVICE  => device(4),
---      STROBE  => strobe,
---      COMMAND => cmd,
---      OUTDATA => outdata_dev(4),
---      DTACK => dtack_dev(4),
---      LCT_L1A_DLY => LCT_L1A_DLY,
---      INJ_DLY => INJ_DLY, 
---      EXT_DLY => EXT_DLY, 
---      CALLCT_DLY => CALLCT_DLY,
---      CABLE_DLY => CABLE_DLY
---    );
   
   DEV4_VMECONFREGS : VMECONFREGS
       port map (
@@ -562,6 +586,43 @@ begin
         QSPI_CONST_REGS  => const_regs_inner,
         QSPI_CFG_REGS    => cfg_regs_inner
       );      
+      
+      DEV6_QSPI_DUMMY_I : QSPI_DUMMY
+      generic map (NREGS => NREGS)
+      port map (
+        SLOWCLK => CLK2P5,
+        CLK => CLK40,
+        RST => RST, 
+        DEVICE => device(6),
+        STROBE => strobe,
+        COMMAND => cmd,
+        WRITER => VME_WRITE_B,
+        DTACK => dtack_dev(6),
+        INDATA => VME_DATA_IN,
+        OUTDATA => outdata_dev(6),
+        QSPI_CFG_UL_PULSE => qspi_cfg_ul_pulse_inner,
+        QSPI_CFG_DL_PULSE   => qspi_cfg_dl_pulse_inner,
+        QSPI_CONST_UL_PULSE => qspi_const_ul_pulse_inner,
+        QSPI_CONST_DL_PULSE => qspi_const_dl_pulse_inner,   
+        QSPI_UL_REG => qspi_reg_in,     
+        QSPI_CFG_BUSY => qspi_cfg_busy,
+        QSPI_CONST_BUSY => qspi_const_busy,
+        QSPI_CONST_REG_WE => qspi_const_reg_we,
+        QSPI_CFG_REG_WE   => qspi_cfg_reg_we,
+        QSPI_CFG_REGS => cfg_regs_inner,
+        QSPI_CONST_REGS => const_regs_inner,
+        QSPI_START_INFO => QSPI_START_INFO,
+        QSPI_START_WRITE => QSPI_START_WRITE,
+        QSPI_START_READ => QSPI_START_READ,
+        QSPI_START_READ_FIFO => QSPI_START_READ_FIFO,
+        QSPI_CMD_INDEX => QSPI_CMD_INDEX,
+        QSPI_READ_ADDR => QSPI_READ_ADDR,
+        QSPI_WD_LIMIT => QSPI_WD_LIMIT,
+        QSPI_STARTADDR => QSPI_STARTADDR,
+        QSPI_PAGECOUNT => QSPI_PAGECOUNT,
+        QSPI_SECTORCOUNT => QSPI_SECTORCOUNT,
+        QSPI_FIFO_OUT => QSPI_FIFO_OUT
+      );
 
   COMMAND_PM : COMMAND_MODULE
     port map (
@@ -588,25 +649,6 @@ begin
       DIAGOUT => open,
       LED     => led_command
       );
-      
-  QSPI_DUMMY_I : QSPI_DUMMY
-    generic map (NREGS => NREGS)
-    port map (
-      SLOWCLK => CLK2P5,
-      CLK => CLK40,
-      RST => RST, 
-      BPI_CFG_UL_PULSE   => qspi_cfg_ul_pulse_inner,
-      BPI_CFG_DL_PULSE   => qspi_cfg_dl_pulse_inner,
-      BPI_CONST_UL_PULSE => qspi_const_ul_pulse_inner,
-      BPI_CONST_DL_PULSE => qspi_const_dl_pulse_inner,
-      CC_CFG_REG => qspi_reg_in,
-      BPI_CONST_BUSY  => qspi_const_busy,
-      CC_CONST_REG_WE => qspi_const_reg_we,
-      BPI_CFG_BUSY    => qspi_cfg_busy,
-      CC_CFG_REG_WE   => qspi_cfg_reg_we,
-      BPI_CFG_REGS => cfg_regs_inner,
-      BPI_CONST_REGS => const_regs_inner
-    );
 
 
 end Behavioral;

@@ -475,7 +475,7 @@ begin
 
   --aVME signal management
   rstn <= not rst_global;
-  vc_cmd <= '1' when (cmddev(15 downto 12) = x"1" or cmddev(15 downto 12) = x"4" or cmddev(15 downto 12) = x"3") else '0';
+  vc_cmd <= '1' when (cmddev(15 downto 12) = x"1" or cmddev(15 downto 12) = x"4" or cmddev(15 downto 12) = x"3" or cmddev(15 downto 12) = x"6") else '0';
   vc_addr <= x"A8" & cmddev(15 downto 1);
   vc_rd <=  '1' when vme_data_in = x"2EAD" else '0';
 
