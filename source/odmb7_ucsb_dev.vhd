@@ -216,21 +216,6 @@ architecture Behavioral of ODMB7_UCSB_DEV is
       CRATEID      : out std_logic_vector(7 downto 0);
       CHANGE_REG_DATA      : in std_logic_vector(15 downto 0);
       CHANGE_REG_INDEX     : in integer range 0 to NREGS;
- 
-      --------------------
-      -- signals to/from QSPI_CTRL
-      --------------------   
-      QSPI_START_INFO      : out std_logic;
-      QSPI_START_WRITE     : out std_logic;
-      QSPI_START_READ      : out std_logic;
-      QSPI_START_READ_FIFO : out std_logic;
-      QSPI_CMD_INDEX       : out std_logic_vector(3 downto 0);
-      QSPI_READ_ADDR       : out std_logic_vector(31 downto 0);
-      QSPI_WD_LIMIT        : out std_logic_vector(31 downto 0);
-      QSPI_STARTADDR       : out std_logic_vector(31 downto 0);
-      QSPI_PAGECOUNT       : out std_logic_vector(16 downto 0);
-      QSPI_SECTORCOUNT     : out std_logic_vector(13 downto 0);
-      QSPI_FIFO_OUT        : in std_logic_vector(15 downto 0);
 
       --------------------
       -- Other
@@ -290,31 +275,6 @@ architecture Behavioral of ODMB7_UCSB_DEV is
       --------------------
       DIAGOUT     : out std_logic_vector (17 downto 0); -- for debugging
       RST         : in std_logic
-      );
-  end component;
-  
-  component QSPI_CTRL is
-    port (
-      
-      CLK40   : in std_logic;
-      RST     : in std_logic;
-  
-      START_READ : in std_logic;
-      START_INFO : in std_logic; --pulse to load startaddr, sectorcount, and pagecount
-      START_WRITE : in std_logic; --pulse to write data to PROM
-      START_ERASE : in std_logic;
-      START_READ_FIFO : in std_logic; --pulse to read one word from FIFO
-      
-      CMD_INDEX : in std_logic_vector(3 downto 0);
-      READ_ADDR : in std_logic_vector(31 downto 0);
-      WD_LIMIT : in std_logic_vector(31 downto 0);
-      STARTADDR : in std_logic_vector(31 downto 0);
-      PAGECOUNT : in std_logic_vector(16 downto 0);
-      SECTORCOUNT : in std_logic_vector(13 downto 0);
-      FIFO_OUT : out std_logic_vector(15 downto 0);
-      
-      DIAGOUT : out std_logic_vector(17 downto 0)
-  
       );
   end component;
 
@@ -408,16 +368,6 @@ architecture Behavioral of ODMB7_UCSB_DEV is
   -- ODMB VME<->ODMB CTRL signals
   --------------------------------------
   signal test_inj, test_pls, test_ped : std_logic := '0';
-  
-  --------------------------------------
-  -- PROM signals
-  --------------------------------------
-  signal qspi_start_info, qspi_start_write, qspi_start_read, qspi_start_read_fifo : std_logic := '0';
-  signal qspi_cmd_index : std_logic_vector(3 downto 0) := x"0";
-  signal qspi_read_addr, qspi_wd_limit, qspi_startaddr : std_logic_vector(31 downto 0) := x"00000000";
-  signal qspi_sectorcount : std_logic_vector(13 downto 0) := (others => '0');
-  signal qspi_pagecount : std_logic_vector(16 downto 0) := (others => '0');
-  signal qspi_fifo_out : std_logic_vector(15 downto 0) := x"0000";
 
   --------------------------------------
   -- Reset signals
@@ -764,20 +714,8 @@ begin
       CRATEID => open,
       CHANGE_REG_DATA => change_reg_data,
       CHANGE_REG_INDEX => change_reg_index,
-      
-      QSPI_START_INFO => qspi_start_info,
-      QSPI_START_WRITE => qspi_start_write,
-      QSPI_START_READ => qspi_start_read,
-      QSPI_START_READ_FIFO => qspi_start_read_fifo,
-      QSPI_CMD_INDEX => qspi_cmd_index,
-      QSPI_READ_ADDR => qspi_read_addr,
-      QSPI_WD_LIMIT => qspi_wd_limit,
-      QSPI_STARTADDR => qspi_startaddr,
-      QSPI_PAGECOUNT => qspi_pagecount,
-      QSPI_SECTORCOUNT => qspi_sectorcount,
-      QSPI_FIFO_OUT => qspi_fifo_out,
 
-      DIAGOUT  => open,
+      DIAGOUT  => diagout_inner,
       RST      => reset
       );
 
@@ -810,25 +748,6 @@ begin
 
       DIAGOUT => open,
       RST => reset
-      );
-
-QSPI_CTRL_I : QSPI_CTRL 
-    port map (
-      CLK40 => CLK40,
-      RST => reset,
-      START_READ => qspi_start_read,
-      START_INFO => qspi_start_info,
-      START_WRITE => qspi_start_write,
-      START_ERASE => '0',
-      START_READ_FIFO => qspi_start_read_fifo,
-      CMD_INDEX => qspi_cmd_index,
-      READ_ADDR => qspi_read_addr,
-      WD_LIMIT => qspi_wd_limit,
-      STARTADDR => qspi_startaddr,
-      PAGECOUNT => qspi_pagecount,
-      SECTORCOUNT => qspi_sectorcount,
-      FIFO_OUT => qspi_fifo_out,
-      DIAGOUT => diagout_inner
       );
 
 end Behavioral;

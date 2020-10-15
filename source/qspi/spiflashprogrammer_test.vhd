@@ -53,6 +53,7 @@ entity spiflashprogrammer_test is
     ----------------------------------
     reset         : in std_logic;
     read         : in std_logic;
+    write        : in std_logic;
     erase        : in std_logic;
     eraseing      : out std_logic;
     erasedone      : out std_logic;
@@ -77,7 +78,10 @@ entity spiflashprogrammer_test is
     out_rd_rddata: out std_logic_vector(15 downto 0);
     out_rd_rddata_all: out std_logic_vector(15 downto 0);
     out_er_status: out std_logic_vector(1 downto 0);
-    out_wrfifo_rden: out std_logic
+    out_wrfifo_rden: out std_logic;
+    out_wr_status : out std_logic_vector(3 downto 0);
+    out_fifo_rden : out std_logic;
+    out_fifodout : out std_logic_vector(63 downto 0)
    ); 	
 end spiflashprogrammer_test;
 architecture behavioral of spiflashprogrammer_test is
@@ -155,6 +159,8 @@ end component oneshot;
    signal StatusDataValid : std_logic := '0';
    signal spi_status      : std_logic_vector(1 downto 0) := "11";
    signal write_done : std_logic := '0';
+   signal write_start : std_logic := '0';
+   signal wr_status  : std_logic_vector(3 downto 0) := x"0";
       ------- erase ----------------------------
    signal er_sector_count          : std_logic_vector(13 downto 0) := "00000000000000";    -- subsector count
    signal er_current_sector_addr   : std_logic_vector(31 downto 0) := X"00000000"; -- start addr of current sector
@@ -215,6 +221,11 @@ end component oneshot;
      attribute keep of synced_read : signal is "true";
      attribute async_reg of synced_read : signal is "true";   
      attribute shreg_extract of synced_read : signal is "no";
+    
+   signal synced_write : std_logic_vector(1 downto 0) := "00";
+     attribute keep of synced_write : signal is "true";
+     attribute async_reg of synced_write : signal is "true";   
+     attribute shreg_extract of synced_write : signal is "no";
 
    signal synced_erase : std_logic_vector(1 downto 0) := "00";
      attribute keep of synced_erase : signal is "true";
@@ -228,11 +239,16 @@ end component oneshot;
    );
    signal erstate  : erstates := S_ER_IDLE;
 
-     type wrstates is
+--     type wrstates is
+--   (
+--     S_WR_IDLE, S_WR_S4BMode_ASSCS1, S_WR_S4BMode_WRCMD, S_WR_S4BMode_ASSCS2, S_WR_S4BMode_WR4BADDR, S_WR_ASSCS1, S_WR_WRCMD,  
+--     S_WR_ASSCS2, S_WR_PROGRAM, S_WR_DATA, S_WR_PPDONE, S_WR_PPDONE_WAIT, S_EXIT4BMode_ASSCS1, 
+--     S_EXIT4BMODE --  
+--   );
+   type wrstates is
    (
-     S_WR_IDLE, S_WR_S4BMode_ASSCS1, S_WR_S4BMode_WRCMD, S_WR_S4BMode_ASSCS2, S_WR_S4BMode_WR4BADDR, S_WR_ASSCS1, S_WR_WRCMD,  
-     S_WR_ASSCS2, S_WR_PROGRAM, S_WR_DATA, S_WR_PPDONE, S_WR_PPDONE_WAIT, S_EXIT4BMode_ASSCS1, 
-     S_EXIT4BMODE --  
+     S_WR_IDLE, S_WR_ASSCS1, S_WR_WRCMD,  S_WR_S4BMode_ASSCS1, S_WR_S4BMode_WRCMD,S_WR_S4BMode_ASSCS2, S_WR_S4BMode_WR4BADDR,
+     S_WR_ASSCS2, S_WR_PROGRAM, S_WR_DATA, S_WR_PPDONE, S_WR_PPDONEPRE, S_WR_PPDONESTATUS, S_WR_PPDONE_WAIT , S_EXIT4BMode_ASSCS1, S_EXIT4BMODE
    );
    signal wrstate  : wrstates := S_WR_IDLE;
 
@@ -298,13 +314,20 @@ end component oneshot;
         clk   => Clk,
         pulse  => erase_start
       );
+     
+  oneshot_inst_wr  : oneshot
+      port map (
+        trigger  => synced_write(0),
+        clk   => Clk,
+        pulse  => write_start
+      );
 
 FIFO36_inst : FIFO36E2
            generic map (
               CLOCK_DOMAINS => "INDEPENDENT",     -- COMMON, INDEPENDENT
               FIRST_WORD_FALL_THROUGH => "TRUE",  -- first word read doesn't require FIFO_EN
               PROG_EMPTY_THRESH => 2,             -- 
-              PROG_FULL_THRESH => 65,             -- Async case. Top level artifect. Usually set to 64 
+              PROG_FULL_THRESH => 65,             -- Async case. Top level artifect. Usually set to 64
               READ_WIDTH => 4,                    -- 
               REGISTER_MODE => "REGISTERED",      -- 
               RSTREG_PRIORITY => "RSTREG",        -- REGCE, RSTREG
@@ -370,6 +393,9 @@ FIFO36_inst : FIFO36E2
     out_cmdreg32 <= cmdreg32;
     out_cmdcntr32 <= rd_cmdcounter32;
     out_nword_cntr <= rd_nword_cntr_dly;
+    out_wr_status <= wr_status;
+    out_fifo_rden <= fifo_rden;
+    out_fifodout <= fifodout;
 
     out_er_status <= er_status;
     out_wrfifo_rden <= fifo_rden;
@@ -605,16 +631,193 @@ end process processerase;
 -----------------------------  erase sectors end  --------------------------------------------------
 
 ------------------------------------  Write Data to Program Pages  ----------------------              
+--processProgram  : process (Clk)
+--  begin
+--  if rising_edge(Clk) then
+--  case wrstate is 
+--   when S_WR_IDLE =>
+--        SpiCsB <= '1';
+--        wr_status <= x"0";
+--        write_done <= '0';
+--        if (startaddrvalid = '1') then Current_Addr <= startaddr; end if;  -- no sync required. lots of time spent in _top
+--        if (pagecountvalid = '1') then page_count <= pagecount; end if;  -- no sync required
+--        if (write_start = '1') then --almostfull having problems
+--        --if (synced_fifo_almostfull(1) = '1') then         -- some  starting point              
+--          dopin_ts <= "1110";
+--          data_valid_cntr <= "000";
+--          cmdcounter32 <= "100111";  -- 32 bit command
+--          rddata <= "00";
+--          cmdreg32 <=  CmdWE & X"00000000";  -- Set WE bit
+--          fifo_rden <= '0';
+--          wrdata_count <= "000";
+--          spi_wrdata <= X"00000000";
+--          wrstate <= S_WR_S4BMode_ASSCS1;
+--        end if;
+                       
+-------------------   Set 4 Byte mode first -----------------------------------------------------
+--   when S_WR_S4BMode_ASSCS1 =>
+--        SpiCsB <= '0';
+--        wr_status <= x"1";
+--        wrstate <= S_WR_S4BMode_WRCMD;
+          
+--   when S_WR_S4BMode_WRCMD =>    -- Set WE bit
+--        wr_status <= x"2";
+--        if (cmdcounter32 /= 32) then cmdcounter32 <= cmdcounter32 - 1; 
+--          cmdreg32 <= cmdreg32(38 downto 0) & '0'; 
+--        else
+--          cmdreg32 <=  Cmd4BMode  & X"00000000";  -- Flag Status register
+--          cmdcounter32 <= "100111";  -- 40 bit command+addr
+--          SpiCsB <= '1';   -- turn off SPI 
+--          wrstate <= S_WR_S4BMode_ASSCS2; 
+--        end if;
+        
+--   when S_WR_S4BMode_ASSCS2 =>
+--        wr_status <= x"3";
+--        SpiCsB <= '0';
+--        wrstate <= S_WR_S4BMode_WR4BADDR;
+                        
+--   when S_WR_S4BMode_WR4BADDR =>    -- Set 4-Byte address Mode
+--        wr_status <= x"4";
+--        if (cmdcounter32 /= 32) then cmdcounter32 <= cmdcounter32 - 1;  
+--           cmdreg32 <= cmdreg32(38 downto 0) & '0';
+--        else 
+--          SpiCsB <= '1';   -- turn off SPI
+--          cmdcounter32 <= "100111";  -- 32 bit command
+--          cmdreg32 <=  CmdWE & X"00000000";  -- Write Enable 
+--          wrstate <= S_WR_ASSCS1;  
+--        end if;  
+---------------------------  end set 4 byte Mode
+
+--   when S_WR_ASSCS1 =>
+--        wr_status <= x"5";
+--        if (page_count /= 0) then 
+--          if (synced_fifo_almostfull(1) = '1') then
+--            SpiCsB <= '0';
+--            wrstate <= S_WR_WRCMD;
+--          end if;
+--        else 
+--          SpiCsB <= '0';
+--          wrstate <= S_WR_WRCMD;
+--        end if;
+                  
+--   when S_WR_WRCMD =>    -- Set WE bit
+--        wr_status <= x"6";
+--        if (cmdcounter32 /= 32) then cmdcounter32 <= cmdcounter32 - 1;  
+--          cmdreg32 <= cmdreg32(38 downto 0) & '0';
+--        elsif (page_count /= 0) then    -- Next PP
+--          SpiCsB <= '1';   -- turn off SPI
+--          cmdreg32 <=  CmdPP32Quad & Current_Addr;  -- Program Page at Current_Addr
+--          cmdcounter32 <= "100111";
+--          wrstate <= S_WR_ASSCS2;
+--        else                              -- Done with writing Program Pages. Turn off 4 byte Mode
+--          cmdcounter32 <= "100111";
+--          cmdreg32 <= CmdExit4BMode & X"00000000";
+--          SpiCsB <= '1';
+--          wrstate <= S_EXIT4BMode_ASSCS1;        
+--        end if;
+                   
+--   when S_WR_ASSCS2 =>
+--        wr_status <= x"7";
+--        SpiCsB <= '0';
+--        wrstate <= S_WR_PROGRAM;
+                                                 
+--   when S_WR_PROGRAM =>  -- send Program command
+--        wr_status <= x"8";
+--        if (cmdcounter32 /= 0) then cmdcounter32 <= cmdcounter32 - 1;
+--          cmdreg32 <= cmdreg32(38 downto 0) & '0';
+--        else 
+--          fifo_rden <= '1';
+--          wrstate <= S_WR_DATA;
+--          dopin_ts <= "0000";
+--        end if;
+                          
+--   when S_WR_DATA =>
+--        wr_status <= x"9";
+--        SpiCsB <= '0';
+--        wrdata_count <= wrdata_count +1;
+--        if (wrdata_count = 7) then -- 8x4 bits from FIFO.  wrdata_count rolls over to 0
+--          Current_Addr <= Current_Addr + 4;  -- 4 bytes out of 256 bytes per page   
+--          if (Current_Addr(7 downto 0) = 252) then   -- every 256 bytes (1 PP) written, only check lower bits = mod 256
+--            SpiCsB <= '1';
+--            fifo_rden <= '0';
+--            dopin_ts <= "1110";
+--            --cmdreg32 <=  CmdStatus & X"00000000";  -- Read Status register next
+--            cmdreg32 <=  CmdFLAGStatus & X"00000000";  -- Read Status register next
+--            wrstate <= S_WR_PPDONE;  -- one PP done
+--          end if;
+--        end if;
+                    
+--   when S_WR_PPDONE =>
+--        wr_status <= x"A";
+--        dopin_ts <= "1110";
+--        SpiCsB <= '0';
+--        data_valid_cntr <= "000";
+--        cmdcounter32 <= "100111";
+--        wrstate <= S_WR_PPDONE_WAIT;
+                       
+--   when S_WR_PPDONE_WAIT => 
+--        wr_status <= x"B";
+--        fifo_rden <= '0';  
+--        if (reset_design = '1') then wrstate <= S_WR_IDLE;
+--        else 
+--          if (cmdcounter32 /= 31) then cmdcounter32 <= cmdcounter32 - 1; 
+--            cmdreg32 <= cmdreg32(38 downto 0) & '0';
+--          else -- keep reading the status register
+--            data_valid_cntr <= data_valid_cntr + 1;  -- rolls over to 0
+--            rddata <= rddata(1) & SpiMiso;  -- deser 1:8  
+--            --rddata <= rddata(1) & "0" ;  -- deser 1:8  
+--            if (data_valid_cntr = 7) then  -- catch status byte
+--              StatusDataValid <= '1';    -- copy WE and Write in progress one cycle after rddate
+--            else 
+--              StatusDataValid <= '0';
+--            end if;
+--            if (StatusDataValid = '1') then spi_status <= rddata; end if;  --  rddata valid from previous cycle
+--            --if spi_status = 0 then    -- Done with page program
+--            if spi_status = 1 then    -- Done with page program
+--              SpiCsB <= '1';   -- turn off SPI
+--              cmdcounter32 <= "100111";
+--              cmdreg32 <=  CmdWE & X"00000000";  -- Set WE bit
+--              data_valid_cntr <= "000";
+--              StatusDataValid <= '0';
+--              spi_status <= "11";
+--              page_count <= page_count - 1;
+--              wrstate <= S_WR_ASSCS1;
+--            end if;  -- spi_status
+--          end if;  -- cmdcounter32
+--        end if;  -- reset_design
+                          
+-------------------   Exit 4 Byte mode ------------------------------------    
+--   when S_EXIT4BMode_ASSCS1 =>
+--        wr_status <= x"C";
+--        SpiCsB <= '0';   
+--        wrstate <= S_EXIT4BMODE;
+         
+--   when S_EXIT4BMODE =>    -- Back to 3 Byte Mode
+--        wr_status <= x"D";
+--        if (cmdcounter32 /= 32) then cmdcounter32 <= cmdcounter32 - 1;  
+--          cmdreg32 <= cmdreg32(38 downto 0) & '0';
+--        else 
+--          SpiCsB <= '1';   -- turn off SPI 
+--          cmdreg32 <= cmdreg32(38 downto 0) & '0';
+--          write_done <= '1';
+--          wrstate <= S_WR_IDLE;  
+--        end if; 
+--    end case;
+--   end if;  -- Clk
+--end process processProgram;
+
 processProgram  : process (Clk)
   begin
   if rising_edge(Clk) then
   case wrstate is 
    when S_WR_IDLE =>
+        wr_status <= x"0";
         SpiCsB <= '1';
         write_done <= '0';
         if (startaddrvalid = '1') then Current_Addr <= startaddr; end if;  -- no sync required. lots of time spent in _top
         if (pagecountvalid = '1') then page_count <= pagecount; end if;  -- no sync required
-        if (synced_fifo_almostfull(1) = '1') then         -- some  starting point              
+        --if (synced_fifo_almostfull(1) = '1') then         -- some  starting point   
+        if (write_start = '1') then --almostfull having problems           
           dopin_ts <= "1110";
           data_valid_cntr <= "000";
           cmdcounter32 <= "100111";  -- 32 bit command
@@ -624,14 +827,17 @@ processProgram  : process (Clk)
           wrdata_count <= "000";
           spi_wrdata <= X"00000000";
           wrstate <= S_WR_S4BMode_ASSCS1;
+          --wrstate <= S_WR_ASSCS1;
         end if;
                        
 -----------------   Set 4 Byte mode first -----------------------------------------------------
    when S_WR_S4BMode_ASSCS1 =>
+        wr_status <= x"1";
         SpiCsB <= '0';
         wrstate <= S_WR_S4BMode_WRCMD;
           
    when S_WR_S4BMode_WRCMD =>    -- Set WE bit
+        wr_status <= x"2";
         if (cmdcounter32 /= 32) then cmdcounter32 <= cmdcounter32 - 1; 
           cmdreg32 <= cmdreg32(38 downto 0) & '0'; 
         else
@@ -642,10 +848,12 @@ processProgram  : process (Clk)
         end if;
         
    when S_WR_S4BMode_ASSCS2 =>
+        wr_status <= x"3";
         SpiCsB <= '0';
         wrstate <= S_WR_S4BMode_WR4BADDR;
                         
    when S_WR_S4BMode_WR4BADDR =>    -- Set 4-Byte address Mode
+        wr_status <= x"4";
         if (cmdcounter32 /= 32) then cmdcounter32 <= cmdcounter32 - 1;  
            cmdreg32 <= cmdreg32(38 downto 0) & '0';
         else 
@@ -657,6 +865,7 @@ processProgram  : process (Clk)
 -------------------------  end set 4 byte Mode
 
    when S_WR_ASSCS1 =>
+        wr_status <= x"5";
         if (page_count /= 0) then 
           if (synced_fifo_almostfull(1) = '1') then
             SpiCsB <= '0';
@@ -668,25 +877,31 @@ processProgram  : process (Clk)
         end if;
                   
    when S_WR_WRCMD =>    -- Set WE bit
+        wr_status <= x"6";
         if (cmdcounter32 /= 32) then cmdcounter32 <= cmdcounter32 - 1;  
           cmdreg32 <= cmdreg32(38 downto 0) & '0';
         elsif (page_count /= 0) then    -- Next PP
           SpiCsB <= '1';   -- turn off SPI
           cmdreg32 <=  CmdPP32Quad & Current_Addr;  -- Program Page at Current_Addr
+          --cmdreg32 <=  CmdPP24Quad & Current_Addr;  -- Program Page at Current_Addr
           cmdcounter32 <= "100111";
           wrstate <= S_WR_ASSCS2;
         else                              -- Done with writing Program Pages. Turn off 4 byte Mode
           cmdcounter32 <= "100111";
           cmdreg32 <= CmdExit4BMode & X"00000000";
           SpiCsB <= '1';
+          write_done <= '1';
+          --wrstate <= S_WR_IDLE;  
           wrstate <= S_EXIT4BMode_ASSCS1;        
         end if;
                    
    when S_WR_ASSCS2 =>
+        wr_status <= x"7";
         SpiCsB <= '0';
         wrstate <= S_WR_PROGRAM;
                                                  
    when S_WR_PROGRAM =>  -- send Program command
+        wr_status <= x"8";
         if (cmdcounter32 /= 0) then cmdcounter32 <= cmdcounter32 - 1;
           cmdreg32 <= cmdreg32(38 downto 0) & '0';
         else 
@@ -696,6 +911,7 @@ processProgram  : process (Clk)
         end if;
                           
    when S_WR_DATA =>
+        wr_status <= x"9";
         SpiCsB <= '0';
         wrdata_count <= wrdata_count +1;
         if (wrdata_count = 7) then -- 8x4 bits from FIFO.  wrdata_count rolls over to 0
@@ -704,19 +920,38 @@ processProgram  : process (Clk)
             SpiCsB <= '1';
             fifo_rden <= '0';
             dopin_ts <= "1110";
-            --cmdreg32 <=  CmdStatus & X"00000000";  -- Read Status register next
-            cmdreg32 <=  CmdFLAGStatus & X"00000000";  -- Read Status register next
-            wrstate <= S_WR_PPDONE;  -- one PP done
+            cmdreg32 <=  CmdStatus & X"00000000";  -- Read Status register next
+            --cmdreg32 <=  CmdFLAGStatus & X"00000000";  -- Read Status register next
+            wrstate <= S_WR_PPDONEPRE;  -- one PP done
           end if;
         end if;
-                    
+--                    
+-- this part is strange, if only do read stataus once, will get 11111111 always from miso
+   when S_WR_PPDONEPRE =>
+        wr_status <= x"A";
+        SpiCsB <= '0';
+        cmdcounter32 <= "100111";
+        wrstate <= S_WR_PPDONESTATUS;
+                       
+   when S_WR_PPDONESTATUS =>   
+        wr_status <= x"B"; 
+        if (cmdcounter32 /= 32) then cmdcounter32 <= cmdcounter32 - 1; 
+          cmdreg32 <= cmdreg32(38 downto 0) & '0'; 
+        else
+          cmdreg32 <=  CmdStatus  & X"00000000";  
+          cmdcounter32 <= "100111";  
+          SpiCsB <= '1';   -- turn off SPI 
+          wrstate <= S_WR_PPDONE; 
+        end if;
+
    when S_WR_PPDONE =>
+        wr_status <= x"C";
         dopin_ts <= "1110";
         SpiCsB <= '0';
         data_valid_cntr <= "000";
         cmdcounter32 <= "100111";
         wrstate <= S_WR_PPDONE_WAIT;
-                       
+--                    
    when S_WR_PPDONE_WAIT => 
         fifo_rden <= '0';  
         if (reset_design = '1') then wrstate <= S_WR_IDLE;
@@ -733,8 +968,9 @@ processProgram  : process (Clk)
               StatusDataValid <= '0';
             end if;
             if (StatusDataValid = '1') then spi_status <= rddata; end if;  --  rddata valid from previous cycle
-            --if spi_status = 0 then    -- Done with page program
-            if spi_status = 1 then    -- Done with page program
+            if spi_status = 0 then    -- Done with page program
+            --if spi_status = 1 then    -- Done with page program
+              wr_status <= x"E";
               SpiCsB <= '1';   -- turn off SPI
               cmdcounter32 <= "100111";
               cmdreg32 <=  CmdWE & X"00000000";  -- Set WE bit
@@ -749,6 +985,7 @@ processProgram  : process (Clk)
                           
 -----------------   Exit 4 Byte mode ------------------------------------    
    when S_EXIT4BMode_ASSCS1 =>
+        wr_status <= x"F";
         SpiCsB <= '0';   
         wrstate <= S_EXIT4BMODE;
          
@@ -758,6 +995,7 @@ processProgram  : process (Clk)
         else 
           SpiCsB <= '1';   -- turn off SPI 
           write_done <= '1';
+          cmdreg32 <= cmdreg32(38 downto 0) & '0';
           wrstate <= S_WR_IDLE;  
         end if; 
     end case;
@@ -798,6 +1036,7 @@ process (clk)  -- Syncers
           synced_fifo_almostfull <= synced_fifo_almostfull(0) & fifo_almostfull;  -- sync FIFO almostfull
           synced_erase <= synced_erase(0) & erase;
           synced_read <= synced_read(0) & read;
+          synced_write <= synced_write(0) & write;
     end if;
 end process;
 

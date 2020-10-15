@@ -38,6 +38,7 @@ entity QSPI_DUMMY is
     --signals to/from QSPI_CTRL
     QSPI_START_INFO      : out std_logic;
     QSPI_START_WRITE     : out std_logic;
+    QSPI_START_ERASE     : out std_logic;
     QSPI_START_READ      : out std_logic;
     QSPI_START_READ_FIFO : out std_logic;
     QSPI_CMD_INDEX       : out std_logic_vector(3 downto 0);
@@ -46,7 +47,9 @@ entity QSPI_DUMMY is
     QSPI_STARTADDR       : out std_logic_vector(31 downto 0);
     QSPI_PAGECOUNT       : out std_logic_vector(16 downto 0);
     QSPI_SECTORCOUNT     : out std_logic_vector(13 downto 0);
-    QSPI_FIFO_OUT        : in std_logic_vector(15 downto 0)
+    QSPI_FIFO_OUT        : in std_logic_vector(15 downto 0);
+    QSPI_FIFO_IN         : out std_logic_vector(15 downto 0);
+    QSPI_WRITE_FIFO_EN   : out std_logic
     );
 end QSPI_DUMMY;
 
@@ -68,13 +71,25 @@ architecture QSPI_DUMMY_Arch of QSPI_DUMMY is
   signal fifo_read_cntr : unsigned(3 downto 0) := x"0";
   signal fifo_read_offcycle : std_logic := '0';
   
-  signal do_upload_q : std_logic := '0';
-  signal do_upload_pulse : std_logic := '0';
+  signal do_cfg_upload_q : std_logic := '0';
+  signal do_cfg_upload_pulse : std_logic := '0';
   signal qspi_read_fifo_pulse : std_logic := '0';
+  
+  --download to PROM signals
+  --signal do_cfg_download_q, do_cfg_download_pulse : std_logic := '0';
+  signal ul_cfg_reg_idx : integer := 0;
+  type dl_cfg_states is (S_IDLE, S_ISSUE_INFO_1, S_ISSUE_ERASE, S_ISSUE_INFO_2, S_PUSH_REG, S_END_PULSE, S_ISSUE_WRITE);
+  signal dl_cfg_state : dl_cfg_states := S_IDLE;
+  signal qspi_fifo_in_inner : std_logic_vector(15 downto 0) := x"0000";
+  
+  --TEMP: erase PROM signals
+  type er_cfg_states is (S_IDLE, S_ISSUE_INFO, S_ISSUE_ERASE);
+  signal er_cfg_state : er_cfg_states := S_IDLE;
+  signal qspi_start_info_inner1, qspi_start_info_inner2, qspi_start_erase_inner1, qspi_start_erase_inner2 : std_logic := '0';
   
   --command parsing signals
   signal cmddev : std_logic_vector(15 downto 0) := x"0000";
-  signal do_upload : std_logic := '0';
+  signal do_cfg_upload, do_cfg_download, do_cfg_erase : std_logic := '0';
   
   --dtack signals
   signal ce_d_dtack, d_dtack, q_dtack : std_logic := '0';
@@ -84,22 +99,130 @@ begin
   --Decode command
   cmddev    <= "000" & DEVICE & COMMAND & "00";
 
-  do_upload <= '1' when (cmddev=x"1004" and strobe='1') else '0'; --0x6004
+  do_cfg_download <= '1' when (cmddev=x"1000" and strobe='1') else '0'; --0x6000
+  do_cfg_upload <= '1' when (cmddev=x"1004" and strobe='1') else '0'; --0x6004
+  --temp command for debugging
+  do_cfg_erase <= '1' when (cmddev=x"1008" and strobe='1') else '0';
 
   --hardcode pages and sector
   QSPI_CMD_INDEX <= x"4"; --RDFR24QUAD
-  QSPI_READ_ADDR <= x"0029D900";
+  QSPI_READ_ADDR <= x"00F3E000";
   QSPI_WD_LIMIT <= x"00000010";
-  QSPI_STARTADDR <= x"003CF960";
+  QSPI_STARTADDR <= x"00F3E000";
   QSPI_PAGECOUNT <= x"0000" & "1";
   QSPI_SECTORCOUNT <= x"000" & "01";
-  QSPI_START_INFO <= '0';
-  QSPI_START_WRITE <= '0';
   
-  do_upload_q <= do_upload when rising_edge(SLOWCLK) else do_upload_q;
-  do_upload_pulse <= do_upload and not do_upload_q;
-  QSPI_START_READ <= do_upload_pulse; --start read from PROM as soon as we get the signal, but wait for a few (2.5MHz) cycles to read FIFO and wait until this is finished to start assigning registers
-  DS_FIFOREAD : DELAY_SIGNAL generic map (NCYCLES_MAX => 16) port map (DOUT => qspi_read_fifo_pulse, CLK => SLOWCLK, NCYCLES => 16, DIN => do_upload_pulse); 
+  --temporary: separate erase PROM command for debugging
+  QSPI_START_INFO <= qspi_start_info_inner1 or qspi_start_info_inner2;
+  QSPI_START_ERASE <= qspi_start_erase_inner1 or qspi_start_erase_inner2;
+  fifo_erase_proc : process (SLOWCLK)
+  begin
+  if rising_edge(SLOWCLK) then
+    case er_cfg_state is
+    when S_IDLE => 
+      qspi_start_info_inner1 <= '0';
+      qspi_start_erase_inner1 <= '0';
+      if (do_cfg_erase='1') then
+        er_cfg_state <= S_ISSUE_INFO;
+      else
+        er_cfg_state <= S_IDLE;
+      end if;
+    when S_ISSUE_INFO =>
+      qspi_start_info_inner1 <= '1';
+      qspi_start_erase_inner1 <= '0';
+      er_cfg_state <= S_ISSUE_ERASE;
+    when S_ISSUE_ERASE =>
+      qspi_start_info_inner1 <= '0';
+      qspi_start_erase_inner1 <= '1';
+      er_cfg_state <= S_IDLE;
+    end case;
+  end if;
+  end process;
+  
+  --Handle download to PROM command
+  --steps: set info, erase page (?), set info, write cfg registers to fifo, issue write command
+  --do_cfg_download_q <= do_cfg_download when rising_edge(SLOWCLK) else do_cfg_download_q;
+  --do_cfg_download_pulse <= do_cfg_download and not do_cfg_download_q;
+  QSPI_FIFO_IN <= qspi_fifo_in_inner;
+  fifo_write_proc : process (SLOWCLK)
+  begin
+  if rising_edge(SLOWCLK) then
+    case dl_cfg_state is
+    when S_IDLE =>
+      qspi_start_info_inner2 <= '0';
+      qspi_start_erase_inner2 <= '0';
+      QSPI_START_WRITE <= '0';
+      qspi_fifo_in_inner <= qspi_fifo_in_inner;
+      QSPI_WRITE_FIFO_EN <= '0';
+      ul_cfg_reg_idx <= 0;
+      --this takes long enough that we shouldn't double write
+      if (do_cfg_download='1') then
+        dl_cfg_state <= S_ISSUE_INFO_2;
+      else
+        dl_cfg_state <= S_IDLE;
+      end if;
+    when S_ISSUE_INFO_1 =>
+      qspi_start_info_inner2 <= '1';
+      qspi_start_erase_inner2 <= '0';
+      QSPI_START_WRITE <= '0';
+      qspi_fifo_in_inner <= qspi_fifo_in_inner;
+      QSPI_WRITE_FIFO_EN <= '0';
+      ul_cfg_reg_idx <= ul_cfg_reg_idx;
+      dl_cfg_state <= S_ISSUE_ERASE;
+    when S_ISSUE_ERASE =>
+      qspi_start_info_inner2 <= '0';
+      qspi_start_erase_inner2 <= '0';
+      QSPI_START_WRITE <= '0';
+      qspi_fifo_in_inner <= qspi_fifo_in_inner;
+      QSPI_WRITE_FIFO_EN <= '0';
+      ul_cfg_reg_idx <= ul_cfg_reg_idx;
+      dl_cfg_state <= S_ISSUE_INFO_2;
+    when S_ISSUE_INFO_2 =>
+      qspi_start_info_inner2 <= '1';
+      qspi_start_erase_inner2 <= '0';
+      QSPI_START_WRITE <= '0';
+      qspi_fifo_in_inner <= qspi_fifo_in_inner;
+      QSPI_WRITE_FIFO_EN <= '0';
+      ul_cfg_reg_idx <= ul_cfg_reg_idx;
+      dl_cfg_state <= S_PUSH_REG;  
+    when S_PUSH_REG =>
+      qspi_start_info_inner2 <= '0';
+      qspi_start_erase_inner2 <= '0';
+      QSPI_START_WRITE <= '0';
+      qspi_fifo_in_inner <= QSPI_CFG_REGS(ul_cfg_reg_idx);
+      QSPI_WRITE_FIFO_EN <= '1';
+      ul_cfg_reg_idx <= ul_cfg_reg_idx;
+      dl_cfg_state <= S_END_PULSE;
+    when S_END_PULSE =>
+      qspi_start_info_inner2 <= '0';
+      qspi_start_erase_inner2 <= '0';
+      QSPI_START_WRITE <= '0';
+      qspi_fifo_in_inner <= qspi_fifo_in_inner;
+      QSPI_WRITE_FIFO_EN <= '0';
+      if (ul_cfg_reg_idx = (NREGS-1)) then
+        ul_cfg_reg_idx <= 0;
+        dl_cfg_state <= S_ISSUE_WRITE;
+      else
+        ul_cfg_reg_idx <= ul_cfg_reg_idx + 1;
+        dl_cfg_state <= S_PUSH_REG;
+      end if;
+    when S_ISSUE_WRITE =>
+      qspi_start_info_inner2 <= '0';
+      qspi_start_erase_inner2 <= '0';
+      QSPI_START_WRITE <= '1';
+      qspi_fifo_in_inner <= qspi_fifo_in_inner;
+      QSPI_WRITE_FIFO_EN <= '0';
+      ul_cfg_reg_idx <= ul_cfg_reg_idx;
+      dl_cfg_state <= S_IDLE;
+    end case;
+  end if;
+  end process;
+  
+  --Handle upload from PROM command
+  do_cfg_upload_q <= do_cfg_upload when rising_edge(SLOWCLK) else do_cfg_upload_q;
+  do_cfg_upload_pulse <= do_cfg_upload and not do_cfg_upload_q;
+  QSPI_START_READ <= do_cfg_upload_pulse; --start read from PROM as soon as we get the signal, but wait for a few (2.5MHz) cycles to read FIFO and wait until this is finished to start assigning registers
+  DS_FIFOREAD : DELAY_SIGNAL generic map (NCYCLES_MAX => 16) port map (DOUT => qspi_read_fifo_pulse, CLK => SLOWCLK, NCYCLES => 16, DIN => do_cfg_upload_pulse); 
   DS_CFGULPULSEPRE : DELAY_SIGNAL generic map (NCYCLES_MAX => 34) port map (DOUT => cfg_ul_pulse_pre, CLK => SLOWCLK, NCYCLES => 34, DIN => qspi_read_fifo_pulse); 
 
   --pulse QSPI_START_READ_FIFO and assign cfg_reg_hardcode based on QSPI_FIFO_OUT

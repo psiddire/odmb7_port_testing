@@ -83,9 +83,10 @@ architecture VMECONFREGS_Arch of VMECONFREGS is
                                                FW_YEAR, x"FFF5", x"FFF6", x"FFF7",
                                                x"FFF8", x"FFF9", x"FFFA", x"FFFB",
                                                x"FFFC", x"FFFD", x"FFFE", x"FFFF");
-  constant cfg_reg_mask : cfg_regs_array := (x"003f", x"003f", x"0001", x"003f", x"001f",
-                                             x"001f", x"000f", x"01ff", x"00ff", x"ffff",
-                                             x"ffff", x"0fff", x"ffff", x"ffff", x"ffff", x"ffff");
+  constant cfg_reg_mask : cfg_regs_array := (x"003f", x"003f", x"0001", x"003f", 
+                                             x"001f", x"001f", x"000f", x"01ff", 
+                                             x"00ff", x"ffff", x"ffff", x"0fff", 
+                                             x"ffff", x"ffff", x"ffff", x"ffff");
   signal do_cfg, do_const                                   : std_logic := '0';
   signal do_cfg_we, do_const_we, do_cfg_we_q, do_const_we_q : std_logic := '0';
   signal bit_const                                          : std_logic := '0';

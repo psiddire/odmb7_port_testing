@@ -143,17 +143,17 @@ entity ODMB_VME is
     --------------------
     -- signals to/from QSPI_CTRL
     --------------------   
-    QSPI_START_INFO      : out std_logic;
-    QSPI_START_WRITE     : out std_logic;
-    QSPI_START_READ      : out std_logic;
-    QSPI_START_READ_FIFO : out std_logic;
-    QSPI_CMD_INDEX       : out std_logic_vector(3 downto 0);
-    QSPI_READ_ADDR       : out std_logic_vector(31 downto 0);
-    QSPI_WD_LIMIT        : out std_logic_vector(31 downto 0);
-    QSPI_STARTADDR       : out std_logic_vector(31 downto 0);
-    QSPI_PAGECOUNT       : out std_logic_vector(16 downto 0);
-    QSPI_SECTORCOUNT     : out std_logic_vector(13 downto 0);
-    QSPI_FIFO_OUT        : in std_logic_vector(15 downto 0);
+--    QSPI_START_INFO      : out std_logic;
+--    QSPI_START_WRITE     : out std_logic;
+--    QSPI_START_READ      : out std_logic;
+--    QSPI_START_READ_FIFO : out std_logic;
+--    QSPI_CMD_INDEX       : out std_logic_vector(3 downto 0);
+--    QSPI_READ_ADDR       : out std_logic_vector(31 downto 0);
+--    QSPI_WD_LIMIT        : out std_logic_vector(31 downto 0);
+--    QSPI_STARTADDR       : out std_logic_vector(31 downto 0);
+--    QSPI_PAGECOUNT       : out std_logic_vector(16 downto 0);
+--    QSPI_SECTORCOUNT     : out std_logic_vector(13 downto 0);
+--    QSPI_FIFO_OUT        : in std_logic_vector(15 downto 0);
 
     --------------------
     -- Other
@@ -350,6 +350,7 @@ architecture Behavioral of ODMB_VME is
       --signals to/from QSPI_CTRL
       QSPI_START_INFO      : out std_logic;
       QSPI_START_WRITE     : out std_logic;
+      QSPI_START_ERASE     : out std_logic;
       QSPI_START_READ      : out std_logic;
       QSPI_START_READ_FIFO : out std_logic;
       QSPI_CMD_INDEX       : out std_logic_vector(3 downto 0);
@@ -358,7 +359,9 @@ architecture Behavioral of ODMB_VME is
       QSPI_STARTADDR       : out std_logic_vector(31 downto 0);
       QSPI_PAGECOUNT       : out std_logic_vector(16 downto 0);
       QSPI_SECTORCOUNT     : out std_logic_vector(13 downto 0);
-      QSPI_FIFO_OUT        : in std_logic_vector(15 downto 0)
+      QSPI_FIFO_OUT        : in std_logic_vector(15 downto 0);
+      QSPI_FIFO_IN         : out std_logic_vector(15 downto 0);
+      QSPI_WRITE_FIFO_EN   : out std_logic
       );
   end component;
 
@@ -392,6 +395,33 @@ architecture Behavioral of ODMB_VME is
       DIAGOUT : out std_logic_vector(17 downto 0);
       LED     : out std_logic_vector(2 downto 0)
       );
+  end component;
+  
+  component QSPI_CTRL is
+  port (
+      
+    CLK40   : in std_logic;
+    RST     : in std_logic;
+  
+    START_READ : in std_logic;
+    START_INFO : in std_logic; --pulse to load startaddr, sectorcount, and pagecount
+    START_WRITE : in std_logic; --pulse to write data to PROM
+    START_ERASE : in std_logic;
+    START_READ_FIFO : in std_logic; --pulse to read one word from FIFO
+      
+    CMD_INDEX : in std_logic_vector(3 downto 0);
+    READ_ADDR : in std_logic_vector(31 downto 0);
+    WD_LIMIT : in std_logic_vector(31 downto 0);
+    STARTADDR : in std_logic_vector(31 downto 0);
+    PAGECOUNT : in std_logic_vector(16 downto 0);
+    SECTORCOUNT : in std_logic_vector(13 downto 0);
+    
+    WRITE_FIFO_IN : in std_logic_vector(15 downto 0);
+    WRITE_FIFO_EN : in std_Logic;
+    FIFO_OUT : out std_logic_vector(15 downto 0);
+      
+    DIAGOUT : out std_logic_vector(17 downto 0)
+    );
   end component;
 
   signal device    : std_logic_vector(num_dev downto 0) := (others => '0');
@@ -430,6 +460,16 @@ architecture Behavioral of ODMB_VME is
   signal qspi_const_reg_we : integer range 0 to NREGS := 0;
   signal const_regs_inner       : cfg_regs_array;
   signal cfg_regs_inner         : cfg_regs_array;
+  
+  --------------------------------------
+  -- PROM signals
+  --------------------------------------
+  signal qspi_start_info, qspi_start_write, qspi_start_read, qspi_start_read_fifo, qspi_write_fifo_en, qspi_start_erase : std_logic := '0';
+  signal qspi_cmd_index : std_logic_vector(3 downto 0) := x"0";
+  signal qspi_read_addr, qspi_wd_limit, qspi_startaddr : std_logic_vector(31 downto 0) := x"00000000";
+  signal qspi_sectorcount : std_logic_vector(13 downto 0) := (others => '0');
+  signal qspi_pagecount : std_logic_vector(16 downto 0) := (others => '0');
+  signal qspi_fifo_out, qspi_write_fifo_in : std_logic_vector(15 downto 0) := x"0000";
 
 begin
 
@@ -497,7 +537,7 @@ begin
       TMS       => dl_jtag_tms_inner,
       FEBTDO    => DCFEB_TDO,
 
-      DIAGOUT => diagout_buf,
+      DIAGOUT => open,
       LED     => led_cfebjtag
       );
 
@@ -611,17 +651,20 @@ begin
         QSPI_CFG_REG_WE   => qspi_cfg_reg_we,
         QSPI_CFG_REGS => cfg_regs_inner,
         QSPI_CONST_REGS => const_regs_inner,
-        QSPI_START_INFO => QSPI_START_INFO,
-        QSPI_START_WRITE => QSPI_START_WRITE,
-        QSPI_START_READ => QSPI_START_READ,
-        QSPI_START_READ_FIFO => QSPI_START_READ_FIFO,
-        QSPI_CMD_INDEX => QSPI_CMD_INDEX,
-        QSPI_READ_ADDR => QSPI_READ_ADDR,
-        QSPI_WD_LIMIT => QSPI_WD_LIMIT,
-        QSPI_STARTADDR => QSPI_STARTADDR,
-        QSPI_PAGECOUNT => QSPI_PAGECOUNT,
-        QSPI_SECTORCOUNT => QSPI_SECTORCOUNT,
-        QSPI_FIFO_OUT => QSPI_FIFO_OUT
+        QSPI_START_INFO => qspi_start_info,
+        QSPI_START_WRITE => qspi_start_write,
+        QSPI_START_ERASE => qspi_start_erase,
+        QSPI_START_READ => qspi_start_read,
+        QSPI_START_READ_FIFO => qspi_start_read_fifo,
+        QSPI_CMD_INDEX => qspi_cmd_index,
+        QSPI_READ_ADDR => qspi_read_addr,
+        QSPI_WD_LIMIT => qspi_wd_limit,
+        QSPI_STARTADDR => qspi_startaddr,
+        QSPI_PAGECOUNT => qspi_pagecount,
+        QSPI_SECTORCOUNT => qspi_sectorcount,
+        QSPI_FIFO_OUT => qspi_fifo_out,
+        QSPI_FIFO_IN => qspi_write_fifo_in,
+        QSPI_WRITE_FIFO_EN => qspi_write_fifo_en
       );
 
   COMMAND_PM : COMMAND_MODULE
@@ -648,6 +691,27 @@ begin
       ADRS    => cmd_adrs_inner,
       DIAGOUT => open,
       LED     => led_command
+      );
+     
+  QSPI_CTRL_I : QSPI_CTRL 
+    port map (
+      CLK40 => CLK40,
+      RST => RST,
+      START_READ => qspi_start_read,
+      START_INFO => qspi_start_info,
+      START_WRITE => qspi_start_write,
+      START_ERASE => qspi_start_erase,
+      START_READ_FIFO => qspi_start_read_fifo,
+      CMD_INDEX => qspi_cmd_index,
+      READ_ADDR => qspi_read_addr,
+      WD_LIMIT => qspi_wd_limit,
+      STARTADDR => qspi_startaddr,
+      PAGECOUNT => qspi_pagecount,
+      SECTORCOUNT => qspi_sectorcount,
+      WRITE_FIFO_IN => qspi_write_fifo_in,
+      WRITE_FIFO_EN => qspi_write_fifo_en,
+      FIFO_OUT => qspi_fifo_out,
+      DIAGOUT => diagout_buf
       );
 
 

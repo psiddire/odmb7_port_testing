@@ -25,6 +25,8 @@ entity QSPI_CTRL is
     PAGECOUNT : in std_logic_vector(16 downto 0);
     SECTORCOUNT : in std_logic_vector(13 downto 0);
 
+    WRITE_FIFO_IN : in std_logic_vector(15 downto 0);
+    WRITE_FIFO_EN : in std_Logic;
     FIFO_OUT : out std_logic_vector(15 downto 0);
     
     DIAGOUT : out std_logic_vector(17 downto 0)
@@ -59,6 +61,7 @@ architecture QSPI_CTRL_Arch of QSPI_CTRL is
     ------------------------------------
     reset       : in  std_logic;
     read       : in std_logic;
+    write      : in std_logic;
     erase     : in std_logic; 
     eraseing     : out std_logic; 
     erasedone     : out std_logic; 
@@ -83,7 +86,10 @@ architecture QSPI_CTRL_Arch of QSPI_CTRL is
     out_rd_rddata: out std_logic_vector(15 downto 0);
     out_rd_rddata_all: out std_logic_vector(15 downto 0);
     out_er_status: out std_logic_vector(1 downto 0);
-    out_wrfifo_rden: out std_logic
+    out_wrfifo_rden: out std_logic;
+    out_wr_status : out std_logic_vector(3 downto 0);
+    out_fifo_rden : out std_logic;
+    out_fifodout : out std_logic_vector(63 downto 0)
   ); 
   end component spiflashprogrammer_test;
 
@@ -111,10 +117,21 @@ architecture QSPI_CTRL_Arch of QSPI_CTRL is
   signal sectorcountvalid : std_logic := '0';
   signal pagecountvalid : std_logic := '0';
 
+  --WRITE FIFO signals
+  signal write_fifo_en_q, write_fifo_en_pulse : std_logic := '0';
+  signal write_fifo_rd_en : std_logic := '0';
+  signal write_fifo_out : std_logic_vector(15 downto 0) := (others => '0');
+
   --WRITE signals
+  signal start_write_q, start_write_pulse : std_logic := '0';
   signal start_write_en : std_logic := '0';
   signal fifo_wren : std_logic := '0';
   signal load_data_cntr : unsigned(31 downto 0) := x"00000000";
+  type wr_prom_states is (S_IDLE, S_WAIT_ERASE, S_READ_LOWER, S_READ_UPPER);
+  signal wr_prom_state : wr_prom_states := S_IDLE;
+  signal write_data : std_logic_vector(31 downto 0) := x"00000000";
+  signal erasedone : std_logic := '0';
+  signal start_write_prom_pulse : std_logic := '0';
 
   --READ signals
   signal wr_dvalid_cnt : unsigned(31 downto 0) := x"00000000";
@@ -133,6 +150,9 @@ architecture QSPI_CTRL_Arch of QSPI_CTRL is
   signal rd_data_valid : std_logic := '0';
   signal spi_readdata : std_logic_vector(15 downto 0) := x"0000";
   signal readback_fifo_wr_rst_busy, readback_fifo_rd_rst_busy : std_logic := '0';
+  
+  --debug
+  signal fifodout_inner : std_logic_vector(63 downto 0);
 
 begin
 
@@ -168,29 +188,77 @@ begin
   end if;
   end process;
 
-  --when START_WRITE received, start writing (currently just a counter, but eventually make a FIFO like the ODMB2014)
+  --when WRITE_FIFO_EN is pulsed, write to input fifo
+  write_fifo_en_q <= WRITE_FIFO_EN when rising_edge(CLK40) else write_fifo_en_q;
+  write_fifo_en_pulse <= WRITE_FIFO_EN and not write_fifo_en_q;
+  spi_write_fifo_i : spi_readback_fifo
+     PORT MAP (
+        srst => RST,
+        wr_clk => CLK40,
+        rd_clk => CLK40,
+        din => WRITE_FIFO_IN,
+        wr_en => write_fifo_en_pulse,
+        rd_en => write_fifo_rd_en,
+        dout => write_fifo_out,
+        full => open,
+        empty => open,
+        --prog_full => rd_fifo_prog_full,
+        wr_rst_busy => open,
+        rd_rst_busy => open
+      );
+  
+
+  --when START_WRITE received, start writing from FIFO
+  start_write_q <= START_WRITE when rising_edge(CLK40) else start_write_q;
+  start_write_pulse <= START_WRITE and not start_write_q;
   process_write : process (CLK40)
   begin
   if (rising_edge(CLK40)) then
-    if (start_write_en = '0') then
+    case wr_prom_state is
+    when S_IDLE =>
       fifo_wren <= '0';
       load_data_cntr <= x"00000000";
-      if (START_WRITE = '1') then
-        start_write_en <= '1';
+      write_data <= write_data;
+      write_fifo_rd_en <= '0';
+      start_write_prom_pulse <= '0';
+      if (start_write_pulse = '1') then
+        wr_prom_state <= S_WAIT_ERASE;
       else
-        start_write_en <= '0';
+        wr_prom_state <= S_IDLE;
       end if;
-    else
+    when S_WAIT_ERASE =>
+      fifo_wren <= '0';
+      load_data_cntr <= load_data_cntr;
+      write_data <= write_data;
+      write_fifo_rd_en <= '0';
+      start_write_prom_pulse <= start_write_prom_pulse;
+      if (erasedone = '1') then
+        wr_prom_state <= S_READ_LOWER;
+      else
+        wr_prom_state <= S_WAIT_ERASE;
+      end if;
+    when S_READ_LOWER =>
+      fifo_wren <= '0';
+      load_data_cntr <= load_data_cntr;
+      write_data <= write_data(31 downto 16) & write_fifo_out;
+      write_fifo_rd_en <= '1';
+      start_write_prom_pulse <= start_write_prom_pulse;
+      wr_prom_state <= S_READ_UPPER;
+    when S_READ_UPPER =>
+      fifo_wren <= '1';
+      write_data <= write_fifo_out & write_data(15 downto 0);
+      write_fifo_rd_en <= '1';
+      --write at least 1 page for something to happen?
       if (load_data_cntr = x"80") then
-        fifo_wren <='0';
-	load_data_cntr <= x"00000000";
-	start_write_en <= '0';
+        load_data_cntr <= x"00000000";
+        start_write_prom_pulse <= '1';
+        wr_prom_state <= S_IDLE;
       else
-        fifo_wren <= '1';
         load_data_cntr <= load_data_cntr + 1;
-	start_write_en <= '1';
-      end if;
-    end if;
+        start_write_prom_pulse <= start_write_prom_pulse;
+        wr_prom_state <= S_READ_LOWER;
+      end if;      
+    end case;
   end if;
   end process;
 
@@ -259,7 +327,7 @@ begin
   (
     clk => CLK40,
     fifoclk => CLK40, --drck,
-    data_to_fifo => std_logic_vector(load_data_cntr),
+    data_to_fifo => write_data,
     startaddr => STARTADDR,
     startaddrvalid => startaddrvalid,
     pagecount => PAGECOUNT,
@@ -275,16 +343,17 @@ begin
     writedone => open,
     reset => RST,
     read => start_read_pulse,
-    eraseing => open,
-    erasedone => open,
+    write => start_write_prom_pulse,
+    eraseing => DIAGOUT(8),
+    erasedone => erasedone,
     erase => start_erase_pulse,
     startwrite => open,
-    out_read_inprogress => open,
+    out_read_inprogress => DIAGOUT(9),
     out_rd_SpiCsB => open,
-    out_SpiCsB_N => open,
+    out_SpiCsB_N => DIAGOUT(0),
     out_read_start => controller_read_start,
-    out_SpiMosi => open,
-    out_SpiMiso => open,
+    out_SpiMosi => DIAGOUT(1),
+    out_SpiMiso => DIAGOUT(2),
     out_CmdSelect => open,
     in_CmdIndex => CMD_INDEX,
     in_rdAddr => READ_ADDR,
@@ -298,12 +367,15 @@ begin
     out_rd_rddata => spi_readdata,
     out_rd_rddata_all => open,
     out_er_status => open,
-    out_wrfifo_rden => open
+    out_wrfifo_rden => open,
+    out_wr_status => DIAGOUT(7 downto 4),
+    out_fifo_rden => open,
+    out_fifodout => fifodout_inner
     );
     
   --debug
-  DIAGOUT(0) <= controller_read_start;
-  DIAGOUT(1) <= readback_fifo_wr_en;
-  DIAGOUT(17 downto 2) <= spi_readdata;
+  DIAGOUT(17 downto 10) <= fifodout_inner(7 downto 0);
+  
+  DIAGOUT(3) <= fifo_wren;
   
 end QSPI_CTRL_Arch;
