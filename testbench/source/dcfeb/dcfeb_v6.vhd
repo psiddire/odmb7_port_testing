@@ -36,7 +36,8 @@ entity dcfeb_v6 is
     INJPLS        : in std_logic;
     EXTPLS        : in std_logic;
     BC0           : in std_logic;
-    RESYNC        : in std_logic);
+    RESYNC        : in std_logic;
+    DIAGOUT       : out std_logic_vector(17 downto 0));
 end dcfeb_v6;
 
 
@@ -73,7 +74,7 @@ architecture dcfeb_v6_arch of dcfeb_v6 is
       IR : out std_logic_vector(9 downto 0);
 
       CAPTURE1 : out std_ulogic;
-      DRCK1    : out std_ulogic;
+      DRCK1_EN : out std_ulogic;
       RESET1   : out std_ulogic;
       SEL1     : out std_ulogic;
       SHIFT1   : out std_ulogic;
@@ -82,7 +83,7 @@ architecture dcfeb_v6_arch of dcfeb_v6 is
       TDO1     : in  std_ulogic;
 
       CAPTURE2 : out std_ulogic;
-      DRCK2    : out std_ulogic;
+      DRCK2_EN : out std_ulogic;
       RESET2   : out std_ulogic;
       SEL2     : out std_ulogic;
       SHIFT2   : out std_ulogic;
@@ -104,16 +105,16 @@ architecture dcfeb_v6_arch of dcfeb_v6 is
 
   component instr_dcd is
     port(
-      TCK    : in  std_ulogic;
-      DRCK   : in  std_ulogic;
-      SEL    : in  std_ulogic;
-      TDI    : in  std_ulogic;
-      UPDATE : in  std_ulogic;
-      SHIFT  : in  std_ulogic;
-      RST    : in  std_ulogic;
-      CLR    : in  std_ulogic;
-      F      : out std_logic_vector (63 downto 0);
-      TDO    : out std_ulogic
+      TCK     : in  std_ulogic;
+      DRCK_EN : in  std_ulogic;
+      SEL     : in  std_ulogic;
+      TDI     : in  std_ulogic;
+      UPDATE  : in  std_ulogic;
+      SHIFT   : in  std_ulogic;
+      RST     : in  std_ulogic;
+      CLR     : in  std_ulogic;
+      F       : out std_logic_vector (63 downto 0);
+      TDO     : out std_ulogic
       );
   end component;
 
@@ -124,7 +125,7 @@ architecture dcfeb_v6_arch of dcfeb_v6 is
       );
     port (
       TCK       : in  std_ulogic;
-      DRCK      : in  std_ulogic;
+      DRCK_EN   : in  std_ulogic;
       FSEL      : in  std_ulogic;
       SEL       : in  std_ulogic;
       TDI       : in  std_ulogic;
@@ -144,7 +145,8 @@ architecture dcfeb_v6_arch of dcfeb_v6 is
       width : integer := 16
       );
     port (
-      DRCK    : in  std_ulogic;
+      TCK     : in  std_ulogic;
+      DRCK_EN : in  std_ulogic;
       FSH     : in  std_ulogic;
       FCAP    : in  std_ulogic;
       SEL     : in  std_ulogic;
@@ -159,7 +161,8 @@ architecture dcfeb_v6_arch of dcfeb_v6 is
   
   component user_counter_reg is
   port(
-    DRCK : in std_logic;      --Data Reg Clock
+    TCK : in std_logic;       --TCK clock
+    DRCK_EN : in std_logic;   --Data Reg Clock enable
     FSEL_3A : in std_logic;   --3A (L1AMATCH counter) function select
     FSEL_3B : in std_logic;   --3B (INJPLS counter) function select
     FSEL_3C : in std_logic;   --3C (EXTPLS counter) function select
@@ -182,8 +185,8 @@ architecture dcfeb_v6_arch of dcfeb_v6 is
   signal fsel                                           : std_logic_vector(63 downto 0);
   signal bpi_status                                     : std_logic_vector(15 downto 0);
   signal int_adc_mask                                   : std_logic_vector(11 downto 0);
-  signal drck1, sel1, reset1, shift1, capture1, update1 : std_logic;
-  signal drck2, sel2, reset2, shift2, capture2, update2 : std_logic;
+  signal drck1_en, sel1, reset1, shift1, capture1, update1 : std_logic;
+  signal drck2_en, sel2, reset2, shift2, capture2, update2 : std_logic;
   signal tdo_f0c, tdo_f17, tdo_f3a3b3c3d                : std_logic;
   signal tdo1                                           : std_logic;
   signal tdo2                                           : std_logic;
@@ -191,7 +194,7 @@ architecture dcfeb_v6_arch of dcfeb_v6 is
   signal tdo4                                           : std_logic := '0';
 
   --signals for counting pulses
-  signal injpls_prev, extpls_prev       : std_logic := '0';
+  signal injpls_prev, extpls_prev, bc0_prev, l1a_match_prev       : std_logic := '0';
   signal injpls_counter, extpls_counter, bc0_counter, l1a_match_counter : unsigned(11 downto 0) := (others=>'0');
 
 begin
@@ -204,38 +207,36 @@ begin
   --on KCU, just use P lines as signals
  
   --count pulses
-  pulse_counter : process (RESYNC, INJPLS, EXTPLS, BC0, L1A_MATCH)
+  pulse_counter : process (RESYNC, CLK)
   begin
-    if RESYNC'event and RESYNC='1' then
+    if RESYNC='1' then
       l1a_match_counter <= x"000";
       injpls_counter <= x"000";
       extpls_counter <= x"000";
       bc0_counter <= x"000";
+    elsif CLK'event and CLK='1' then
+      if INJPLS='1' and injpls_prev='0' then
+        injpls_counter <= injpls_counter + 1;
+      end if;
+      if EXTPLS='1' and extpls_prev='0' then
+        extpls_counter <= extpls_counter + 1;
+      end if;
+      if BC0='1' and bc0_prev='0' then
+        bc0_counter <= bc0_counter + 1;
+      end if;
+      if L1A_MATCH='1' and l1a_match_prev='0' then
+        l1a_match_counter <= l1a_match_counter + 1;
+      end if;
+      injpls_prev <= INJPLS;
+      extpls_prev <= EXTPLS;
+      bc0_prev <= BC0;
+      l1a_match_prev <= L1A_MATCH;
     end if;
-    if INJPLS'event and INJPLS='1' then
-      injpls_counter <= injpls_counter + 1;
-    end if;
-    if EXTPLS'event and EXTPLS='1' then
-      extpls_counter <= extpls_counter + 1;
-    end if;
-    if BC0'event and BC0='1' then
-      bc0_counter <= bc0_counter + 1;
-    end if;
-    if L1A_MATCH'event and L1A_MATCH='1' then
-      l1a_match_counter <= l1a_match_counter + 1;
-    end if;
-    
---    if CLK'event and CLK='1' then
---      if injpls='1' and injpls_prev='0' then
---        injpls_counter <= injpls_counter + 1;
---      end if;
---      if extpls='1' and extpls_prev='0' then
---        extpls_counter <= extpls_counter + 1;
---      end if;
---      injpls_prev <= injpls;
---      extpls_prev <= extpls;
---    end if;
   end process;
+  
+  --debugging
+  DIAGOUT(11 downto 0) <= std_logic_vector(extpls_counter);
+  DIAGOUT(17 downto 12) <= "000000";
 
   --currently not using data-generation functionality
 --  PMAP_dcfeb_data_gen : dcfeb_data_gen
@@ -258,7 +259,7 @@ begin
       IR => dcfeb_jtag_ir,
 
       CAPTURE1 => capture1,
-      DRCK1    => drck1,
+      DRCK1_EN => drck1_en,
       RESET1   => reset1,
       SEL1     => sel1,
       SHIFT1   => shift1,
@@ -267,7 +268,7 @@ begin
       TDO1     => tdo1,
 
       CAPTURE2 => capture2,
-      DRCK2    => drck2,
+      DRCK2_EN => drck2_en,
       RESET2   => reset2,
       SEL2     => sel2,
       SHIFT2   => shift2,
@@ -289,16 +290,16 @@ begin
 
   PMAP_INSTR_DECODER : instr_dcd
     port map (
-      TCK    => tck,                    -- in
-      DRCK   => drck1,                  -- in 
-      SEL    => sel1,                   -- in 
-      TDI    => tdi,                    -- in 
-      UPDATE => update1,                -- in 
-      SHIFT  => shift1,                 -- in
-      RST    => reset1,                 -- in  
-      CLR    => '0',                    -- in
-      F      => fsel,                   -- out
-      TDO    => tdo1                    -- out
+      TCK     => tck,                    -- in
+      DRCK_EN => drck1_en,                  -- in 
+      SEL     => sel1,                   -- in 
+      TDI     => tdi,                    -- in 
+      UPDATE  => update1,                -- in 
+      SHIFT   => shift1,                 -- in
+      RST     => reset1,                 -- in  
+      CLR     => '0',                    -- in
+      F       => fsel,                   -- out
+      TDO     => tdo1                    -- out
       );
 
   PMAP_TDO_MUX : tdo_mux
@@ -319,7 +320,7 @@ begin
 --  );
     port map (
       TCK       => tck,                 -- in
-      DRCK      => drck2,               -- in
+      DRCK_EN   => drck2_en,            -- in
       FSEL      => fsel(12),            -- in
       SEL       => sel2,                -- in
       TDI       => tdi,                 -- in
@@ -347,7 +348,8 @@ begin
 --     width => 16
 --  );
     port map (
-      DRCK    => drck2,                 -- in
+      TCK     => tck,                   -- in
+      DRCK_EN => drck2_en,              -- in
       FSH     => '0',                   -- in (not used)
       FCAP    => fsel(23),              -- in
       SEL     => sel2,                  -- in
@@ -361,7 +363,8 @@ begin
 
   PMAP_COUNTERS : user_counter_reg
   port map (
-    DRCK      => drck2,
+    TCK       => tck,
+    DRCK_EN   => drck2_en,
     FSEL_3A   => fsel(58),
     FSEL_3B   => fsel(59),
     FSEL_3C   => fsel(60),

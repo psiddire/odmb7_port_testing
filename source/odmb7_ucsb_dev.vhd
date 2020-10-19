@@ -13,6 +13,7 @@ use work.Firmware_pkg.all;     -- for switch between sim and synthesis
 
 entity ODMB7_UCSB_DEV is
   generic (
+    NREGS       : integer := 16;
     NCFEB       : integer range 1 to 7 := 7  -- Number of DCFEBS, 7 for ME1/1, 5
   );
   PORT (
@@ -190,18 +191,31 @@ architecture Behavioral of ODMB7_UCSB_DEV is
       TEST_LCT             : out std_logic;
       MASK_L1A             : out std_logic_vector(NCFEB downto 0);
       MASK_PLS             : out std_logic;
-      ODMB_CTRL            : out std_logic_vector(15 downto 0);
+      ODMB_CAL             : out std_logic;
+      MUX_DATA_PATH        : out std_logic;
+      MUX_TRIGGER          : out std_logic;
+      MUX_LVMB             : out std_logic;
+      ODMB_PED             : out std_logic_vector(1 downto 0);
       ODMB_DATA            : in std_logic_vector(15 downto 0);
       ODMB_DATA_SEL        : out std_logic_vector(7 downto 0);
 
       --------------------
       -- VMECONFREGS Configuration signals for top level
       --------------------
-      LCT_L1A_DLY          : out std_logic_vector(5 downto 0);
-      INJ_DLY              : out std_logic_vector(4 downto 0);
-      EXT_DLY              : out std_logic_vector(4 downto 0);
-      CALLCT_DLY           : out std_logic_vector(3 downto 0);
-      CABLE_DLY            : out integer range 0 to 1;
+      LCT_L1A_DLY   : out std_logic_vector(5 downto 0);
+      CABLE_DLY     : out integer range 0 to 1;
+      OTMB_PUSH_DLY : out integer range 0 to 63;
+      ALCT_PUSH_DLY : out integer range 0 to 63;
+      BX_DLY        : out integer range 0 to 4095;
+      INJ_DLY       : out std_logic_vector(4 downto 0);
+      EXT_DLY       : out std_logic_vector(4 downto 0);
+      CALLCT_DLY    : out std_logic_vector(3 downto 0);
+      ODMB_ID      : out std_logic_vector(15 downto 0);
+      NWORDS_DUMMY : out std_logic_vector(15 downto 0);
+      KILL         : out std_logic_vector(NCFEB+2 downto 1);
+      CRATEID      : out std_logic_vector(7 downto 0);
+      CHANGE_REG_DATA      : in std_logic_vector(15 downto 0);
+      CHANGE_REG_INDEX     : in integer range 0 to NREGS;
 
       --------------------
       -- Other
@@ -292,6 +306,11 @@ architecture Behavioral of ODMB7_UCSB_DEV is
   signal clk2p5_unbuf    : std_logic := '0';
   signal clk2p5_inv      : std_logic := '1';
   signal clk2p5          : std_logic := '0';
+  signal clk1p25         : std_logic := '0';
+  signal clk1p25_inv     : std_logic := '1';
+  signal clk625k         : std_logic := '0';
+  signal clk625k_inv     : std_logic := '1';
+  signal clk625k_unbuf   : std_logic := '0';
 
   --------------------------------------
   -- PPIB/DCFEB signals
@@ -340,6 +359,9 @@ architecture Behavioral of ODMB7_UCSB_DEV is
   signal callct_dly : std_logic_vector(3 downto 0) := (others => '0');
   signal cable_dly : integer range 0 to 1;
   signal odmb_ctrl_reg : std_logic_vector(15 downto 0) := (others => '0');
+  signal kill : std_logic_vector(NCFEB+2 downto 1) := (others => '0');
+  signal change_reg_data  : std_logic_vector(15 downto 0);
+  signal change_reg_index : integer range 0 to NREGS := NREGS;
 
   --------------------------------------
   -- ODMB VME<->ODMB CTRL signals
@@ -353,6 +375,12 @@ architecture Behavioral of ODMB7_UCSB_DEV is
   signal ccb_softrst_b_q : std_logic := '1'; --no CCB currently
   signal fw_rst_reg : std_logic_vector(31 downto 0) := (others => '0');
   signal reset : std_logic := '0';
+
+  --------------------------------------
+  -- Debug signals
+  --------------------------------------
+
+  signal diagout_inner : std_logic_vector(17 downto 0) := (others => '0');
 
   --------------------------------------
   -- Data readout signals
@@ -371,11 +399,16 @@ begin
   clk20_inv <= not clk20_unbuf;
   clk5_inv <= not clk5_unbuf;
   clk2p5_inv <= not clk2p5_unbuf;
+  clk1p25_inv <= not clk1p25;
+  clk625k_inv <= not clk625k_unbuf;
   FD_clk20  : FD port map(D => clk20_inv,  C => CLK40, Q => clk20_unbuf );
   FD_clk5   : FD port map(D => clk5_inv,   C => CLK10, Q => clk5_unbuf  );
-  FD_clk2p5 : FD port map(D => clk2p5_inv, C => CLK10, Q => clk2p5_unbuf);
+  FD_clk2p5 : FD port map(D => clk2p5_inv, C => clk5_unbuf, Q => clk2p5_unbuf);
+  FD_clk1p25 : FD port map(D => clk1p25_inv, C => clk2p5_unbuf, Q => clk1p25);
+  FD_clk625k : FD port map(D => clk625k_inv, C => clk1p25, Q => clk625k_unbuf);
   BUFG_clk20  : BUFG port map(I => clk20_unbuf, O => clk20);
   BUFG_clk2p5 : BUFG port map(I => clk2p5_unbuf, O => clk2p5);
+  BUFG_clk625k : BUFG port map(I => clk625k_unbuf, O => clk625k);
 
   -------------------------------------------------------------------------------------------
   -- Handle VME signals
@@ -533,10 +566,9 @@ begin
   end process;
 
   dcfeb_initjtag_dd <= or_reduce(dcfeb_done_pulse);
-  -- FIXME: temporarily using clk40 so I don't have to wait an eternity, 10kHz in realistic design
-  DS_DCFEB_INITJTAG    : DELAY_SIGNAL generic map(240) port map(DOUT => dcfeb_initjtag_d, CLK => CLK40, NCYCLES => 240, DIN => dcfeb_initjtag_dd);
-  -- FIXME: temporarily using clk40 so I don't have to wait an eternity, 625kHz in realistic design
-  PULSE_DCFEB_INITJTAG : NPULSE2FAST port map(DOUT => dcfeb_initjtag, CLK_DOUT => CLK40, RST => '0', NPULSE => 5, DIN => dcfeb_initjtag_d);
+  -- FIXME: currently doesn't do anything because state machine pulses dcfeb_done_pulse for 1 40 MHz clock cycle, 10kHz on real board
+  DS_DCFEB_INITJTAG    : DELAY_SIGNAL generic map(10) port map(DOUT => dcfeb_initjtag_d, CLK => clk625k, NCYCLES => 10, DIN => dcfeb_initjtag_dd);
+  PULSE_DCFEB_INITJTAG : NPULSE2FAST port map(DOUT => dcfeb_initjtag, CLK_DOUT => clk2p5, RST => '0', NPULSE => 5, DIN => dcfeb_initjtag_d);
 
   -------------------------------------------------------------------------------------------
   -- Handle Triggers
@@ -549,6 +581,10 @@ begin
   -------------------------------------------------------------------------------------------
   -- Handle Internal configuration signals
   -------------------------------------------------------------------------------------------
+  
+  --FIXME should change with bad_dcfeb_pulse and good_dcfeb_pulse, currently, KILL must be updated manually via VME command
+  change_reg_data <= x"0" & "000" & kill(9) & kill(8) & kill(7 downto 1);
+  change_reg_index <= NREGS;
 
   -------------------------------------------------------------------------------------------
   -- Handle reset signals
@@ -564,6 +600,17 @@ begin
   pon_rst_reg    <= pon_rst_reg(30 downto 0) & '0' when rising_edge(clk40) else
                     pon_rst_reg;
   pon_reset <= pon_rst_reg(31);
+  
+  -------------------------------------------------------------------------------------------
+  -- Debug
+  -------------------------------------------------------------------------------------------
+
+  DIAGOUT(8 downto 0) <= diagout_inner(8 downto 0);
+  DIAGOUT(9) <= reset;
+  DIAGOUT(10) <= RST;
+  DIAGOUT(11) <= fw_rst_reg(31);
+  DIAGOUT(12) <= pon_rst_reg(31);
+  DIAGOUT(17 downto 13) <= (others => '0');
 
   -------------------------------------------------------------------------------------------
   -- Handle data readout
@@ -587,7 +634,7 @@ begin
   -- Sub-modules
   -------------------------------------------------------------------------------------------
   
-  i_odmb_vme : ODMB_VME
+  MBV : ODMB_VME
     generic map (
       NCFEB => NCFEB
       )
@@ -649,17 +696,30 @@ begin
       TEST_LCT => test_lct,
       MASK_L1A => mask_l1a,
       MASK_PLS => mask_pls,
-      ODMB_CTRL => odmb_ctrl_reg,
+      ODMB_CAL => odmb_ctrl_reg(0),
+      MUX_DATA_PATH => odmb_ctrl_reg(7),
+      MUX_TRIGGER => odmb_ctrl_reg(9),
+      MUX_LVMB => odmb_ctrl_reg(10),
+      ODMB_PED => odmb_ctrl_reg(14 downto 13),
       ODMB_DATA => odmb_data,
       ODMB_DATA_SEL => odmb_data_sel,
 
       LCT_L1A_DLY => lct_l1a_dly,
+      CABLE_DLY => cable_dly,
+      OTMB_PUSH_DLY => open,
+      ALCT_PUSH_DLY => open,
+      BX_DLY => open,
       INJ_DLY => inj_dly, 
       EXT_DLY => ext_dly, 
-      CALLCT_DLY => callct_dly, 
-      CABLE_DLY => cable_dly,
+      CALLCT_DLY => callct_dly,
+      ODMB_ID => open,
+      NWORDS_DUMMY => open,
+      KILL => kill,
+      CRATEID => open,
+      CHANGE_REG_DATA => change_reg_data,
+      CHANGE_REG_INDEX => change_reg_index,
 
-      DIAGOUT  => DIAGOUT,
+      DIAGOUT  => diagout_inner,
       RST      => reset
       );
 

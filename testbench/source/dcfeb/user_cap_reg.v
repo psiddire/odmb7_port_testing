@@ -22,11 +22,12 @@
 // Additional Comments: 
 //
 //////////////////////////////////////////////////////////////////////////////////
-module user_cap_reg(DRCK, FSH, FCAP, SEL, TDI, SHIFT, CAPTURE, RST, PI, TDO);
+module user_cap_reg(TCK, DRCK_EN, FSH, FCAP, SEL, TDI, SHIFT, CAPTURE, RST, PI, TDO);
 
 parameter width = 8;
   
-    input DRCK;
+    input TCK;
+    input DRCK_EN;
     input FSH;
     input FCAP;
     input SEL;
@@ -41,9 +42,9 @@ parameter width = 8;
   wire ce;
   
   assign TDO     = ce & q[0];
-  assign ce      = SEL & (FSH & SHIFT | (FCAP & (CAPTURE | SHIFT)));
+  assign ce      = SEL & DRCK_EN & (FSH & SHIFT | (FCAP & (CAPTURE | SHIFT)));
   
-  always @(posedge DRCK or posedge RST) begin
+  always @(posedge TCK or posedge RST) begin
   if(RST)
 	   q <= {width{1'b0}};           // default
     else

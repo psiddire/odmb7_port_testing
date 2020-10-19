@@ -32,6 +32,10 @@ if { $argc != 1 } {
   #set_property -dict [list CONFIG.Memory_Type {Single_Port_ROM} CONFIG.Write_Width_A {12} CONFIG.Write_Depth_A {128} CONFIG.Enable_A {Always_Enabled} CONFIG.Register_PortA_Output_of_Memory_Primitives {false} CONFIG.Load_Init_File {true} CONFIG.Coe_File {../../../source/data/Input2.coe} CONFIG.Read_Width_A {12} CONFIG.Write_Width_B {12} CONFIG.Read_Width_B {12} CONFIG.Port_A_Write_Rate {0}] [get_ips lut_input2]
   #set_property -dict [list CONFIG.Write_Width_A {16} CONFIG.Write_Depth_A {8} CONFIG.Read_Width_A {16} CONFIG.Write_Width_B {16} CONFIG.Read_Width_B {16}] [get_ips lut_input2]
 
+  # Create VIO
+  create_ip -name vio -vendor xilinx.com -library ip -version 3.0 -module_name vio_input -dir ../ip/$FPGA_TYPE
+  set_property -dict [list CONFIG.C_PROBE_OUT3_WIDTH {16} CONFIG.C_PROBE_OUT2_WIDTH {16} CONFIG.C_NUM_PROBE_OUT {4} CONFIG.C_NUM_PROBE_IN {0} CONFIG.C_EN_PROBE_IN_ACTIVITY {0}] [get_ips vio_input]
+
   puts "\[Success\] Created ip for $FPGA_TYPE"
   close_project
 }
