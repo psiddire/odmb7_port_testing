@@ -57,7 +57,7 @@ entity ODMB_VME is
     VME_IACK_B    : in std_logic;
     VME_BERR_B    : in std_logic;
     VME_SYSFAIL_B : in std_logic;
-    VME_DTACK_B   : inout std_logic;
+    VME_DTACK_B   : out std_logic;
     VME_OE_B      : out std_logic;
     VME_DIR_B     : out std_logic;
 
@@ -417,8 +417,6 @@ begin
   idx_dev <= to_integer(unsigned(cmd_adrs_inner(15 downto 12)));
   VME_DATA_OUT <= outdata_dev(idx_dev);
 
-  --Handle DTACK
-  PULLUP_vme_dtack : PULLUP port map (O => VME_DTACK_B);
   VME_DTACK_B <= not or_reduce(dtack_dev);
   
   ----------------------------------
