@@ -10,3 +10,20 @@ testbench/tb_project/tb_project.sim
 #testbench/ip
 TestBench_odmb7
 
+testbench/ip/xcku040-ffva1156-2-e/lut_input1/
+!testbench/ip/xcku040-ffva1156-2-e/lut_input1/*xci
+
+testbench/ip/xcku040-ffva1156-2-e/lut_input2/
+!testbench/ip/xcku040-ffva1156-2-e/lut_input2/*xci
+
+testbench/ip/xcku040-ffva1156-2-e/ila/
+!testbench/ip/xcku040-ffva1156-2-e/ila/*xci
+
+testbench/ip/xcku040-ffva1156-2-e/clock_manager/
+!testbench/ip/xcku040-ffva1156-2-e/clock_manager/*xci
+
+testbench/ip/xcku040-ffva1156-2-e/clockManager/
+!testbench/ip/xcku040-ffva1156-2-e/clockManager/*xci
+
+testbench/ip/xcku040-ffva1156-2-e/ibert_odmb7_gth/
+!testbench/ip/xcku040-ffva1156-2-e/ibert_odmb7_gth/*xci
