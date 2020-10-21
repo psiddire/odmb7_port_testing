@@ -75,11 +75,15 @@ architecture VMECONFREGS_Arch of VMECONFREGS is
 
   constant cfg_reg_mask_we   : std_logic_vector(15 downto 0) := x"FDFF";
   constant const_reg_mask_we : std_logic_vector(15 downto 0) := x"FFE1";
-  constant cfg_reg_init : cfg_regs_array := (x"FFF0", x"FFF1", x"FFF2", x"FFF3",
-                                             x"FFF4", x"FFF5", x"FFF6", x"FFF7",
-                                             x"FFF8", FW_VERSION, x"FFFA", x"FFFB",
-                                             x"FFFC", x"FFFD", x"FFFE", x"FFFF");
-  constant const_reg_init : cfg_regs_array := (x"FFF0", FW_VERSION, FW_ID, FW_MONTH_DAY,
+--  constant cfg_reg_init : cfg_regs_array := (x"FFF0", x"FFF1", x"FFF2", x"FFF3",
+--                                             x"FFF4", x"FFF5", x"FFF6", x"FFF7",
+--                                             x"FFF8", FW_VERSION, x"FFFA", x"FFFB",
+--                                             x"FFFC", x"FFFD", x"FFFE", x"FFFF");
+                                               constant cfg_reg_init : cfg_regs_array := (x"5468", x"6973", x"2069", x"7320",
+                                                                                          x"6120", x"7465", x"7374", x"2066",
+                                                                                          x"6F72", x"2077", x"7269", x"7469",
+                                                                                          x"6E67", x"2050", x"524F", x"4D21");
+  constant const_reg_init : cfg_regs_array := (x"0D3B", FW_VERSION, FW_ID, FW_MONTH_DAY,
                                                FW_YEAR, x"FFF5", x"FFF6", x"FFF7",
                                                x"FFF8", x"FFF9", x"FFFA", x"FFFB",
                                                x"FFFC", x"FFFD", x"FFFE", x"FFFF");
@@ -143,7 +147,7 @@ begin
   -- Output for read commands (R 0x40YZ and R 0x4Y00) and output data to top level
   OUTDATA <= mask_vme(15 downto 0) when r_mask_vme = '1' else
              const_regs(const_reg_index) when do_const = '1' else
-             cfg_regs(cfg_reg_index) and cfg_reg_mask(cfg_reg_index);
+             cfg_regs(cfg_reg_index); -- and cfg_reg_mask(cfg_reg_index);
 
   QSPI_CFG_REGS   <= cfg_regs;
   QSPI_CONST_REGS <= const_regs;

@@ -22,7 +22,7 @@ entity QSPI_CTRL is
     READ_ADDR : in std_logic_vector(31 downto 0);
     WD_LIMIT : in std_logic_vector(31 downto 0);
     STARTADDR : in std_logic_vector(31 downto 0);
-    PAGECOUNT : in std_logic_vector(16 downto 0);
+    PAGECOUNT : in std_logic_vector(17 downto 0);
     SECTORCOUNT : in std_logic_vector(13 downto 0);
 
     WRITE_FIFO_IN : in std_logic_vector(15 downto 0);
@@ -46,7 +46,7 @@ architecture QSPI_CTRL_Arch of QSPI_CTRL is
     data_to_fifo : in std_logic_vector(31 downto 0); -- until sectorcountvalid, all hardcoded
     startaddr   : in std_logic_vector(31 downto 0);
     startaddrvalid   : in std_logic;
-    pagecount   : in std_logic_vector(16 downto 0);
+    pagecount   : in std_logic_vector(17 downto 0);
     pagecountvalid   : in std_logic;
     sectorcount : in std_logic_vector(13 downto 0);
     sectorcountvalid : in std_logic;
@@ -61,7 +61,7 @@ architecture QSPI_CTRL_Arch of QSPI_CTRL is
     ------------------------------------
     reset       : in  std_logic;
     read       : in std_logic;
-    write      : in std_logic;
+    --write      : in std_logic;
     erase     : in std_logic; 
     eraseing     : out std_logic; 
     erasedone     : out std_logic; 
@@ -86,10 +86,10 @@ architecture QSPI_CTRL_Arch of QSPI_CTRL is
     out_rd_rddata: out std_logic_vector(15 downto 0);
     out_rd_rddata_all: out std_logic_vector(15 downto 0);
     out_er_status: out std_logic_vector(1 downto 0);
-    out_wrfifo_rden: out std_logic;
-    out_wr_status : out std_logic_vector(3 downto 0);
-    out_fifo_rden : out std_logic;
-    out_fifodout : out std_logic_vector(63 downto 0)
+    out_wr_statusdatavalid: out std_logic;
+    out_wr_spistatus: out std_logic_vector(1 downto 0);
+    out_wrfifo_dout: out std_logic_vector(3 downto 0);
+    out_wrfifo_rden: out std_logic
   ); 
   end component spiflashprogrammer_test;
 
@@ -230,23 +230,28 @@ begin
       fifo_wren <= '0';
       load_data_cntr <= load_data_cntr;
       write_data <= write_data;
-      write_fifo_rd_en <= '0';
       start_write_prom_pulse <= start_write_prom_pulse;
       if (erasedone = '1') then
+        --enable 1 read so FIFO doesn't double first word?
+        write_fifo_rd_en <= '1';
         wr_prom_state <= S_READ_LOWER;
       else
+        write_fifo_rd_en <= '0';
         wr_prom_state <= S_WAIT_ERASE;
       end if;
     when S_READ_LOWER =>
       fifo_wren <= '0';
       load_data_cntr <= load_data_cntr;
-      write_data <= write_data(31 downto 16) & write_fifo_out;
+      --data is written in 4 bit chunks so we have to reverse words in 4 bit chunks
+      --write_data <= write_data(31 downto 16) & write_fifo_out(3 downto 0) & write_fifo_out(7 downto 4) & write_fifo_out(11 downto 8) & write_fifo_out(15 downto 12);
+      write_data <= write_fifo_out(15 downto 0) & write_data(15 downto 0);
       write_fifo_rd_en <= '1';
       start_write_prom_pulse <= start_write_prom_pulse;
       wr_prom_state <= S_READ_UPPER;
     when S_READ_UPPER =>
       fifo_wren <= '1';
-      write_data <= write_fifo_out & write_data(15 downto 0);
+      --write_data <= write_fifo_out(3 downto 0) & write_fifo_out(7 downto 4) & write_fifo_out(11 downto 8) & write_fifo_out(15 downto 12) & write_data(15 downto 0);
+      write_data <= write_data(31 downto 16) & write_fifo_out(15 downto 0);
       write_fifo_rd_en <= '1';
       --write at least 1 page for something to happen?
       if (load_data_cntr = x"80") then
@@ -343,17 +348,17 @@ begin
     writedone => open,
     reset => RST,
     read => start_read_pulse,
-    write => start_write_prom_pulse,
-    eraseing => DIAGOUT(8),
+    --write => start_write_prom_pulse,
+    eraseing => open,
     erasedone => erasedone,
     erase => start_erase_pulse,
     startwrite => open,
-    out_read_inprogress => DIAGOUT(9),
+    out_read_inprogress => open,
     out_rd_SpiCsB => open,
-    out_SpiCsB_N => DIAGOUT(0),
+    out_SpiCsB_N => DIAGOUT(10),
     out_read_start => controller_read_start,
-    out_SpiMosi => DIAGOUT(1),
-    out_SpiMiso => DIAGOUT(2),
+    out_SpiMosi => DIAGOUT(9),
+    out_SpiMiso => DIAGOUT(8),
     out_CmdSelect => open,
     in_CmdIndex => CMD_INDEX,
     in_rdAddr => READ_ADDR,
@@ -367,15 +372,15 @@ begin
     out_rd_rddata => spi_readdata,
     out_rd_rddata_all => open,
     out_er_status => open,
-    out_wrfifo_rden => open,
-    out_wr_status => DIAGOUT(7 downto 4),
-    out_fifo_rden => open,
-    out_fifodout => fifodout_inner
+    out_wr_statusdatavalid => open,
+    out_wr_spistatus => open,
+    out_wrfifo_dout => open,
+    out_wrfifo_rden => open
     );
     
   --debug
-  DIAGOUT(17 downto 10) <= fifodout_inner(7 downto 0);
-  
-  DIAGOUT(3) <= fifo_wren;
+  DIAGOUT(7 downto 0) <= write_fifo_out(7 downto 0);
+  DIAGOUT(16) <= write_fifo_rd_en;
+  DIAGOUT(17) <= START_WRITE;
   
 end QSPI_CTRL_Arch;

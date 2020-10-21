@@ -357,7 +357,7 @@ architecture Behavioral of ODMB_VME is
       QSPI_READ_ADDR       : out std_logic_vector(31 downto 0);
       QSPI_WD_LIMIT        : out std_logic_vector(31 downto 0);
       QSPI_STARTADDR       : out std_logic_vector(31 downto 0);
-      QSPI_PAGECOUNT       : out std_logic_vector(16 downto 0);
+      QSPI_PAGECOUNT       : out std_logic_vector(17 downto 0);
       QSPI_SECTORCOUNT     : out std_logic_vector(13 downto 0);
       QSPI_FIFO_OUT        : in std_logic_vector(15 downto 0);
       QSPI_FIFO_IN         : out std_logic_vector(15 downto 0);
@@ -413,7 +413,7 @@ architecture Behavioral of ODMB_VME is
     READ_ADDR : in std_logic_vector(31 downto 0);
     WD_LIMIT : in std_logic_vector(31 downto 0);
     STARTADDR : in std_logic_vector(31 downto 0);
-    PAGECOUNT : in std_logic_vector(16 downto 0);
+    PAGECOUNT : in std_logic_vector(17 downto 0);
     SECTORCOUNT : in std_logic_vector(13 downto 0);
     
     WRITE_FIFO_IN : in std_logic_vector(15 downto 0);
@@ -468,7 +468,7 @@ architecture Behavioral of ODMB_VME is
   signal qspi_cmd_index : std_logic_vector(3 downto 0) := x"0";
   signal qspi_read_addr, qspi_wd_limit, qspi_startaddr : std_logic_vector(31 downto 0) := x"00000000";
   signal qspi_sectorcount : std_logic_vector(13 downto 0) := (others => '0');
-  signal qspi_pagecount : std_logic_vector(16 downto 0) := (others => '0');
+  signal qspi_pagecount : std_logic_vector(17 downto 0) := (others => '0');
   signal qspi_fifo_out, qspi_write_fifo_in : std_logic_vector(15 downto 0) := x"0000";
 
 begin

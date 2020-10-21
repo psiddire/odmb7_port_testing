@@ -45,7 +45,7 @@ entity QSPI_DUMMY is
     QSPI_READ_ADDR       : out std_logic_vector(31 downto 0);
     QSPI_WD_LIMIT        : out std_logic_vector(31 downto 0);
     QSPI_STARTADDR       : out std_logic_vector(31 downto 0);
-    QSPI_PAGECOUNT       : out std_logic_vector(16 downto 0);
+    QSPI_PAGECOUNT       : out std_logic_vector(17 downto 0);
     QSPI_SECTORCOUNT     : out std_logic_vector(13 downto 0);
     QSPI_FIFO_OUT        : in std_logic_vector(15 downto 0);
     QSPI_FIFO_IN         : out std_logic_vector(15 downto 0);
@@ -106,10 +106,10 @@ begin
 
   --hardcode pages and sector
   QSPI_CMD_INDEX <= x"4"; --RDFR24QUAD
-  QSPI_READ_ADDR <= x"00F3E000";
+  QSPI_READ_ADDR <= x"003d5000";
   QSPI_WD_LIMIT <= x"00000010";
-  QSPI_STARTADDR <= x"00F3E000";
-  QSPI_PAGECOUNT <= x"0000" & "1";
+  QSPI_STARTADDR <= x"003d5000";
+  QSPI_PAGECOUNT <= x"0000" & "01";
   QSPI_SECTORCOUNT <= x"000" & "01";
   
   --temporary: separate erase PROM command for debugging
@@ -157,7 +157,7 @@ begin
       ul_cfg_reg_idx <= 0;
       --this takes long enough that we shouldn't double write
       if (do_cfg_download='1') then
-        dl_cfg_state <= S_ISSUE_INFO_2;
+        dl_cfg_state <= S_ISSUE_INFO_1;
       else
         dl_cfg_state <= S_IDLE;
       end if;
@@ -222,7 +222,7 @@ begin
   do_cfg_upload_q <= do_cfg_upload when rising_edge(SLOWCLK) else do_cfg_upload_q;
   do_cfg_upload_pulse <= do_cfg_upload and not do_cfg_upload_q;
   QSPI_START_READ <= do_cfg_upload_pulse; --start read from PROM as soon as we get the signal, but wait for a few (2.5MHz) cycles to read FIFO and wait until this is finished to start assigning registers
-  DS_FIFOREAD : DELAY_SIGNAL generic map (NCYCLES_MAX => 16) port map (DOUT => qspi_read_fifo_pulse, CLK => SLOWCLK, NCYCLES => 16, DIN => do_cfg_upload_pulse); 
+  DS_FIFOREAD : DELAY_SIGNAL generic map (NCYCLES_MAX => 64) port map (DOUT => qspi_read_fifo_pulse, CLK => SLOWCLK, NCYCLES => 64, DIN => do_cfg_upload_pulse); 
   DS_CFGULPULSEPRE : DELAY_SIGNAL generic map (NCYCLES_MAX => 34) port map (DOUT => cfg_ul_pulse_pre, CLK => SLOWCLK, NCYCLES => 34, DIN => qspi_read_fifo_pulse); 
 
   --pulse QSPI_START_READ_FIFO and assign cfg_reg_hardcode based on QSPI_FIFO_OUT
