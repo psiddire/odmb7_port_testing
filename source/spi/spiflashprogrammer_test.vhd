@@ -53,6 +53,7 @@ entity spiflashprogrammer_test is
     ----------------------------------
     reset         : in std_logic;
     read         : in std_logic;
+    readdone     : out std_logic;
     erase        : in std_logic;
     eraseing      : out std_logic;
     erasedone      : out std_logic;
@@ -191,8 +192,10 @@ END COMPONENT;
       ------- read ----------------------------
    signal rd_SpiCsB       : std_logic;
    signal read_start     : std_logic := '0';
+   signal read_done      : std_logic := '1';
    signal rd_data_valid       : std_logic := '0';
    signal rd_data_valid_cntr       : std_logic_vector(3 downto 0) := "0000";
+   signal rd_current_sector_addr   : std_logic_vector(31 downto 0) := X"00000000"; -- start addr of current sector
    -- count 1 page for now
    signal rd_nword_limit       : std_logic_vector(31 downto 0) := x"00000000";
    signal rd_nword_cntr       : std_logic_vector(31 downto 0) := x"00000000";
@@ -389,6 +392,7 @@ writeFIFO_i : writeSpiFIFO
     rd_rst_busy => open 
   );
 -----------------------------  pass output signals  --------------------------------------------------
+    readdone                <= read_done;
     out_read_inprogress     <= read_inprogress; 
     out_rd_SpiCsB           <= rd_SpiCsB;
     out_SpiCsB_N            <= SpiCsB_N; 
@@ -419,8 +423,6 @@ writeFIFO_i : writeSpiFIFO
                CmdRDFlashPara   when CmdIndex = x"3" else
                CmdRDFR24Quad    when CmdIndex = x"4" else
                x"FF";
-               
-  rd_nword_limit(31 downto 0) <= in_wdlimit(31 downto 0); 
 
 -----------------------------  read sectors  --------------------------------------------------
 processread : process (Clk)
@@ -429,9 +431,11 @@ processread : process (Clk)
   case rdstate is 
    when S_RD_IDLE =>
         rd_SpiCsB <= '1';
+        if (startaddrvalid = '1') then rd_current_sector_addr <= startaddr; end if;  -- no sync required. lots of time spent in _top
         if (read_start = '1') then  -- one shot based on I/F erase -> synced_erase input going high e.g. "if rising edge erase"
           rd_data_valid_cntr <= "0000";
           rd_cmdcounter32 <= "100111";  -- 32 bit command (cmd + addr = 40 bits)
+          rd_nword_limit(31 downto 0) <= in_wdlimit(31 downto 0); 
           rd_rddata <= x"0000";
           rd_rddata_all <= x"0000";
           --rd_cmdreg32 <=  CmdSelect & X"00000000";  
@@ -440,6 +444,7 @@ processread : process (Clk)
           rd_cmdreg32 <=  CmdWE & X"00000000";  -- Write Enable
           read_inprogress <= '1';
           rdstate <= S_RD_S4BMode_ASSCS1;
+          read_done <= '0';
          end if;
                        
 -----------------   Set 4 Byte mode first -----------------------------------------------------
@@ -469,7 +474,8 @@ processread : process (Clk)
           --rd_cmdcounter32 <= "100111";  -- 32 bit command
           --rd_cmdcounter32 <= "110001";  -- 32 bit address + 8 bit command + 5 bit wait
           rd_cmdcounter32 <= "110000";  -- 32 bit address + 8 bit command + 5 bit wait
-          rd_cmdreg32 <=  CmdSelect & in_rdAddr;  
+          --rd_cmdreg32 <=  CmdSelect & in_rdAddr;
+          rd_cmdreg32 <=  CmdSelect & rd_current_sector_addr;  
           rdstate <= S_RD_CS1;  
         end if;  
 -------------------------  end set 4 byte Mode
@@ -521,6 +527,7 @@ processread : process (Clk)
         else 
           rd_SpiCsB <= '1';   -- turn off SPI 
           read_inprogress <= '0';
+          read_done <= '1';
           rdstate <= S_RD_IDLE;  
         end if; 
    end case;  

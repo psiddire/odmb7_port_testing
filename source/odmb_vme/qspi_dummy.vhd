@@ -7,7 +7,7 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.ucsb_types.all;
 
-entity QSPI_DUMMY is
+entity SPI_PORT is
   generic (
     NREGS  : integer := 16
     );
@@ -36,6 +36,10 @@ entity QSPI_DUMMY is
     QSPI_CFG_REGS         : in cfg_regs_array;
     QSPI_CONST_REGS       : in cfg_regs_array;
     --signals to/from QSPI_CTRL
+    SPI_CMD_FIFO_WRITE_EN     : out std_logic;
+    SPI_CMD_FIFO_IN           : out std_logic_vector(15 downto 0);
+    SPI_READBACK_FIFO_OUT     : in std_logic_vector(15 downto 0);
+    SPI_READBACK_FIFO_READ_EN : out std_logic;
     QSPI_START_INFO      : out std_logic;
     QSPI_START_WRITE     : out std_logic;
     QSPI_START_ERASE     : out std_logic;
@@ -51,9 +55,9 @@ entity QSPI_DUMMY is
     QSPI_FIFO_IN         : out std_logic_vector(15 downto 0);
     QSPI_WRITE_FIFO_EN   : out std_logic
     );
-end QSPI_DUMMY;
+end SPI_PORT;
 
-architecture QSPI_DUMMY_Arch of QSPI_DUMMY is
+architecture SPI_PORT_Arch of SPI_PORT is
 
   signal cfg_reg_hardcode : cfg_regs_array := (x"0019", x"FFF1", x"0001", x"FFF3",
                                                  x"0008", x"0008", x"0004", x"0000",
@@ -87,9 +91,16 @@ architecture QSPI_DUMMY_Arch of QSPI_DUMMY is
   signal er_cfg_state : er_cfg_states := S_IDLE;
   signal qspi_start_info_inner1, qspi_start_info_inner2, qspi_start_erase_inner1, qspi_start_erase_inner2 : std_logic := '0';
   
+  --SPI command command signals
+  signal strobe_q, strobe_pulse : std_logic := '0';
+  
+  --SPI read signals
+  signal spi_read_data : std_logic_vector(15 downto 0) := x"0000";
+  signal readback_fifo_en : std_logic := '0';
+  
   --command parsing signals
   signal cmddev : std_logic_vector(15 downto 0) := x"0000";
-  signal do_cfg_upload, do_cfg_download, do_cfg_erase : std_logic := '0';
+  signal do_cfg_upload, do_cfg_download, do_cfg_erase, do_spi_cmd, do_spi_read : std_logic := '0';
   
   --dtack signals
   signal ce_d_dtack, d_dtack, q_dtack : std_logic := '0';
@@ -99,10 +110,34 @@ begin
   --Decode command
   cmddev    <= "000" & DEVICE & COMMAND & "00";
 
-  do_cfg_download <= '1' when (cmddev=x"1000" and strobe='1') else '0'; --0x6000
-  do_cfg_upload <= '1' when (cmddev=x"1004" and strobe='1') else '0'; --0x6004
+  do_cfg_download <= '1' when (cmddev=x"1000" and STROBE='1') else '0'; --0x6000
+  do_cfg_upload <= '1' when (cmddev=x"1004" and STROBE='1') else '0'; --0x6004
   --temp command for debugging
-  do_cfg_erase <= '1' when (cmddev=x"1008" and strobe='1') else '0';
+  do_cfg_erase <= '1' when (cmddev=x"1008" and STROBE='1') else '0';
+  do_spi_cmd <= '1' when (cmddev=x"102C") else '0';
+  do_spi_read <= '1' when (cmddev=x"1030") else '0';
+  
+  --handle SPI command command
+  strobe_q <= STROBE when rising_edge(SLOWCLK);
+  strobe_pulse <= strobe and not strobe_q;
+  SPI_CMD_FIFO_WRITE_EN <= do_spi_cmd and strobe_pulse;
+  SPI_CMD_FIFO_IN <= INDATA;
+  
+  --handle SPI read command
+  SPI_READBACK_FIFO_READ_EN <= readback_fifo_en;
+  OUTDATA <= spi_read_data; --currently the only output in this module, will fix later
+  spi_read_proc : process (SLOWCLK)
+  begin
+  if rising_edge(SLOWCLK) then
+    if (do_spi_read='1' and strobe_pulse='1') then
+      spi_read_data <= SPI_READBACK_FIFO_OUT;
+      readback_fifo_en <= '1';
+    else
+      spi_read_data <= spi_read_data;
+      readback_fifo_en <= '0';
+    end if;
+  end if;
+  end process;
 
   --hardcode pages and sector
   QSPI_CMD_INDEX <= x"4"; --RDFR24QUAD
@@ -313,4 +348,4 @@ begin
   FD_Q_DTACK : FD port map(Q => q_dtack, C => SLOWCLK, D => d_dtack);
   DTACK    <= q_dtack;
 
-end QSPI_DUMMY_Arch;
+end SPI_PORT_Arch;

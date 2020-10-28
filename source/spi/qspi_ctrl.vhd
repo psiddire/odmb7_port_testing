@@ -6,11 +6,18 @@ use ieee.numeric_std.all;
 use work.ucsb_types.all;
 use unisim.vcomponents.all;
 
-entity QSPI_CTRL is
+entity SPI_CTRL is
   port (
     
     CLK40   : in std_logic;
+    CLK2P5  : in std_logic;
     RST     : in std_logic;
+    
+    CMD_FIFO_IN : in std_logic_vector(15 downto 0);
+    CMD_FIFO_WRITE_EN : in std_logic;
+    
+    READBACK_FIFO_OUT : out std_logic_vector(15 downto 0);
+    READBACK_FIFO_READ_EN : in std_logic;
 
     START_READ : in std_logic;
     START_INFO : in std_logic; --pulse to load startaddr, sectorcount, and pagecount
@@ -32,10 +39,10 @@ entity QSPI_CTRL is
     DIAGOUT : out std_logic_vector(17 downto 0)
 
     );
-end QSPI_CTRL;
+end SPI_CTRL;
 
 
-architecture QSPI_CTRL_Arch of QSPI_CTRL is
+architecture SPI_CTRL_Arch of SPI_CTRL is
 
   component spiflashprogrammer_test is
   port
@@ -61,6 +68,7 @@ architecture QSPI_CTRL_Arch of QSPI_CTRL is
     ------------------------------------
     reset       : in  std_logic;
     read       : in std_logic;
+    readdone   : out std_logic;
     --write      : in std_logic;
     erase     : in std_logic; 
     eraseing     : out std_logic; 
@@ -92,6 +100,23 @@ architecture QSPI_CTRL_Arch of QSPI_CTRL is
     out_wrfifo_rden: out std_logic
   ); 
   end component spiflashprogrammer_test;
+  
+  component spi_cmd_fifo
+    port (
+      srst : IN STD_LOGIC;
+      wr_clk : IN STD_LOGIC;
+      rd_clk : IN STD_LOGIC;
+      din : IN STD_LOGIC_VECTOR(15 DOWNTO 0);
+      wr_en : IN STD_LOGIC;
+      rd_en : IN STD_LOGIC;
+      dout : OUT STD_LOGIC_VECTOR(15 DOWNTO 0);
+      full : OUT STD_LOGIC;
+      empty : OUT STD_LOGIC;
+      --prog_full : OUT STD_LOGIC;
+      wr_rst_busy : OUT STD_LOGIC;
+      rd_rst_busy : OUT STD_LOGIC
+      );
+    end component;
 
   component spi_readback_fifo
   port (
@@ -109,6 +134,22 @@ architecture QSPI_CTRL_Arch of QSPI_CTRL is
     rd_rst_busy : OUT STD_LOGIC
     );
   end component;
+
+  --CMD FIFO signals
+  signal cmd_fifo_empty : std_logic := '1';
+  signal cmd_fifo_read_en : std_logic := '0';
+  signal cmd_fifo_out : std_logic_vector(15 downto 0) := x"0000";
+  signal prom_addr : std_logic_vector(31 downto 0) := x"00000000";
+  signal prom_load_addr : std_logic := '0';
+  signal temp_pagecount : std_logic_vector(17 downto 0) := x"0000" & "01";
+  signal temp_sectorcount : std_logic_vector(13 downto 0) := x"000" & "01";
+  signal temp_cmdindex : std_logic_vector(3 downto 0) := x"4"; --RDFR24QUAD
+  signal read_nwords : std_logic_vector(31 downto 0) := (others => '0');
+  type cmd_fifo_states is (S_IDLE, S_LOAD_ADDR_LOWER, S_LOAD_ADDR_WAIT, S_READ_LOW, S_WAIT_READ, S_WRITE);
+  signal cmd_fifo_state : cmd_fifo_states := S_IDLE;
+  
+  signal prom_read_en : std_logic := '0';
+  signal read_done : std_logic := '0';
 
   --INFO signals
   signal start_info_en : std_logic := '0';
@@ -156,6 +197,89 @@ architecture QSPI_CTRL_Arch of QSPI_CTRL is
 
 begin
 
+  --Handle outside signals coming to command FIFO
+  spi_cmd_fifo_i : spi_cmd_fifo
+      PORT MAP (
+        srst => RST,
+        wr_clk => CLK2P5,
+        rd_clk => CLK40,
+        din => CMD_FIFO_IN,
+        wr_en => CMD_FIFO_WRITE_EN,
+        rd_en => cmd_fifo_read_en,
+        dout => cmd_fifo_out,
+        full => open,
+        empty => cmd_fifo_empty,
+        wr_rst_busy => open,
+        rd_rst_busy => open
+      );
+
+  --FSM to handle command FIFO
+  process_cmd_fifo : process(CLK40)
+  begin
+  if (rising_edge(CLK40)) then
+    case cmd_fifo_state is
+    
+    when S_IDLE =>
+      prom_load_addr <= '0';
+      if (cmd_fifo_empty='0') then
+        --command to be processed, interpret OPCODE
+        cmd_fifo_read_en <= '1';
+        case "000" & cmd_fifo_out(4 downto 0) is
+        when x"17" =>
+          --load address
+          prom_addr(31 downto 16) <= "00000" & cmd_fifo_out(15 downto 5);
+          cmd_fifo_state <= S_LOAD_ADDR_WAIT;
+        when x"04" =>
+          --read n
+          read_nwords <= x"00000" & "0" & cmd_fifo_out(15 downto 5);
+          prom_read_en <= '1';
+          cmd_fifo_state <= S_READ_LOW;
+        when others =>
+          --unknown command, skip
+          cmd_fifo_state <= S_IDLE;
+        end case;
+      else
+        cmd_fifo_read_en <= '0';
+        cmd_fifo_state <= S_IDLE;
+      end if;
+      
+    when S_LOAD_ADDR_WAIT => 
+      --need to wait because empty takes an extra cycle to go low?
+      cmd_fifo_read_en <= '0';
+      cmd_fifo_state <= S_LOAD_ADDR_LOWER;
+      
+    when S_LOAD_ADDR_LOWER =>
+      if (cmd_fifo_empty='0') then
+        cmd_fifo_read_en <= '1';
+        prom_addr(15 downto 0) <= cmd_fifo_out;
+        prom_load_addr <= '1';
+        cmd_fifo_state <= S_IDLE;
+      else
+        cmd_fifo_read_en <= '0';     
+        cmd_fifo_state <= S_LOAD_ADDR_LOWER;
+      end if;
+      
+    when S_READ_LOW => 
+      prom_read_en <= '0';
+      cmd_fifo_read_en <= '0';
+      cmd_fifo_state <= S_WAIT_READ;
+      
+    when S_WAIT_READ =>
+      cmd_fifo_read_en <= '0';
+      if (read_done='1') then
+        cmd_fifo_state <= S_IDLE;
+      else 
+        cmd_fifo_state <= S_WAIT_READ;
+      end if;
+    
+    when others =>
+      --unimplemented state
+      cmd_fifo_read_en <= '0';
+      cmd_fifo_state <= S_IDLE;
+    end case;
+  end if;
+  end process;
+
   --when START_INFO received, turn on startaddrvalid, sectorcountvalid, and pagecountvalid for 10 clock cycles
   process_info : process(CLK40)
   begin
@@ -191,21 +315,21 @@ begin
   --when WRITE_FIFO_EN is pulsed, write to input fifo
   write_fifo_en_q <= WRITE_FIFO_EN when rising_edge(CLK40) else write_fifo_en_q;
   write_fifo_en_pulse <= WRITE_FIFO_EN and not write_fifo_en_q;
-  spi_write_fifo_i : spi_readback_fifo
-     PORT MAP (
-        srst => RST,
-        wr_clk => CLK40,
-        rd_clk => CLK40,
-        din => WRITE_FIFO_IN,
-        wr_en => write_fifo_en_pulse,
-        rd_en => write_fifo_rd_en,
-        dout => write_fifo_out,
-        full => open,
-        empty => open,
-        --prog_full => rd_fifo_prog_full,
-        wr_rst_busy => open,
-        rd_rst_busy => open
-      );
+--  spi_write_fifo_i : spi_readback_fifo
+--     PORT MAP (
+--        srst => RST,
+--        wr_clk => CLK40,
+--        rd_clk => CLK40,
+--        din => WRITE_FIFO_IN,
+--        wr_en => write_fifo_en_pulse,
+--        rd_en => write_fifo_rd_en,
+--        dout => write_fifo_out,
+--        full => open,
+--        empty => open,
+--        --prog_full => rd_fifo_prog_full,
+--        wr_rst_busy => open,
+--        rd_rst_busy => open
+--      );
   
 
   --when START_WRITE received, start writing from FIFO
@@ -310,11 +434,11 @@ begin
       PORT MAP (
         srst => RST,
         wr_clk => CLK40,
-        rd_clk => CLK40,
+        rd_clk => CLK2P5,
         din => spi_readdata,
         wr_en => readback_fifo_wr_en,
-        rd_en => readback_fifo_rd_en,
-        dout => FIFO_OUT,
+        rd_en => READBACK_FIFO_READ_EN,
+        dout => READBACK_FIFO_OUT,
         full => open,
         empty => open,
         --prog_full => rd_fifo_prog_full,
@@ -333,12 +457,12 @@ begin
     clk => CLK40,
     fifoclk => CLK40, --drck,
     data_to_fifo => write_data,
-    startaddr => STARTADDR,
-    startaddrvalid => startaddrvalid,
-    pagecount => PAGECOUNT,
-    pagecountvalid => pagecountvalid,
-    sectorcount => SECTORCOUNT,
-    sectorcountvalid => sectorcountvalid,
+    startaddr => prom_addr,
+    startaddrvalid => prom_load_addr,
+    pagecount => temp_pagecount,
+    pagecountvalid => prom_load_addr,
+    sectorcount => temp_sectorcount,
+    sectorcountvalid => prom_load_addr,
     fifowren => fifo_wren,
     fifofull => open,
     fifoempty => open,
@@ -347,7 +471,8 @@ begin
     fiforderr => open,
     writedone => open,
     reset => RST,
-    read => start_read_pulse,
+    read => prom_read_en,
+    readdone => read_done,
     --write => start_write_prom_pulse,
     eraseing => open,
     erasedone => erasedone,
@@ -355,14 +480,14 @@ begin
     startwrite => open,
     out_read_inprogress => open,
     out_rd_SpiCsB => open,
-    out_SpiCsB_N => DIAGOUT(10),
+    out_SpiCsB_N => DIAGOUT(2),
     out_read_start => controller_read_start,
-    out_SpiMosi => DIAGOUT(9),
-    out_SpiMiso => DIAGOUT(8),
+    out_SpiMosi => DIAGOUT(1),
+    out_SpiMiso => DIAGOUT(0),
     out_CmdSelect => open,
-    in_CmdIndex => CMD_INDEX,
+    in_CmdIndex => temp_cmdindex,
     in_rdAddr => READ_ADDR,
-    in_wdlimit => WD_LIMIT,
+    in_wdlimit => read_nwords,
     out_SpiCsB_FFDin => open,
     out_rd_data_valid_cntr => open,
     out_rd_data_valid => rd_data_valid,
@@ -379,8 +504,13 @@ begin
     );
     
   --debug
-  DIAGOUT(7 downto 0) <= write_fifo_out(7 downto 0);
+  DIAGOUT(10 downto 3) <= read_nwords(11 downto 4);
+  DIAGOUT(11) <= cmd_fifo_empty;
+  DIAGOUT(12) <= controller_read_start;
+  DIAGOUT(13) <= prom_read_en;
+  DIAGOUT(14) <= prom_read_en;
+  DIAGOUT(15) <= READBACK_FIFO_READ_EN;
   DIAGOUT(16) <= write_fifo_rd_en;
   DIAGOUT(17) <= START_WRITE;
   
-end QSPI_CTRL_Arch;
+end SPI_CTRL_Arch;

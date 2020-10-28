@@ -67,6 +67,7 @@ entity ODMB7_UCSB_DEV is
     L1A_N          : out std_logic;                        -- Bank 66, ODMB CTRL
     L1A_MATCH_P    : out std_logic_vector(NCFEB downto 1); -- Bank 66, ODMB CTRL
     L1A_MATCH_N    : out std_logic_vector(NCFEB downto 1); -- Bank 66, ODMB CTRL
+    PPIB_OUT_EN_B  : out std_logic;                        -- Bank 68
 
     LVMB_PON   : out std_logic_vector(7 downto 0);
     PON_LOAD   : out std_logic;
@@ -438,6 +439,7 @@ begin
   -- Handle PPIB/DCFEB signals
   -------------------------------------------------------------------------------------------
 
+  PPIB_OUT_EN_B <= '0';
   -- Handle DCFEB I/O buffers
   -- OB_DCFEB_TMS: OBUFTDS port map (I => dcfeb_tms, O => DCFEB_TMS_P, OB => DCFEB_TMS_N, T => dcfeb_tms_t);
   -- FIXME: KCU only: on KCU, just use P lines as signals

@@ -576,6 +576,7 @@ begin
     L1A_N           => l1a_n,
     L1A_MATCH_P     => l1a_match_p,
     L1A_MATCH_N     => l1a_match_n,
+    PPIB_OUT_EN_B   => open,
     LVMB_PON        => lvmb_pon,
     PON_LOAD        => pon_load,
     PON_OE_B        => pon_oe_B,

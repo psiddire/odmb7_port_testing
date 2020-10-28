@@ -319,7 +319,7 @@ architecture Behavioral of ODMB_VME is
       );
   end component;
   
-  component QSPI_DUMMY is
+  component SPI_PORT is
     generic (
       NREGS  : integer := 16
       );
@@ -348,6 +348,10 @@ architecture Behavioral of ODMB_VME is
       QSPI_CFG_REGS         : in cfg_regs_array;
       QSPI_CONST_REGS       : in cfg_regs_array;
       --signals to/from QSPI_CTRL
+      SPI_CMD_FIFO_WRITE_EN : out std_logic;
+      SPI_CMD_FIFO_IN      : out std_logic_vector(15 downto 0);
+      SPI_READBACK_FIFO_OUT     : in std_logic_vector(15 downto 0);
+      SPI_READBACK_FIFO_READ_EN : out std_logic;
       QSPI_START_INFO      : out std_logic;
       QSPI_START_WRITE     : out std_logic;
       QSPI_START_ERASE     : out std_logic;
@@ -397,11 +401,17 @@ architecture Behavioral of ODMB_VME is
       );
   end component;
   
-  component QSPI_CTRL is
+  component SPI_CTRL is
   port (
       
     CLK40   : in std_logic;
+    CLK2P5  : in std_logic;
     RST     : in std_logic;
+    
+    CMD_FIFO_IN : in std_logic_vector(15 downto 0);
+    CMD_FIFO_WRITE_EN : in std_logic;
+    READBACK_FIFO_OUT : out std_logic_vector(15 downto 0);
+    READBACK_FIFO_READ_EN : in std_logic;
   
     START_READ : in std_logic;
     START_INFO : in std_logic; --pulse to load startaddr, sectorcount, and pagecount
@@ -453,6 +463,10 @@ architecture Behavioral of ODMB_VME is
   signal qspi_cfg_dl_pulse_inner : std_logic := '0';
   signal qspi_const_ul_pulse_inner : std_logic := '0';
   signal qspi_const_dl_pulse_inner : std_logic := '0';
+  signal spi_cmd_fifo_write_en : std_logic := '0';
+  signal spi_cmd_fifo_in : std_logic_vector(15 downto 0) := (others => '0');
+  signal spi_readback_fifo_read_en : std_logic := '0';
+  signal spi_readback_fifo_out : std_logic_vector(15 downto 0) := (others => '0');
   signal qspi_reg_in : std_logic_vector(15 downto 0) := (others => '0');
   signal qspi_cfg_busy : std_logic := '0';
   signal qspi_const_busy : std_logic := '0';
@@ -627,7 +641,7 @@ begin
         QSPI_CFG_REGS    => cfg_regs_inner
       );      
       
-      DEV6_QSPI_DUMMY_I : QSPI_DUMMY
+      DEV6_SPI_PORT_I : SPI_PORT
       generic map (NREGS => NREGS)
       port map (
         SLOWCLK => CLK2P5,
@@ -651,6 +665,10 @@ begin
         QSPI_CFG_REG_WE   => qspi_cfg_reg_we,
         QSPI_CFG_REGS => cfg_regs_inner,
         QSPI_CONST_REGS => const_regs_inner,
+        SPI_CMD_FIFO_WRITE_EN => spi_cmd_fifo_write_en,
+        SPI_CMD_FIFO_IN => spi_cmd_fifo_in,
+        SPI_READBACK_FIFO_OUT => spi_readback_fifo_out,
+        SPI_READBACK_FIFO_READ_EN => spi_readback_fifo_read_en,
         QSPI_START_INFO => qspi_start_info,
         QSPI_START_WRITE => qspi_start_write,
         QSPI_START_ERASE => qspi_start_erase,
@@ -693,10 +711,15 @@ begin
       LED     => led_command
       );
      
-  QSPI_CTRL_I : QSPI_CTRL 
+  SPI_CTRL_I : SPI_CTRL 
     port map (
       CLK40 => CLK40,
+      CLK2P5 => CLK2P5,
       RST => RST,
+      CMD_FIFO_IN => spi_cmd_fifo_in,
+      CMD_FIFO_WRITE_EN => spi_cmd_fifo_write_en,
+      READBACK_FIFO_OUT => spi_readback_fifo_out,
+      READBACK_FIFO_READ_EN => spi_readback_fifo_read_en,
       START_READ => qspi_start_read,
       START_INFO => qspi_start_info,
       START_WRITE => qspi_start_write,

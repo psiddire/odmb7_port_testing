@@ -37,9 +37,13 @@ if { $argc != 1 } {
   set_property -dict [list CONFIG.C_PROBE_OUT3_WIDTH {16} CONFIG.C_PROBE_OUT2_WIDTH {16} CONFIG.C_NUM_PROBE_OUT {4} CONFIG.C_NUM_PROBE_IN {0} CONFIG.C_EN_PROBE_IN_ACTIVITY {0}] [get_ips vio_input]
 
   #ODMB IP cores
+  #create spi_cmd_fifo
+  create_ip -name fifo_generator -vendor xilinx.com -library ip -version 13.1 -module_name spi_cmd_fifo -dir ../ip/$FPGA_TYPE
+set_property -dict [list CONFIG.Fifo_Implementation {Independent_Clocks_Builtin_FIFO} CONFIG.Performance_Options {First_Word_Fall_Through} CONFIG.Input_Data_Width {16} CONFIG.Read_Clock_Frequency {40} CONFIG.Write_Clock_Frequency {2} CONFIG.Output_Data_Width {16} CONFIG.Empty_Threshold_Assert_Value {6} CONFIG.Empty_Threshold_Negate_Value {7}] [get_ips spi_cmd_fifo]
+
   # Create spi_readback_fifo
   create_ip -name fifo_generator -vendor xilinx.com -library ip -version 13.1 -module_name spi_readback_fifo -dir ../ip/$FPGA_TYPE
-  set_property -dict [list CONFIG.Fifo_Implementation {Independent_Clocks_Builtin_FIFO} CONFIG.Input_Data_Width {16} CONFIG.Input_Depth {512} CONFIG.Read_Clock_Frequency {40} CONFIG.Write_Clock_Frequency {40} CONFIG.Output_Data_Width {16} CONFIG.Output_Depth {512} CONFIG.Data_Count_Width {9} CONFIG.Write_Data_Count_Width {9} CONFIG.Read_Data_Count_Width {9} CONFIG.Full_Threshold_Assert_Value {511} CONFIG.Full_Threshold_Negate_Value {510} CONFIG.Performance_Options {First_Word_Fall_Through} CONFIG.Empty_Threshold_Assert_Value {6} CONFIG.Empty_Threshold_Negate_Value {7}] [get_ips spi_readback_fifo]
+  set_property -dict [list CONFIG.Fifo_Implementation {Independent_Clocks_Builtin_FIFO} CONFIG.Input_Data_Width {16} CONFIG.Input_Depth {512} CONFIG.Read_Clock_Frequency {2} CONFIG.Write_Clock_Frequency {40} CONFIG.Output_Data_Width {16} CONFIG.Output_Depth {512} CONFIG.Data_Count_Width {9} CONFIG.Write_Data_Count_Width {9} CONFIG.Read_Data_Count_Width {9} CONFIG.Full_Threshold_Assert_Value {511} CONFIG.Full_Threshold_Negate_Value {510} CONFIG.Performance_Options {First_Word_Fall_Through} CONFIG.Empty_Threshold_Assert_Value {6} CONFIG.Empty_Threshold_Negate_Value {7}] [get_ips spi_readback_fifo]
 
   #create writeSpiFIFO
   create_ip -name fifo_generator -vendor xilinx.com -library ip -version 13.1 -module_name writeSpiFIFO -dir ../ip/$FPGA_TYPE
