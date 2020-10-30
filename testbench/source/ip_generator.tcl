@@ -47,7 +47,7 @@ set_property -dict [list CONFIG.Fifo_Implementation {Independent_Clocks_Builtin_
 
   #create writeSpiFIFO
   create_ip -name fifo_generator -vendor xilinx.com -library ip -version 13.1 -module_name writeSpiFIFO -dir ../ip/$FPGA_TYPE
-  set_property -dict [list CONFIG.Fifo_Implementation {Independent_Clocks_Builtin_FIFO} CONFIG.Performance_Options {First_Word_Fall_Through} CONFIG.asymmetric_port_width {true} CONFIG.Input_Data_Width {32} CONFIG.Read_Clock_Frequency {40} CONFIG.Write_Clock_Frequency {40} CONFIG.Programmable_Full_Type {Single_Programmable_Full_Threshold_Constant} CONFIG.Full_Threshold_Assert_Value {64} CONFIG.Output_Data_Width {4} CONFIG.Output_Depth {8192} CONFIG.Read_Data_Count_Width {13} CONFIG.Full_Threshold_Negate_Value {63} CONFIG.Empty_Threshold_Assert_Value {4} CONFIG.Empty_Threshold_Negate_Value {5}] [get_ips writeSpiFIFO]
+  set_property -dict [list CONFIG.Fifo_Implementation {Independent_Clocks_Builtin_FIFO} CONFIG.Performance_Options {First_Word_Fall_Through} CONFIG.asymmetric_port_width {true} CONFIG.Input_Data_Width {16} CONFIG.Read_Clock_Frequency {40} CONFIG.Write_Clock_Frequency {40} CONFIG.Programmable_Full_Type {Single_Programmable_Full_Threshold_Constant} CONFIG.Full_Threshold_Assert_Value {64} CONFIG.Output_Data_Width {4} CONFIG.Output_Depth {8192} CONFIG.Read_Data_Count_Width {13} CONFIG.Full_Threshold_Negate_Value {63} CONFIG.Empty_Threshold_Assert_Value {4} CONFIG.Empty_Threshold_Negate_Value {5}] [get_ips writeSpiFIFO]
 
   puts "\[Success\] Created ip for $FPGA_TYPE"
   close_project

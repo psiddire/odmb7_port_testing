@@ -412,23 +412,6 @@ architecture Behavioral of ODMB_VME is
     CMD_FIFO_WRITE_EN : in std_logic;
     READBACK_FIFO_OUT : out std_logic_vector(15 downto 0);
     READBACK_FIFO_READ_EN : in std_logic;
-  
-    START_READ : in std_logic;
-    START_INFO : in std_logic; --pulse to load startaddr, sectorcount, and pagecount
-    START_WRITE : in std_logic; --pulse to write data to PROM
-    START_ERASE : in std_logic;
-    START_READ_FIFO : in std_logic; --pulse to read one word from FIFO
-      
-    CMD_INDEX : in std_logic_vector(3 downto 0);
-    READ_ADDR : in std_logic_vector(31 downto 0);
-    WD_LIMIT : in std_logic_vector(31 downto 0);
-    STARTADDR : in std_logic_vector(31 downto 0);
-    PAGECOUNT : in std_logic_vector(17 downto 0);
-    SECTORCOUNT : in std_logic_vector(13 downto 0);
-    
-    WRITE_FIFO_IN : in std_logic_vector(15 downto 0);
-    WRITE_FIFO_EN : in std_Logic;
-    FIFO_OUT : out std_logic_vector(15 downto 0);
       
     DIAGOUT : out std_logic_vector(17 downto 0)
     );
@@ -720,20 +703,6 @@ begin
       CMD_FIFO_WRITE_EN => spi_cmd_fifo_write_en,
       READBACK_FIFO_OUT => spi_readback_fifo_out,
       READBACK_FIFO_READ_EN => spi_readback_fifo_read_en,
-      START_READ => qspi_start_read,
-      START_INFO => qspi_start_info,
-      START_WRITE => qspi_start_write,
-      START_ERASE => qspi_start_erase,
-      START_READ_FIFO => qspi_start_read_fifo,
-      CMD_INDEX => qspi_cmd_index,
-      READ_ADDR => qspi_read_addr,
-      WD_LIMIT => qspi_wd_limit,
-      STARTADDR => qspi_startaddr,
-      PAGECOUNT => qspi_pagecount,
-      SECTORCOUNT => qspi_sectorcount,
-      WRITE_FIFO_IN => qspi_write_fifo_in,
-      WRITE_FIFO_EN => qspi_write_fifo_en,
-      FIFO_OUT => qspi_fifo_out,
       DIAGOUT => diagout_buf
       );
 

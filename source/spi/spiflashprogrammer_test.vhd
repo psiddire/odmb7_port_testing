@@ -29,13 +29,15 @@ use ieee.std_logic_unsigned.all;
 use ieee.numeric_std.all;
 use UNISIM.vcomponents.all;
 
+use work.Firmware_pkg.all;     -- for switch between sim and synthesis
+
 entity spiflashprogrammer_test is
   port
   (
     Clk           : in  std_logic;
     fifoclk       : in std_logic;
     ------------------------------------
-    data_to_fifo  : in std_logic_vector(31 downto 0);
+    data_to_fifo  : in std_logic_vector(15 downto 0);
     startaddr     : in std_logic_vector(31 downto 0);
     startaddrvalid   : in std_logic;
     pagecount     : in std_logic_vector(17 downto 0);   
@@ -52,11 +54,14 @@ entity spiflashprogrammer_test is
     writedone     : out std_logic;
     ----------------------------------
     reset         : in std_logic;
-    read         : in std_logic;
-    readdone     : out std_logic;
-    erase        : in std_logic;
+    read          : in std_logic;
+    readdone      : out std_logic;
+    write         : in std_logic;
+    erase         : in std_logic;
     eraseing      : out std_logic;
-    erasedone      : out std_logic;
+    erasedone     : out std_logic;
+    ------------------------------------
+    write_nwords : in unsigned(11 downto 0);
     ------------------------------------
     startwrite   : out std_logic;
     out_read_inprogress        : out std_logic;
@@ -113,7 +118,7 @@ COMPONENT writeSpiFIFO
       srst : IN STD_LOGIC;
       wr_clk : IN STD_LOGIC;
       rd_clk : IN STD_LOGIC;
-      din : IN STD_LOGIC_VECTOR(31 DOWNTO 0);
+      din : IN STD_LOGIC_VECTOR(15 DOWNTO 0);
       wr_en : IN STD_LOGIC;
       rd_en : IN STD_LOGIC;
       dout : OUT STD_LOGIC_VECTOR(3 DOWNTO 0);
@@ -177,8 +182,9 @@ END COMPONENT;
    signal StatusDataValid : std_logic := '0';
    signal spi_status      : std_logic_vector(1 downto 0) := "11";
    signal write_done : std_logic := '0';
+   signal write_nwords_limit : unsigned(13 downto 0) := (others => '0');
       ------- erase ----------------------------
-   signal er_sector_count          : std_logic_vector(13 downto 0) := "00000000000000";    -- subsector count
+   signal er_sector_count          : std_logic_vector(13 downto 0) := "00000000000001";    -- subsector count
    signal er_current_sector_addr   : std_logic_vector(31 downto 0) := X"00000000"; -- start addr of current sector
    signal er_SpiCsB       : std_logic;
    signal erase_start     : std_logic := '0';
@@ -223,7 +229,7 @@ END COMPONENT;
    signal fifo_almostfull : std_logic := '0';
    signal fifo_almostempty : std_logic := '0';
    signal fifodout        : std_logic_vector(63 downto 0) := X"0000000000000000";
-   signal fifo_unconned   : std_logic_vector(31 downto 0) := X"00000000";
+   signal fifo_unconned   : std_logic_vector(15 downto 0) := X"0000";
    ----- Misc signal
    signal reset_design    : std_logic := '0';
    signal wrerr           : std_logic := '0';
@@ -432,7 +438,7 @@ processread : process (Clk)
    when S_RD_IDLE =>
         rd_SpiCsB <= '1';
         if (startaddrvalid = '1') then rd_current_sector_addr <= startaddr; end if;  -- no sync required. lots of time spent in _top
-        if (read_start = '1') then  -- one shot based on I/F erase -> synced_erase input going high e.g. "if rising edge erase"
+        if (read = '1') then  -- one shot based on I/F erase -> synced_erase input going high e.g. "if rising edge erase"
           rd_data_valid_cntr <= "0000";
           rd_cmdcounter32 <= "100111";  -- 32 bit command (cmd + addr = 40 bits)
           rd_nword_limit(31 downto 0) <= in_wdlimit(31 downto 0); 
@@ -449,6 +455,7 @@ processread : process (Clk)
                        
 -----------------   Set 4 Byte mode first -----------------------------------------------------
    when S_RD_S4BMode_ASSCS1=>
+        rd_nword_limit <= rd_nword_limit + 1; --we're given nwords-1
         rd_SpiCsB <= '0';
         rdstate <= S_RD_S4BMode_WRCMD;
           
@@ -542,7 +549,7 @@ processerase : process (Clk)
   case erstate is 
    when S_ER_IDLE =>
         er_SpiCsB <= '1';
-        if (sectorcountvalid = '1') then er_sector_count <= sectorcount; end if;  -- no sync required
+        --if (sectorcountvalid = '1') then er_sector_count <= sectorcount; end if;  -- no sync required
         if (startaddrvalid = '1') then er_current_sector_addr <= startaddr; end if;  -- no sync required. lots of time spent in _top
         if (erase_start = '1') then  -- one shot based on I/F erase -> synced_erase input going high e.g. "if rising edge erase"
           er_data_valid_cntr <= "000";
@@ -594,7 +601,7 @@ processerase : process (Clk)
            er_cmdreg32 <= er_cmdreg32(38 downto 0) & '0';
          else 
            er_SpiCsB <= '1';   -- turn off SPI
-           er_cmdreg32 <=  CmdSSE24 & er_current_sector_addr;  -- 4-Byte Sector erase 
+           er_cmdreg32 <=  CmdSE24 & er_current_sector_addr;  -- 4-Byte Sector erase 
            --er_cmdreg32 <=  CmdSSE32 & er_current_sector_addr;  -- 4-Byte Sector erase 
            er_cmdcounter32 <= "100111";
            erstate <= S_ER_ASSCS2;        
@@ -629,7 +636,7 @@ processerase : process (Clk)
           --er_rddata <= er_rddata(1) & "0";  -- deser 1:8 
           if (er_data_valid_cntr = 7) then  -- Check Status after 8 bits (+1) of status read
             er_status <= er_rddata;   -- Check WE and ERASE in progress one cycle after er_rddate
-            if (er_status = 0) then
+            if (er_status = 0 or in_simulation) then
               if (er_sector_count = 0) then 
                 erstate <= S_ER_IDLE;   -- Done. All sectors erased
                 erase_inprogress <= '0';
@@ -661,7 +668,8 @@ processProgram  : process (Clk)
         write_done <= '0';
         if (startaddrvalid = '1') then Current_Addr <= startaddr; end if;  -- no sync required. lots of time spent in _top
         if (pagecountvalid = '1') then page_count <= pagecount; end if;  -- no sync required
-        if (synced_fifo_almostfull(1) = '1') then         -- some  starting point              
+        --if (synced_fifo_almostfull(1) = '1') then         -- some  starting point     
+        if (write = '1') then         -- some  starting point           
           dopin_ts <= "1110";
           data_valid_cntr <= "000";
           cmdcounter32 <= "100111";  -- 32 bit command
@@ -669,6 +677,7 @@ processProgram  : process (Clk)
           cmdreg32 <=  CmdWE & X"00000000";  -- Set WE bit
           fifo_rden <= '0';
           wrdata_count <= "000";
+          write_nwords_limit <= write_nwords & "00";
           spi_wrdata <= X"00000000";
           wrstate <= S_WR_S4BMode_ASSCS1;
           --wrstate <= S_WR_ASSCS1;
@@ -705,20 +714,21 @@ processProgram  : process (Clk)
 -------------------------  end set 4 byte Mode
 
    when S_WR_ASSCS1 =>
-        if (page_count /= 0) then 
-          if (synced_fifo_almostfull(1) = '1') then
-            SpiCsB <= '0';
-            wrstate <= S_WR_WRCMD;
-          end if;
-        else 
+        --if (page_count /= 0) then 
+        --  if (synced_fifo_almostfull(1) = '1') then
+        --    SpiCsB <= '0';
+        --    wrstate <= S_WR_WRCMD;
+        --  end if;
+        --else 
+        --don't wait for fifo anymore?
           SpiCsB <= '0';
           wrstate <= S_WR_WRCMD;
-        end if;
+        --end if;
                   
    when S_WR_WRCMD =>    -- Set WE bit
         if (cmdcounter32 /= 32) then cmdcounter32 <= cmdcounter32 - 1;  
           cmdreg32 <= cmdreg32(38 downto 0) & '0';
-        elsif (page_count /= 0) then    -- Next PP
+        elsif (write_nwords_limit /= 0) then    -- Next PP
           SpiCsB <= '1';   -- turn off SPI
           cmdreg32 <=  CmdPP32Quad & Current_Addr;  -- Program Page at Current_Addr
           --cmdreg32 <=  CmdPP24Quad & Current_Addr;  -- Program Page at Current_Addr
@@ -751,7 +761,10 @@ processProgram  : process (Clk)
         wrdata_count <= wrdata_count +1;
         if (wrdata_count = 7) then -- 8x4 bits from FIFO.  wrdata_count rolls over to 0
           Current_Addr <= Current_Addr + 4;  -- 4 bytes out of 256 bytes per page   
-          if (Current_Addr(7 downto 0) = 252) then   -- every 256 bytes (1 PP) written, only check lower bits = mod 256
+          if (write_nwords_limit /= 0) then
+            write_nwords_limit <= write_nwords_limit - 1;
+          end if;
+          if ((Current_Addr(7 downto 0) = 252)) then   -- every 256 bytes (1 PP) written, only check lower bits = mod 256
             SpiCsB <= '1';
             fifo_rden <= '0';
             dopin_ts <= "1110";
@@ -800,7 +813,7 @@ processProgram  : process (Clk)
               StatusDataValid <= '0';
             end if;
             if (StatusDataValid = '1') then spi_status <= rddata; end if;  --  rddata valid from previous cycle
-            if spi_status = 0 then    -- Done with page program
+            if (spi_status = 0 or in_simulation) then    -- Done with page program
             --if spi_status = 1 then    -- Done with page program
               SpiCsB <= '1';   -- turn off SPI
               cmdcounter32 <= "100111";
@@ -870,7 +883,7 @@ end process;
 
 --------------********* misc **************---------------------
 reset_design <= reset;
-fifo_unconned(31 downto 0) <= data_to_fifo;
+fifo_unconned(15 downto 0) <= data_to_fifo;
 
 -- to top design. Some may require syncronizers when used   
 fifofull    <= fifo_full;
