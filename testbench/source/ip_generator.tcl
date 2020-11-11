@@ -34,7 +34,7 @@ if { $argc != 1 } {
 
   # Create VIO
   create_ip -name vio -vendor xilinx.com -library ip -version 3.0 -module_name vio_input -dir ../ip/$FPGA_TYPE
-  set_property -dict [list CONFIG.C_PROBE_OUT3_WIDTH {16} CONFIG.C_PROBE_OUT2_WIDTH {16} CONFIG.C_NUM_PROBE_OUT {4} CONFIG.C_NUM_PROBE_IN {0} CONFIG.C_EN_PROBE_IN_ACTIVITY {0}] [get_ips vio_input]
+  set_property -dict [list CONFIG.C_PROBE_IN0_WIDTH {16} CONFIG.C_PROBE_OUT3_WIDTH {16} CONFIG.C_PROBE_OUT2_WIDTH {16} CONFIG.C_NUM_PROBE_OUT {4} CONFIG.C_NUM_PROBE_IN {1} CONFIG.C_EN_PROBE_IN_ACTIVITY {0}] [get_ips vio_input]
 
   #ODMB IP cores
   #create spi_cmd_fifo

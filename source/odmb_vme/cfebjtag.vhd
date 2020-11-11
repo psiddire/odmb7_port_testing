@@ -55,7 +55,8 @@ architecture CFEBJTAG_Arch of CFEBJTAG is
   signal d_dtack_readcfeb, dtack_readcfeb                        : std_logic;
   
   --Signals for READTDO command
-  signal rdtdodk                                                              : std_logic;
+  signal rdtdodk, dtack_readtdo                                  : std_logic;
+  
   
   --signals for INITJTAGS and RSTJTAG command
   signal d1_resetjtag, q1_resetjtag, q2_resetjtag                               : std_logic;
@@ -165,16 +166,6 @@ begin
 
 
 
-  -- Handle READCFEB command (0x1024)
-  OUTDATA <= "000000000" & selfeb(7 downto 1) when (STROBE = '1' and readcfeb = '1') else (others => 'Z');
-
-  -- Generate DTACK when READCFEB=1 on second clock cycle after strobe (see combined DTACK logic)
-  d_dtack_readcfeb <= '1' when (STROBE = '1' and readcfeb = '1') else '0';
-  FD_readcfebdtack : FD port map(D => d_dtack_readcfeb, C => SLOWCLK, Q => dtack_readcfeb);
-
-
-
-
   -- Handle RSTJTAG command (0x1018) and INITJTAGS upon startup
   -- resetjtag set 4th clock cycle after INITJTAGS or STROBE
   -- INITJTAGS comes from odmb_ucsb_v2 when the DCFEBs DONE bits go high
@@ -213,10 +204,6 @@ begin
 
 
 
-
-  -- Handle read TDO command (0x1014). Note rdtdodk is also dtack 
-  rdtdodk <= '1' when (STROBE = '1' and readtdo = '1' and busyp1 = '0' and busy = '0') else '0';
-  OUTDATA(15 downto 0) <= q_outdata(15 downto 0) when (rdtdodk = '1') else (others => 'Z');
 
 
 
@@ -394,11 +381,25 @@ begin
 
 
 
+  -- Handle OUTDATA (includes  READCFEB command (0x1024), read TDO command (0x1014))
+  rdtdodk <= '1' when (STROBE = '1' and readtdo = '1' and busyp1 = '0' and busy = '0') else '0';
+  OUTDATA <= "000000000" & selfeb(7 downto 1) when (STROBE = '1' and readcfeb = '1') else
+             q_outdata(15 downto 0) when (rdtdodk = '1') else (others => 'Z');
+
+
+  -- Generate DTACK when READCFEB=1 on second clock cycle after strobe (see combined DTACK logic)
+  d_dtack_readcfeb <= '1' when (STROBE = '1' and readcfeb = '1') else '0';
+  FD_readcfebdtack : FD port map(D => d_dtack_readcfeb, C => SLOWCLK, Q => dtack_readcfeb);
+  
+  --Generate DTACK on cycle after rdtdodk
+  FD_readtdodtack : FD port map(D => rdtdodk, C => SLOWCLK, Q => dtack_readtdo);
+
+
   -- Handle DTACK
   DTACK <= '1' when (dtack_selcfeb = '1') or
                  (dtack_readcfeb = '1') or
                  (dtack_rstjtag = '1') or
-                 (rdtdodk = '1') or
+                 (dtack_readtdo = '1') or
                  (dtack_shft = '1') else '0';
 
 
@@ -413,6 +414,14 @@ begin
   DIAGOUT(6 downto 0)  <= selfeb(7 downto 1);
   DIAGOUT(7) <= RST;
   DIAGOUT(8) <= INITJTAGS;
-  DIAGOUT(17 downto 9)  <= (others => '0');
+  DIAGOUT(9) <= readcfeb;
+  DIAGOUT(10) <= selcfeb;
+  DIAGOUT(11) <= shihead;
+  DIAGOUT(12) <= shdhead;
+  DIAGOUT(13) <= shdata;
+  DIAGOUT(14) <= shtail;
+  DIAGOUT(15) <= dtack_readcfeb;
+  DIAGOUT(16) <= dtack_readtdo;
+  DIAGOUT(17) <= STROBE;
 
 end CFEBJTAG_Arch;

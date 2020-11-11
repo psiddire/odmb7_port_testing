@@ -18,6 +18,7 @@ entity SPI_CTRL is
     
     READBACK_FIFO_OUT : out std_logic_vector(15 downto 0);
     READBACK_FIFO_READ_EN : in std_logic;
+    READ_BUSY : out std_logic;
     
     DIAGOUT : out std_logic_vector(17 downto 0)
 
@@ -139,38 +140,12 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
   signal prom_read_en, prom_erase_en, prom_write_en : std_logic := '0';
   signal read_done, erase_done, write_done : std_logic := '0';
 
-  --INFO signals
-  signal start_info_en : std_logic := '0';
-  signal load_bit_cntr : integer range 0 to 10 := 0;
-  signal startaddrvalid : std_logic := '0';
-  signal sectorcountvalid : std_logic := '0';
-  signal pagecountvalid : std_logic := '0';
-
-  --WRITE FIFO signals
-  signal write_fifo_en_q, write_fifo_en_pulse : std_logic := '0';
-  signal write_fifo_rd_en : std_logic := '0';
-  signal write_fifo_out : std_logic_vector(15 downto 0) := (others => '0');
-
-  --WRITE signals
-  signal start_write_q, start_write_pulse : std_logic := '0';
-  signal start_write_en : std_logic := '0';
-  signal fifo_wren : std_logic := '0';
-  signal load_data_cntr : unsigned(31 downto 0) := x"00000000";
-  type wr_prom_states is (S_IDLE, S_WAIT_ERASE, S_READ_LOWER, S_READ_UPPER);
-  signal wr_prom_state : wr_prom_states := S_IDLE;
-  signal write_data : std_logic_vector(31 downto 0) := x"00000000";
-  signal erasedone : std_logic := '0';
-  signal start_write_prom_pulse : std_logic := '0';
-
   --READ signals
   signal wr_dvalid_cnt : unsigned(31 downto 0) := x"00000000";
   signal load_rd_fifo : std_logic := '0';
   signal controller_read_start : std_logic := '0';
   type rd_fifo_states is (S_FIFOIDLE, S_FIFOWRITE_PRE, S_FIFOWRITE);
   signal rd_fifo_state : rd_fifo_states := S_FIFOIDLE;
-  
-  --READ FIFO and ERASE signals
-  signal start_read_q, start_read_pulse, start_erase_q, start_erase_pulse : std_logic := '0';
 
   --read FIFO signals
   signal readback_fifo_wr_en : std_logic := '0';
@@ -179,9 +154,6 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
   signal rd_data_valid : std_logic := '0';
   signal spi_readdata : std_logic_vector(15 downto 0) := x"0000";
   signal readback_fifo_wr_rst_busy, readback_fifo_rd_rst_busy : std_logic := '0';
-  
-  --debug
-  signal fifodout_inner : std_logic_vector(63 downto 0);
 
 begin
 
@@ -348,7 +320,7 @@ begin
         load_rd_fifo <= '1';
         rd_fifo_state <= S_FIFOWRITE;
       when S_FIFOWRITE =>
-        if (wr_dvalid_cnt = unsigned(read_nwords)) then
+        if ((wr_dvalid_cnt-1) = unsigned(read_nwords)) then
           rd_fifo_state <= S_FIFOIDLE;
           load_rd_fifo <= '0';
           wr_dvalid_cnt <= x"00000000";
@@ -434,14 +406,17 @@ begin
     out_wrfifo_rden => open
     );
     
+  --read busy signal
+  READ_BUSY <= not read_done;
+    
   --debug
-  DIAGOUT(10 downto 3) <= read_nwords(11 downto 4);
+  DIAGOUT(10 downto 3) <= spi_readdata(7 downto 0);
   DIAGOUT(11) <= cmd_fifo_empty;
   DIAGOUT(12) <= controller_read_start;
-  DIAGOUT(13) <= prom_read_en;
-  DIAGOUT(14) <= prom_read_en;
+  DIAGOUT(13) <= load_rd_fifo;
+  DIAGOUT(14) <= readback_fifo_wr_en;
   DIAGOUT(15) <= READBACK_FIFO_READ_EN;
-  DIAGOUT(16) <= write_fifo_rd_en;
+  DIAGOUT(16) <= '0';
   DIAGOUT(17) <= prom_write_en;
   
 end SPI_CTRL_Arch;

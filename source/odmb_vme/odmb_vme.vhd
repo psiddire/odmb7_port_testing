@@ -140,20 +140,6 @@ entity ODMB_VME is
     CHANGE_REG_DATA      : in std_logic_vector(15 downto 0);
     CHANGE_REG_INDEX     : in integer range 0 to NREGS;
     
-    --------------------
-    -- signals to/from QSPI_CTRL
-    --------------------   
---    QSPI_START_INFO      : out std_logic;
---    QSPI_START_WRITE     : out std_logic;
---    QSPI_START_READ      : out std_logic;
---    QSPI_START_READ_FIFO : out std_logic;
---    QSPI_CMD_INDEX       : out std_logic_vector(3 downto 0);
---    QSPI_READ_ADDR       : out std_logic_vector(31 downto 0);
---    QSPI_WD_LIMIT        : out std_logic_vector(31 downto 0);
---    QSPI_STARTADDR       : out std_logic_vector(31 downto 0);
---    QSPI_PAGECOUNT       : out std_logic_vector(16 downto 0);
---    QSPI_SECTORCOUNT     : out std_logic_vector(13 downto 0);
---    QSPI_FIFO_OUT        : in std_logic_vector(15 downto 0);
 
     --------------------
     -- Other
@@ -167,22 +153,6 @@ architecture Behavioral of ODMB_VME is
   -- Constants
   constant bw_data  : integer := 16; -- data bit width
   constant num_dev  : integer := 9;  -- number of devices (exclude dev0)
-
---  component CONFREGS_DUMMY is
---    port (
---      SLOWCLK              : in std_logic;
---      DEVICE               : in std_logic;
---      STROBE               : in std_logic;
---      COMMAND              : in std_logic_vector(9 downto 0);
---      OUTDATA              : inout std_logic_vector(15 downto 0);
---      DTACK                : out std_logic;
---      LCT_L1A_DLY          : out std_logic_vector(5 downto 0);
---      INJ_DLY              : out std_logic_vector(4 downto 0);
---      EXT_DLY              : out std_logic_vector(4 downto 0);
---      CALLCT_DLY           : out std_logic_vector(3 downto 0);
---      CABLE_DLY            : out integer range 0 to 1
---    );
---  end component;
   
   component VMECONFREGS is
       generic (
@@ -224,16 +194,16 @@ architecture Behavioral of ODMB_VME is
           CHANGE_REG_DATA  : in std_logic_vector(15 downto 0);
           CHANGE_REG_INDEX : in integer range 0 to NREGS;
       
-      -- To/From QSPI Interface
-          QSPI_CFG_UL_PULSE   : in std_logic;
-          QSPI_CONST_UL_PULSE : in std_logic;
-          QSPI_REG_IN : in std_logic_vector(15 downto 0);
-          QSPI_CFG_BUSY    : in  std_logic;
-          QSPI_CONST_BUSY  : in  std_logic;
-          QSPI_CFG_REG_WE   : in  integer range 0 to NREGS;
-          QSPI_CONST_REG_WE : in  integer range 0 to NREGS;
-          QSPI_CFG_REGS    : out cfg_regs_array;
-          QSPI_CONST_REGS  : out cfg_regs_array
+      -- To/From SPI Interface
+          SPI_CFG_UL_PULSE   : in std_logic;
+          SPI_CONST_UL_PULSE : in std_logic;
+          SPI_REG_IN : in std_logic_vector(15 downto 0);
+          SPI_CFG_BUSY    : in  std_logic;
+          SPI_CONST_BUSY  : in  std_logic;
+          SPI_CFG_REG_WE   : in  integer range 0 to NREGS;
+          SPI_CONST_REG_WE : in  integer range 0 to NREGS;
+          SPI_CFG_REGS    : out cfg_regs_array;
+          SPI_CONST_REGS  : out cfg_regs_array
       );
     end component;
 
@@ -336,36 +306,21 @@ architecture Behavioral of ODMB_VME is
       INDATA               : in  std_logic_vector(15 downto 0);
       OUTDATA              : out std_logic_vector(15 downto 0);
       --CONFREGS signals
-      QSPI_CFG_UL_PULSE     : out std_logic;
-      QSPI_CFG_DL_PULSE     : out std_logic;
-      QSPI_CONST_UL_PULSE   : out std_logic;
-      QSPI_CONST_DL_PULSE   : out std_logic;
-      QSPI_UL_REG           : out std_logic_vector(15 downto 0);
-      QSPI_CFG_BUSY         : out std_logic;
-      QSPI_CONST_BUSY       : out std_logic;
-      QSPI_CFG_REG_WE       : out integer range 0 to NREGS;
-      QSPI_CONST_REG_WE     : out integer range 0 to NREGS;
-      QSPI_CFG_REGS         : in cfg_regs_array;
-      QSPI_CONST_REGS       : in cfg_regs_array;
-      --signals to/from QSPI_CTRL
+      SPI_CFG_UL_PULSE     : out std_logic;
+      SPI_CONST_UL_PULSE   : out std_logic;
+      SPI_UL_REG           : out std_logic_vector(15 downto 0);
+      SPI_CFG_BUSY         : out std_logic;
+      SPI_CONST_BUSY       : out std_logic;
+      SPI_CFG_REG_WE       : out integer range 0 to NREGS;
+      SPI_CONST_REG_WE     : out integer range 0 to NREGS;
+      SPI_CFG_REGS         : in cfg_regs_array;
+      SPI_CONST_REGS       : in cfg_regs_array;
+      --signals to/from SPI_CTRL
       SPI_CMD_FIFO_WRITE_EN : out std_logic;
       SPI_CMD_FIFO_IN      : out std_logic_vector(15 downto 0);
       SPI_READBACK_FIFO_OUT     : in std_logic_vector(15 downto 0);
       SPI_READBACK_FIFO_READ_EN : out std_logic;
-      QSPI_START_INFO      : out std_logic;
-      QSPI_START_WRITE     : out std_logic;
-      QSPI_START_ERASE     : out std_logic;
-      QSPI_START_READ      : out std_logic;
-      QSPI_START_READ_FIFO : out std_logic;
-      QSPI_CMD_INDEX       : out std_logic_vector(3 downto 0);
-      QSPI_READ_ADDR       : out std_logic_vector(31 downto 0);
-      QSPI_WD_LIMIT        : out std_logic_vector(31 downto 0);
-      QSPI_STARTADDR       : out std_logic_vector(31 downto 0);
-      QSPI_PAGECOUNT       : out std_logic_vector(17 downto 0);
-      QSPI_SECTORCOUNT     : out std_logic_vector(13 downto 0);
-      QSPI_FIFO_OUT        : in std_logic_vector(15 downto 0);
-      QSPI_FIFO_IN         : out std_logic_vector(15 downto 0);
-      QSPI_WRITE_FIFO_EN   : out std_logic
+      SPI_READ_BUSY             : in std_logic
       );
   end component;
 
@@ -412,6 +367,7 @@ architecture Behavioral of ODMB_VME is
     CMD_FIFO_WRITE_EN : in std_logic;
     READBACK_FIFO_OUT : out std_logic_vector(15 downto 0);
     READBACK_FIFO_READ_EN : in std_logic;
+    READ_BUSY : out std_logic;
       
     DIAGOUT : out std_logic_vector(17 downto 0)
     );
@@ -441,32 +397,28 @@ architecture Behavioral of ODMB_VME is
   
   signal odmb_id_inner : std_logic_vector(15 downto 0);
   
-  --temp bpi signals
-  signal qspi_cfg_ul_pulse_inner : std_logic := '0';
-  signal qspi_cfg_dl_pulse_inner : std_logic := '0';
-  signal qspi_const_ul_pulse_inner : std_logic := '0';
-  signal qspi_const_dl_pulse_inner : std_logic := '0';
-  signal spi_cmd_fifo_write_en : std_logic := '0';
-  signal spi_cmd_fifo_in : std_logic_vector(15 downto 0) := (others => '0');
-  signal spi_readback_fifo_read_en : std_logic := '0';
-  signal spi_readback_fifo_out : std_logic_vector(15 downto 0) := (others => '0');
-  signal qspi_reg_in : std_logic_vector(15 downto 0) := (others => '0');
-  signal qspi_cfg_busy : std_logic := '0';
-  signal qspi_const_busy : std_logic := '0';
-  signal qspi_cfg_reg_we : integer range 0 to NREGS := 0;
-  signal qspi_const_reg_we : integer range 0 to NREGS := 0;
-  signal const_regs_inner       : cfg_regs_array;
-  signal cfg_regs_inner         : cfg_regs_array;
+  --------------------------------------
+  -- CFG and CONST register signals
+  --------------------------------------
+  signal spi_cfg_ul_pulse           : std_logic := '0';
+  signal spi_const_ul_pulse         : std_logic := '0';
+  signal spi_reg_in                 : std_logic_vector(15 downto 0) := (others => '0');
+  signal spi_cfg_busy               : std_logic := '0';
+  signal spi_const_busy             : std_logic := '0';
+  signal spi_cfg_reg_we             : integer range 0 to NREGS := 0;
+  signal spi_const_reg_we           : integer range 0 to NREGS := 0;
+  signal spi_const_regs             : cfg_regs_array;
+  signal spi_cfg_regs               : cfg_regs_array;
   
   --------------------------------------
   -- PROM signals
   --------------------------------------
-  signal qspi_start_info, qspi_start_write, qspi_start_read, qspi_start_read_fifo, qspi_write_fifo_en, qspi_start_erase : std_logic := '0';
-  signal qspi_cmd_index : std_logic_vector(3 downto 0) := x"0";
-  signal qspi_read_addr, qspi_wd_limit, qspi_startaddr : std_logic_vector(31 downto 0) := x"00000000";
-  signal qspi_sectorcount : std_logic_vector(13 downto 0) := (others => '0');
-  signal qspi_pagecount : std_logic_vector(17 downto 0) := (others => '0');
-  signal qspi_fifo_out, qspi_write_fifo_in : std_logic_vector(15 downto 0) := x"0000";
+  signal spi_cmd_fifo_write_en     : std_logic := '0';
+  signal spi_cmd_fifo_in           : std_logic_vector(15 downto 0) := x"0000";
+  signal spi_readback_fifo_read_en : std_logic := '0';
+  signal spi_readback_fifo_out     : std_logic_vector(15 downto 0) := x"0000";
+  signal spi_read_busy             : std_logic := '0';
+  
 
 begin
 
@@ -534,7 +486,7 @@ begin
       TMS       => dl_jtag_tms_inner,
       FEBTDO    => DCFEB_TDO,
 
-      DIAGOUT => open,
+      DIAGOUT => diagout_buf,
       LED     => led_cfebjtag
       );
 
@@ -612,16 +564,15 @@ begin
         CHANGE_REG_DATA  => CHANGE_REG_DATA,
         CHANGE_REG_INDEX => CHANGE_REG_INDEX,
         
-        QSPI_CFG_UL_PULSE   => qspi_cfg_ul_pulse_inner,
-        QSPI_CONST_UL_PULSE   => qspi_const_ul_pulse_inner,
-        QSPI_REG_IN => qspi_reg_in,
-        QSPI_CONST_BUSY  => qspi_const_busy,
-        QSPI_CONST_REG_WE => qspi_const_reg_we,
-        QSPI_CFG_BUSY    => qspi_cfg_busy,
-        QSPI_CFG_REG_WE   => qspi_cfg_reg_we,
-        
-        QSPI_CONST_REGS  => const_regs_inner,
-        QSPI_CFG_REGS    => cfg_regs_inner
+        SPI_CFG_UL_PULSE    => spi_cfg_ul_pulse,
+        SPI_CONST_UL_PULSE  => spi_const_ul_pulse,
+        SPI_REG_IN          => spi_reg_in,
+        SPI_CONST_BUSY      => spi_const_busy,
+        SPI_CONST_REG_WE    => spi_const_reg_we,
+        SPI_CFG_BUSY        => spi_cfg_busy,
+        SPI_CFG_REG_WE      => spi_cfg_reg_we,  
+        SPI_CONST_REGS      => spi_const_regs,
+        SPI_CFG_REGS        => spi_cfg_regs
       );      
       
       DEV6_SPI_PORT_I : SPI_PORT
@@ -637,35 +588,20 @@ begin
         DTACK => dtack_dev(6),
         INDATA => VME_DATA_IN,
         OUTDATA => outdata_dev(6),
-        QSPI_CFG_UL_PULSE => qspi_cfg_ul_pulse_inner,
-        QSPI_CFG_DL_PULSE   => qspi_cfg_dl_pulse_inner,
-        QSPI_CONST_UL_PULSE => qspi_const_ul_pulse_inner,
-        QSPI_CONST_DL_PULSE => qspi_const_dl_pulse_inner,   
-        QSPI_UL_REG => qspi_reg_in,     
-        QSPI_CFG_BUSY => qspi_cfg_busy,
-        QSPI_CONST_BUSY => qspi_const_busy,
-        QSPI_CONST_REG_WE => qspi_const_reg_we,
-        QSPI_CFG_REG_WE   => qspi_cfg_reg_we,
-        QSPI_CFG_REGS => cfg_regs_inner,
-        QSPI_CONST_REGS => const_regs_inner,
+        SPI_CFG_UL_PULSE => spi_cfg_ul_pulse,
+        SPI_CONST_UL_PULSE   => spi_const_ul_pulse,
+        SPI_UL_REG => spi_reg_in,     
+        SPI_CFG_BUSY => spi_cfg_busy,
+        SPI_CONST_BUSY => spi_const_busy,
+        SPI_CONST_REG_WE => spi_const_reg_we,
+        SPI_CFG_REG_WE   => spi_cfg_reg_we,
+        SPI_CFG_REGS => spi_cfg_regs,
+        SPI_CONST_REGS => spi_const_regs,
         SPI_CMD_FIFO_WRITE_EN => spi_cmd_fifo_write_en,
         SPI_CMD_FIFO_IN => spi_cmd_fifo_in,
         SPI_READBACK_FIFO_OUT => spi_readback_fifo_out,
         SPI_READBACK_FIFO_READ_EN => spi_readback_fifo_read_en,
-        QSPI_START_INFO => qspi_start_info,
-        QSPI_START_WRITE => qspi_start_write,
-        QSPI_START_ERASE => qspi_start_erase,
-        QSPI_START_READ => qspi_start_read,
-        QSPI_START_READ_FIFO => qspi_start_read_fifo,
-        QSPI_CMD_INDEX => qspi_cmd_index,
-        QSPI_READ_ADDR => qspi_read_addr,
-        QSPI_WD_LIMIT => qspi_wd_limit,
-        QSPI_STARTADDR => qspi_startaddr,
-        QSPI_PAGECOUNT => qspi_pagecount,
-        QSPI_SECTORCOUNT => qspi_sectorcount,
-        QSPI_FIFO_OUT => qspi_fifo_out,
-        QSPI_FIFO_IN => qspi_write_fifo_in,
-        QSPI_WRITE_FIFO_EN => qspi_write_fifo_en
+        SPI_READ_BUSY => spi_read_busy
       );
 
   COMMAND_PM : COMMAND_MODULE
@@ -703,7 +639,8 @@ begin
       CMD_FIFO_WRITE_EN => spi_cmd_fifo_write_en,
       READBACK_FIFO_OUT => spi_readback_fifo_out,
       READBACK_FIFO_READ_EN => spi_readback_fifo_read_en,
-      DIAGOUT => diagout_buf
+      READ_BUSY => spi_read_busy,
+      DIAGOUT => open
       );
 
 

@@ -52,15 +52,15 @@ entity VMECONFREGS is
     CHANGE_REG_INDEX : in integer range 0 to NREGS;
 
 -- To/From QSPI Interface
-    QSPI_CFG_UL_PULSE   : in std_logic;
-    QSPI_CONST_UL_PULSE : in std_logic;
-    QSPI_REG_IN : in std_logic_vector(15 downto 0);
-    QSPI_CFG_BUSY    : in  std_logic;
-    QSPI_CONST_BUSY  : in  std_logic;
-    QSPI_CFG_REG_WE   : in  integer range 0 to NREGS;
-    QSPI_CONST_REG_WE : in  integer range 0 to NREGS;
-    QSPI_CFG_REGS    : out cfg_regs_array;
-    QSPI_CONST_REGS  : out cfg_regs_array
+    SPI_CFG_UL_PULSE   : in std_logic;
+    SPI_CONST_UL_PULSE : in std_logic;
+    SPI_REG_IN : in std_logic_vector(15 downto 0);
+    SPI_CFG_BUSY    : in  std_logic;
+    SPI_CONST_BUSY  : in  std_logic;
+    SPI_CFG_REG_WE   : in  integer range 0 to NREGS;
+    SPI_CONST_REG_WE : in  integer range 0 to NREGS;
+    SPI_CFG_REGS    : out cfg_regs_array;
+    SPI_CONST_REGS  : out cfg_regs_array
     );
 end VMECONFREGS;
 
@@ -69,7 +69,7 @@ architecture VMECONFREGS_Arch of VMECONFREGS is
 
   constant FW_VERSION       : std_logic_vector(15 downto 0) := x"D3B7";
   constant FW_ID            : std_logic_vector(15 downto 0) := x"D3B7";
-  constant FW_MONTH_DAY     : std_logic_vector(15 downto 0) := x"1007";
+  constant FW_MONTH_DAY     : std_logic_vector(15 downto 0) := x"1109";
   constant FW_YEAR          : std_logic_vector(15 downto 0) := x"2020";
   constant able_write_const : std_logic                     := '0';
 
@@ -149,8 +149,8 @@ begin
              const_regs(const_reg_index) when do_const = '1' else
              cfg_regs(cfg_reg_index); -- and cfg_reg_mask(cfg_reg_index);
 
-  QSPI_CFG_REGS   <= cfg_regs;
-  QSPI_CONST_REGS <= const_regs;
+  SPI_CFG_REGS   <= cfg_regs;
+  SPI_CONST_REGS <= const_regs;
 
   LCT_L1A_DLY   <= cfg_regs(0)(5 downto 0);                          -- 0x4000
   OTMB_PUSH_DLY <= to_integer(unsigned(cfg_regs(1)(5 downto 0)));    -- 0x4004
@@ -171,15 +171,15 @@ begin
 
 
   -- Write configuration registers (W 0x40YZ or top level signal) when vme_cfg_reg_we or CC_CFG_REG_WE are not NREGS
-  do_cfg_we      <= do_cfg and not WRITER and STROBE and not QSPI_CFG_BUSY;
+  do_cfg_we      <= do_cfg and not WRITER and STROBE and not SPI_CFG_BUSY;
   PULSE_CFGWE : PULSE2FAST port map(DOUT => do_cfg_we_q, CLK_DOUT => CLK, RST => RST, DIN => do_cfg_we);
   vme_cfg_reg_we <= cfg_reg_index when do_cfg_we_q = '1' else NREGS;
 
   cfg_reg_we <= CHANGE_REG_INDEX when CHANGE_REG_INDEX < NREGS else
-                QSPI_CFG_REG_WE when QSPI_CFG_UL_PULSE = '1' else
+                SPI_CFG_REG_WE when SPI_CFG_UL_PULSE = '1' else
                 vme_cfg_reg_we;
   cfg_reg_in <= CHANGE_REG_DATA when CHANGE_REG_INDEX < NREGS else
-                QSPI_REG_IN when QSPI_CFG_UL_PULSE = '1' else
+                SPI_REG_IN when SPI_CFG_UL_PULSE = '1' else
                 INDATA;
 
   cfg_reg_proc : process (RST, CLK, cfg_reg_we, cfg_reg_in, cfg_regs)
@@ -213,12 +213,12 @@ begin
 
 
   -- Writing protected registers (W 0x4Y00)
-  do_const_we      <= do_const and not WRITER and STROBE and not QSPI_CONST_BUSY and mask_vme(const_reg_index);
+  do_const_we      <= do_const and not WRITER and STROBE and not SPI_CONST_BUSY and mask_vme(const_reg_index);
   PULSE_CONSTWE : PULSE2FAST port map(DOUT => do_const_we_q, CLK_DOUT => CLK, RST => RST, DIN => do_const_we);
   vme_const_reg_we <= const_reg_index when do_const_we_q = '1' else NCONST;
 
-  const_reg_we <= vme_const_reg_we when (QSPI_CONST_UL_PULSE = '0') else QSPI_CONST_REG_WE;
-  const_reg_in <= INDATA           when (QSPI_CONST_UL_PULSE = '0') else QSPI_REG_IN;
+  const_reg_we <= vme_const_reg_we when (SPI_CONST_UL_PULSE = '0') else SPI_CONST_REG_WE;
+  const_reg_in <= INDATA           when (SPI_CONST_UL_PULSE = '0') else SPI_REG_IN;
 
   const_reg_proc : process (RST, CLK, const_reg_we, const_reg_in, const_regs)
   begin

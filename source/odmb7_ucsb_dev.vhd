@@ -43,7 +43,7 @@ entity ODMB7_UCSB_DEV is
     VME_SYSFAIL_B   : in std_logic;                        -- Bank 48
     VME_CLK_B       : in std_logic;                        -- Bank 48, not used
     KUS_VME_OE_B    : out std_logic;                       -- Bank 44
-    KUS_VME_DIR_B   : out std_logic;                       -- Bank 44
+    KUS_VME_DIR     : out std_logic;                       -- Bank 44
     VME_DTACK_KUS_B : inout std_logic;                     -- Bank 44
 
     DCFEB_TCK_P    : out std_logic_vector(NCFEB downto 1); -- Bank 68
@@ -293,7 +293,7 @@ architecture Behavioral of ODMB7_UCSB_DEV is
   -- VME signals
   --------------------------------------
   -- signal cmd_adrs     : std_logic_vector (15 downto 0);
-  signal vme_dir_b    : std_logic;
+  signal vme_dir_b, vme_oe_b    : std_logic;
   signal vme_dir      : std_logic;
   signal vme_data_out_buf, vme_data_in_buf : std_logic_vector(15 downto 0) := (others => '0');
 
@@ -416,15 +416,16 @@ begin
   -- Handle VME signals
   -------------------------------------------------------------------------------------------
 
-  -- Handle VME data direction line
-  KUS_VME_DIR_B <= vme_dir_b;
+  -- Handle VME data direction and output enable lines
+  KUS_VME_DIR <= vme_dir;
   vme_dir <= not vme_dir_b;
+  KUS_VME_OE_B <= vme_oe_b;
 
   -- FIXME: KCU only: multiplex vme_data_in and out lines together
   -- can't have internal IOBUFs on KCU
   vme_data_kcu_i : if in_synthesis generate
     vme_data_in_buf <= VME_DATA_IN;
-    VME_DATA_OUT <= vme_data_out_buf; 
+    VME_DATA_OUT <= vme_data_out_buf when (vme_dir='1' and vme_oe_b='0') else (others => 'Z'); 
   end generate vme_data_kcu_i;
   --real board/simulation can have IOBUFs
   vme_data_simulation_i : if in_simulation generate
@@ -656,7 +657,7 @@ begin
       VME_BERR_B     => VME_BERR_B,
       VME_SYSFAIL_B  => VME_SYSFAIL_B,
       VME_DTACK_B    => VME_DTACK_KUS_B,
-      VME_OE_B       => KUS_VME_OE_B,
+      VME_OE_B       => vme_oe_b,
       VME_DIR_B      => vme_dir_b,      -- to be used in IOBUF
 
       DCFEB_TCK      => dcfeb_tck,

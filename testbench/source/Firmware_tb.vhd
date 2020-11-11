@@ -130,6 +130,7 @@ architecture Behavioral of Firmware_tb is
   component vio_input is
   port (
     CLK : in std_logic;
+    probe_in0 : in std_logic_vector(15 downto 0);
     probe_out0 : out std_logic_vector(0 downto 0); --don't ask me why, but it complains about being std_logic
     probe_out1 : out std_logic_vector(0 downto 0); --" (vivado 2017.2)
     probe_out2 : out std_logic_vector(15 downto 0);
@@ -144,6 +145,8 @@ architecture Behavioral of Firmware_tb is
   signal vio_issue_vme_cmd_qq : std_logic := '0';
   signal vio_vme_addr : std_logic_vector(15 downto 0) := x"0000";
   signal vio_vme_data : std_logic_vector(15 downto 0) := x"0000";
+  signal vio_vme_out : std_logic_vector(15 downto 0) := x"0000";
+  signal vme_dtack_q : std_logic := '0';
 
   -- Clock signals
   signal clk_in_buf : std_logic := '0';
@@ -197,7 +200,7 @@ architecture Behavioral of Firmware_tb is
   signal vme_clk_b   : std_logic := '0';
   signal vme_oe_b    : std_logic := '0';
   signal kus_vme_oe_b : std_logic := '0';
-  signal vme_dir_b   : std_logic := '0';
+  signal vme_dir     : std_logic := '0';
   signal vme_data_io_in   : std_logic_vector(15 downto 0) := (others => '0');
   signal vme_data_io_out  : std_logic_vector (15 downto 0) := (others => '0');
   signal vme_data_io_in_buf   : std_logic_vector(15 downto 0) := (others => '0');
@@ -335,7 +338,8 @@ begin
   trig0(31 downto 16) <= vme_data_io_in;
   trig0(15 downto 0) <= cmddev;
   --
-  data(4095 downto 101) <= (others => '0');
+  data(4095 downto 102) <= (others => '0');
+  data(101) <= vme_dtack;
   data(100) <= rst_global;
   data(99) <= cack;
   data(98) <= vc_cmd;
@@ -367,6 +371,7 @@ begin
   vio_input_i: vio_input
     port map(
               CLK => sysclk,
+              PROBE_IN0 => vio_vme_out,
               PROBE_OUT0 => use_vio_input_vector,
               PROBE_OUT1 => vio_issue_vme_cmd_vector,
               PROBE_OUT2 => vio_vme_addr,
@@ -459,6 +464,17 @@ begin
         input_dav <= '0';
       end if;
     end if;
+  end process;
+  
+  -- generate vme output for vio
+  proc_vio_vme_out : process (sysclk) is
+  begin
+  if rising_edge(sysclk) then
+    vme_dtack_q <= vme_dtack;
+    if (vme_dtack='0' and vme_dtack_q='1') then
+      vio_vme_out <= vme_data_io_out;
+    end if;
+  end if;
   end process;
   
   -- Generate VME acknowledge
@@ -554,7 +570,7 @@ begin
     VME_DTACK_KUS_B => vme_dtack,
     VME_CLK_B       => vme_clk_b,
     KUS_VME_OE_B    => kus_vme_oe_b,
-    KUS_VME_DIR_B   => vme_dir_b,
+    KUS_VME_DIR     => vme_dir,
     DCFEB_TCK_P     => dcfeb_tck_p,
     DCFEB_TCK_N     => dcfeb_tck_n,
     DCFEB_TMS_P     => dcfeb_tms_p,

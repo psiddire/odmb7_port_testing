@@ -24,79 +24,58 @@ entity SPI_PORT is
     INDATA               : in  std_logic_vector(15 downto 0);
     OUTDATA              : out std_logic_vector(15 downto 0);
     --CONFREGS signals
-    QSPI_CFG_UL_PULSE     : out std_logic;
-    QSPI_CFG_DL_PULSE     : out std_logic;
-    QSPI_CONST_UL_PULSE   : out std_logic;
-    QSPI_CONST_DL_PULSE   : out std_logic;
-    QSPI_UL_REG           : out std_logic_vector(15 downto 0);
-    QSPI_CFG_BUSY         : out std_logic;
-    QSPI_CONST_BUSY       : out std_logic;
-    QSPI_CFG_REG_WE       : out integer range 0 to NREGS;
-    QSPI_CONST_REG_WE     : out integer range 0 to NREGS;
-    QSPI_CFG_REGS         : in cfg_regs_array;
-    QSPI_CONST_REGS       : in cfg_regs_array;
+    SPI_CFG_UL_PULSE     : out std_logic;
+    SPI_CONST_UL_PULSE   : out std_logic;
+    SPI_UL_REG           : out std_logic_vector(15 downto 0);
+    SPI_CFG_BUSY         : out std_logic;
+    SPI_CONST_BUSY       : out std_logic;
+    SPI_CFG_REG_WE       : out integer range 0 to NREGS;
+    SPI_CONST_REG_WE     : out integer range 0 to NREGS;
+    SPI_CFG_REGS         : in cfg_regs_array;
+    SPI_CONST_REGS       : in cfg_regs_array;
     --signals to/from QSPI_CTRL
     SPI_CMD_FIFO_WRITE_EN     : out std_logic;
     SPI_CMD_FIFO_IN           : out std_logic_vector(15 downto 0);
     SPI_READBACK_FIFO_OUT     : in std_logic_vector(15 downto 0);
     SPI_READBACK_FIFO_READ_EN : out std_logic;
-    QSPI_START_INFO      : out std_logic;
-    QSPI_START_WRITE     : out std_logic;
-    QSPI_START_ERASE     : out std_logic;
-    QSPI_START_READ      : out std_logic;
-    QSPI_START_READ_FIFO : out std_logic;
-    QSPI_CMD_INDEX       : out std_logic_vector(3 downto 0);
-    QSPI_READ_ADDR       : out std_logic_vector(31 downto 0);
-    QSPI_WD_LIMIT        : out std_logic_vector(31 downto 0);
-    QSPI_STARTADDR       : out std_logic_vector(31 downto 0);
-    QSPI_PAGECOUNT       : out std_logic_vector(17 downto 0);
-    QSPI_SECTORCOUNT     : out std_logic_vector(13 downto 0);
-    QSPI_FIFO_OUT        : in std_logic_vector(15 downto 0);
-    QSPI_FIFO_IN         : out std_logic_vector(15 downto 0);
-    QSPI_WRITE_FIFO_EN   : out std_logic
+    SPI_READ_BUSY             : in std_logic
     );
 end SPI_PORT;
 
 architecture SPI_PORT_Arch of SPI_PORT is
 
-  signal cfg_reg_hardcode : cfg_regs_array := (x"0019", x"FFF1", x"0001", x"FFF3",
-                                                 x"0008", x"0008", x"0004", x"0000",
-                                                 x"D3B7", x"D3B7", x"00FF", x"0100",
-                                                 x"FFFC", x"FFFD", x"FFFE", x"FFFF");
-  --what are normal values?
+  --signal cfg_reg_hardcode : cfg_regs_array := (x"0019", x"FFF1", x"0001", x"FFF3",
+  --                                               x"0008", x"0008", x"0004", x"0000",
+  --                                               x"D3B7", x"D3B7", x"00FF", x"0100",
+  --                                               x"FFFC", x"FFFD", x"FFFE", x"FFFF");
   
-  signal ce_cfg_reg_count_enable : std_logic := '0';
-  signal cfg_reg_count_enable : std_logic := '0';
-  signal cfg_ul_pulse_pre : std_logic := '0';
-  signal qspi_cfg_ul_pulse_inner : std_logic := '0';
-  signal cc_cfg_reg_we_inner : integer := NREGS;
+  --CFG register download signals
+  type cfg_download_states is (S_IDLE, S_SET_ADDR_LOWER, S_ERASE, S_BUFFER_PROGRAM, S_WRITE);
+  signal cfg_download_state  : cfg_download_states := S_IDLE;
+  signal spi_cmd_fifo_write_en_cfg_dl : std_logic := '0';
+  signal spi_cmd_fifo_in_cfg_dl : std_logic_vector(15 downto 0) := x"0000";
+  signal download_cfg_reg_index : integer := 0;
   
-  signal fifo_read_en : std_logic := '0';
-  signal fifo_read_cntr : unsigned(3 downto 0) := x"0";
-  signal fifo_read_offcycle : std_logic := '0';
-  
-  signal do_cfg_upload_q : std_logic := '0';
-  signal do_cfg_upload_pulse : std_logic := '0';
-  signal qspi_read_fifo_pulse : std_logic := '0';
-  
-  --download to PROM signals
-  --signal do_cfg_download_q, do_cfg_download_pulse : std_logic := '0';
-  signal ul_cfg_reg_idx : integer := 0;
-  type dl_cfg_states is (S_IDLE, S_ISSUE_INFO_1, S_ISSUE_ERASE, S_ISSUE_INFO_2, S_PUSH_REG, S_END_PULSE, S_ISSUE_WRITE);
-  signal dl_cfg_state : dl_cfg_states := S_IDLE;
-  signal qspi_fifo_in_inner : std_logic_vector(15 downto 0) := x"0000";
-  
-  --TEMP: erase PROM signals
-  type er_cfg_states is (S_IDLE, S_ISSUE_INFO, S_ISSUE_ERASE);
-  signal er_cfg_state : er_cfg_states := S_IDLE;
-  signal qspi_start_info_inner1, qspi_start_info_inner2, qspi_start_erase_inner1, qspi_start_erase_inner2 : std_logic := '0';
+  --CFG register upload signals
+  type cfg_upload_states is (S_IDLE, S_SET_ADDR_LOWER, S_READN, S_WAIT_READ_BUSY, S_WAIT_READ_DONE, S_WAIT_READ_STALL, S_READBACK);
+  signal cfg_upload_state  : cfg_upload_states := S_IDLE;
+  signal spi_cmd_fifo_write_en_cfg_ul : std_logic := '0';
+  signal spi_cmd_fifo_in_cfg_ul : std_logic_vector(15 downto 0) := x"0000";
+  signal upload_cfg_reg_index : integer := 0;  
+  signal spi_readback_fifo_read_en_cfg_ul : std_logic := '0';
+  signal spi_cfg_ul_pulse_inner : std_logic := '0';
+  signal spi_cfg_reg_we_inner : integer := NREGS;
+  signal spi_ul_reg_inner : std_logic_vector(15 downto 0) := x"0000";
+  signal readback_fifo_stall_counter : unsigned(3 downto 0) := x"0";
   
   --SPI command command signals
   signal strobe_q, strobe_pulse : std_logic := '0';
+  signal spi_cmd_fifo_write_en_cmd : std_logic := '0';
+  signal spi_cmd_fifo_in_cmd : std_logic_vector(15 downto 0) := x"0000";
   
   --SPI read signals
   signal spi_read_data : std_logic_vector(15 downto 0) := x"0000";
-  signal readback_fifo_en : std_logic := '0';
+  signal spi_readback_fifo_read_en_cmd : std_logic := '0';
   
   --command parsing signals
   signal cmddev : std_logic_vector(15 downto 0) := x"0000";
@@ -116,231 +95,212 @@ begin
   do_cfg_erase <= '1' when (cmddev=x"1008" and STROBE='1') else '0';
   do_spi_cmd <= '1' when (cmddev=x"102C") else '0';
   do_spi_read <= '1' when (cmddev=x"1030") else '0';
-  
-  --handle SPI command command
+
+
+  --generate strobe_pulse
   strobe_q <= STROBE when rising_edge(SLOWCLK);
   strobe_pulse <= strobe and not strobe_q;
-  SPI_CMD_FIFO_WRITE_EN <= do_spi_cmd and strobe_pulse;
-  SPI_CMD_FIFO_IN <= INDATA;
+  
+  
+  --handle SPI command command
+  spi_cmd_fifo_write_en_cmd <= do_spi_cmd and strobe_pulse;
+  spi_cmd_fifo_in_cmd <= INDATA;
+  
   
   --handle SPI read command
-  SPI_READBACK_FIFO_READ_EN <= readback_fifo_en;
   OUTDATA <= spi_read_data; --currently the only output in this module, will fix later
   spi_read_proc : process (SLOWCLK)
   begin
   if rising_edge(SLOWCLK) then
     if (do_spi_read='1' and strobe_pulse='1') then
       spi_read_data <= SPI_READBACK_FIFO_OUT;
-      readback_fifo_en <= '1';
+      spi_readback_fifo_read_en_cmd <= '1';
     else
       spi_read_data <= spi_read_data;
-      readback_fifo_en <= '0';
+      spi_readback_fifo_read_en_cmd <= '0';
     end if;
   end if;
   end process;
 
-  --hardcode pages and sector
-  QSPI_CMD_INDEX <= x"4"; --RDFR24QUAD
-  QSPI_READ_ADDR <= x"003d5000";
-  QSPI_WD_LIMIT <= x"00000010";
-  QSPI_STARTADDR <= x"003d5000";
-  QSPI_PAGECOUNT <= x"0000" & "01";
-  QSPI_SECTORCOUNT <= x"000" & "01";
-  
-  --temporary: separate erase PROM command for debugging
-  QSPI_START_INFO <= qspi_start_info_inner1 or qspi_start_info_inner2;
-  QSPI_START_ERASE <= qspi_start_erase_inner1 or qspi_start_erase_inner2;
-  fifo_erase_proc : process (SLOWCLK)
+
+  --handle CFG download command
+  cfg_download_proc : process (SLOWCLK)
   begin
   if rising_edge(SLOWCLK) then
-    case er_cfg_state is
+    case cfg_download_state is
     when S_IDLE => 
-      qspi_start_info_inner1 <= '0';
-      qspi_start_erase_inner1 <= '0';
-      if (do_cfg_erase='1') then
-        er_cfg_state <= S_ISSUE_INFO;
+      if do_cfg_download='1' then
+        spi_cmd_fifo_write_en_cfg_dl <= '1';
+        --send CMD to load address 003d...
+        spi_cmd_fifo_in_cfg_dl <= x"07B7";
+        cfg_download_state <= S_SET_ADDR_LOWER;
       else
-        er_cfg_state <= S_IDLE;
+        spi_cmd_fifo_write_en_cfg_dl <= '0';
+        spi_cmd_fifo_in_cfg_dl <= x"0000";
+        cfg_download_state <= S_IDLE;
       end if;
-    when S_ISSUE_INFO =>
-      qspi_start_info_inner1 <= '1';
-      qspi_start_erase_inner1 <= '0';
-      er_cfg_state <= S_ISSUE_ERASE;
-    when S_ISSUE_ERASE =>
-      qspi_start_info_inner1 <= '0';
-      qspi_start_erase_inner1 <= '1';
-      er_cfg_state <= S_IDLE;
+      
+    when S_SET_ADDR_LOWER =>
+      spi_cmd_fifo_write_en_cfg_dl <= '1';
+      --send CMD to load address ....5000
+      spi_cmd_fifo_in_cfg_dl <= x"5000";
+      cfg_download_state <= S_ERASE;
+    
+    when S_ERASE =>
+      spi_cmd_fifo_write_en_cfg_dl <= '1';
+      --send CMD to erase block
+      spi_cmd_fifo_in_cfg_dl <= x"000A";
+      cfg_download_state <= S_BUFFER_PROGRAM;
+
+    when S_BUFFER_PROGRAM =>
+      spi_cmd_fifo_write_en_cfg_dl <= '1';
+      --send CMD to buffer 16 word program
+      spi_cmd_fifo_in_cfg_dl <= x"01CC";
+      cfg_download_state <= S_WRITE;
+
+    when S_WRITE =>
+      spi_cmd_fifo_write_en_cfg_dl <= '1';
+      --send CFG registers as program data
+      spi_cmd_fifo_in_cfg_dl <= SPI_CFG_REGS(download_cfg_reg_index);
+      if (download_cfg_reg_index=15) then
+        download_cfg_reg_index <= 0;
+        cfg_download_State <= S_IDLE;
+      else
+        download_cfg_reg_index <= download_cfg_reg_index + 1;
+        cfg_download_state <= S_WRITE;
+      end if;
+
     end case;
   end if;
   end process;
   
-  --Handle download to PROM command
-  --steps: set info, erase page (?), set info, write cfg registers to fifo, issue write command
-  --do_cfg_download_q <= do_cfg_download when rising_edge(SLOWCLK) else do_cfg_download_q;
-  --do_cfg_download_pulse <= do_cfg_download and not do_cfg_download_q;
-  QSPI_FIFO_IN <= qspi_fifo_in_inner;
-  fifo_write_proc : process (SLOWCLK)
-  begin
-  if rising_edge(SLOWCLK) then
-    case dl_cfg_state is
-    when S_IDLE =>
-      qspi_start_info_inner2 <= '0';
-      qspi_start_erase_inner2 <= '0';
-      QSPI_START_WRITE <= '0';
-      qspi_fifo_in_inner <= qspi_fifo_in_inner;
-      QSPI_WRITE_FIFO_EN <= '0';
-      ul_cfg_reg_idx <= 0;
-      --this takes long enough that we shouldn't double write
-      if (do_cfg_download='1') then
-        dl_cfg_state <= S_ISSUE_INFO_1;
-      else
-        dl_cfg_state <= S_IDLE;
-      end if;
-    when S_ISSUE_INFO_1 =>
-      qspi_start_info_inner2 <= '1';
-      qspi_start_erase_inner2 <= '0';
-      QSPI_START_WRITE <= '0';
-      qspi_fifo_in_inner <= qspi_fifo_in_inner;
-      QSPI_WRITE_FIFO_EN <= '0';
-      ul_cfg_reg_idx <= ul_cfg_reg_idx;
-      dl_cfg_state <= S_ISSUE_ERASE;
-    when S_ISSUE_ERASE =>
-      qspi_start_info_inner2 <= '0';
-      qspi_start_erase_inner2 <= '0';
-      QSPI_START_WRITE <= '0';
-      qspi_fifo_in_inner <= qspi_fifo_in_inner;
-      QSPI_WRITE_FIFO_EN <= '0';
-      ul_cfg_reg_idx <= ul_cfg_reg_idx;
-      dl_cfg_state <= S_ISSUE_INFO_2;
-    when S_ISSUE_INFO_2 =>
-      qspi_start_info_inner2 <= '1';
-      qspi_start_erase_inner2 <= '0';
-      QSPI_START_WRITE <= '0';
-      qspi_fifo_in_inner <= qspi_fifo_in_inner;
-      QSPI_WRITE_FIFO_EN <= '0';
-      ul_cfg_reg_idx <= ul_cfg_reg_idx;
-      dl_cfg_state <= S_PUSH_REG;  
-    when S_PUSH_REG =>
-      qspi_start_info_inner2 <= '0';
-      qspi_start_erase_inner2 <= '0';
-      QSPI_START_WRITE <= '0';
-      qspi_fifo_in_inner <= QSPI_CFG_REGS(ul_cfg_reg_idx);
-      QSPI_WRITE_FIFO_EN <= '1';
-      ul_cfg_reg_idx <= ul_cfg_reg_idx;
-      dl_cfg_state <= S_END_PULSE;
-    when S_END_PULSE =>
-      qspi_start_info_inner2 <= '0';
-      qspi_start_erase_inner2 <= '0';
-      QSPI_START_WRITE <= '0';
-      qspi_fifo_in_inner <= qspi_fifo_in_inner;
-      QSPI_WRITE_FIFO_EN <= '0';
-      if (ul_cfg_reg_idx = (NREGS-1)) then
-        ul_cfg_reg_idx <= 0;
-        dl_cfg_state <= S_ISSUE_WRITE;
-      else
-        ul_cfg_reg_idx <= ul_cfg_reg_idx + 1;
-        dl_cfg_state <= S_PUSH_REG;
-      end if;
-    when S_ISSUE_WRITE =>
-      qspi_start_info_inner2 <= '0';
-      qspi_start_erase_inner2 <= '0';
-      QSPI_START_WRITE <= '1';
-      qspi_fifo_in_inner <= qspi_fifo_in_inner;
-      QSPI_WRITE_FIFO_EN <= '0';
-      ul_cfg_reg_idx <= ul_cfg_reg_idx;
-      dl_cfg_state <= S_IDLE;
-    end case;
-  end if;
-  end process;
   
-  --Handle upload from PROM command
-  do_cfg_upload_q <= do_cfg_upload when rising_edge(SLOWCLK) else do_cfg_upload_q;
-  do_cfg_upload_pulse <= do_cfg_upload and not do_cfg_upload_q;
-  QSPI_START_READ <= do_cfg_upload_pulse; --start read from PROM as soon as we get the signal, but wait for a few (2.5MHz) cycles to read FIFO and wait until this is finished to start assigning registers
-  DS_FIFOREAD : DELAY_SIGNAL generic map (NCYCLES_MAX => 64) port map (DOUT => qspi_read_fifo_pulse, CLK => SLOWCLK, NCYCLES => 64, DIN => do_cfg_upload_pulse); 
-  DS_CFGULPULSEPRE : DELAY_SIGNAL generic map (NCYCLES_MAX => 34) port map (DOUT => cfg_ul_pulse_pre, CLK => SLOWCLK, NCYCLES => 34, DIN => qspi_read_fifo_pulse); 
-
-  --pulse QSPI_START_READ_FIFO and assign cfg_reg_hardcode based on QSPI_FIFO_OUT
-  fifo_read_proc : process (SLOWCLK)
-  begin
-    if rising_edge(SLOWCLK) then
-      if (qspi_read_fifo_pulse='1') then
-        fifo_read_en <= '1';
-        fifo_read_offcycle <= '0';
-        fifo_read_cntr <= x"0";
-        QSPI_START_READ_FIFO <= '0';
-      else
-        if (fifo_read_en='1') then
-          if (fifo_read_offcycle='0') then
-            cfg_reg_hardcode(to_integer(fifo_read_cntr)) <= QSPI_FIFO_OUT;
-            fifo_read_offcycle <= '1';
-            fifo_read_en <= '1';
-            fifo_read_cntr <= fifo_read_cntr;
-            QSPI_START_READ_FIFO <= '1';
-          else
-            if (fifo_read_cntr=x"F") then
-              fifo_read_en <= '0';
-            else
-              fifo_read_en <= '1';
-            end if;
-            QSPI_START_READ_FIFO <= '0';
-            fifo_read_cntr <= fifo_read_cntr + 1;
-            fifo_read_offcycle <= '0';
-          end if;
-        end if;
-      end if;
-    end if;
-  end process;
-
-  QSPI_UL_REG <= cfg_reg_hardcode(cc_cfg_reg_we_inner) when (cc_cfg_reg_we_inner /= NREGS) else x"0000";
-  QSPI_CONST_BUSY <= '0';
-  QSPI_CFG_BUSY <= '0';
-  QSPI_CONST_DL_PULSE <= '0';
-  QSPI_CFG_DL_PULSE <= '0';
-  QSPI_CONST_UL_PULSE <= '0'; --never upload CONST REGs
-  QSPI_CONST_REG_WE <= NREGS;
-  QSPI_CFG_UL_PULSE <= qspi_cfg_ul_pulse_inner;
-  QSPI_CFG_REG_WE <= cc_cfg_reg_we_inner;
-
-  --upload CFG registers on reset
-
-  FDPE_cfg_ul_pulse : FDPE port map(Q => cfg_reg_count_enable, C => SLOWCLK, CE => ce_cfg_reg_count_enable, PRE => cfg_ul_pulse_pre, D => '0');
-  
+  --handle CFG upload command
   cfg_upload_proc : process (SLOWCLK)
   begin
-    if rising_edge(SLOWCLK) then
-      if (cfg_reg_count_enable = '0') then
-        --IDLE state, don't do anything
-        ce_cfg_reg_count_enable <= '0';
-        qspi_cfg_ul_pulse_inner <= '0';
-        cc_cfg_reg_we_inner <= NREGS;
+  if rising_edge(SLOWCLK) then
+    case cfg_upload_state is
+    when S_IDLE => 
+      spi_readback_fifo_read_en_cfg_ul <= '0';
+      spi_cfg_ul_pulse_inner <= '0';
+      spi_cfg_reg_we_inner <= NREGS;
+      spi_ul_reg_inner <= x"0000";
+      if do_cfg_upload='1' then
+        spi_cmd_fifo_write_en_cfg_ul <= '1';
+        --send CMD to load address 003d...
+        spi_cmd_fifo_in_cfg_ul <= x"07B7";
+        cfg_upload_state <= S_SET_ADDR_LOWER;
       else
-        if (cc_cfg_reg_we_inner = NREGS) then
-          --first cycle after RST, move we to 0 but don't do anything else
-          ce_cfg_reg_count_enable <= '0'; 
-          qspi_cfg_ul_pulse_inner <= '0';
-          cc_cfg_reg_we_inner <= 0;          
-        elsif (cc_cfg_reg_we_inner = NREGS-1) then
-          --reset everything for next RST
-          ce_cfg_reg_count_enable <= '1';
-          qspi_cfg_ul_pulse_inner <= '0';
-          cc_cfg_reg_we_inner <= NREGS;
-        else
-          if (qspi_cfg_ul_pulse_inner = '0') then
-            --on-cycle give a UL pulse
-            ce_cfg_reg_count_enable <= '0';
-            qspi_cfg_ul_pulse_inner <= '1';
-            cc_cfg_reg_we_inner <= cc_cfg_reg_we_inner;
-          else
-            --off-cycle, update reg_we
-            ce_cfg_reg_count_enable <= '0';
-            qspi_cfg_ul_pulse_inner <= '0';
-            cc_cfg_reg_we_inner <= cc_cfg_reg_we_inner + 1;
-          end if;
-        end if;
+        spi_cmd_fifo_write_en_cfg_ul <= '0';
+        spi_cmd_fifo_in_cfg_ul <= x"0000";
+        cfg_upload_state <= S_IDLE;
       end if;
-    end if;
+     
+    when S_SET_ADDR_LOWER =>
+      spi_cmd_fifo_write_en_cfg_ul <= '1';
+      spi_readback_fifo_read_en_cfg_ul <= '0';
+      spi_cfg_ul_pulse_inner <= '0';
+      spi_cfg_reg_we_inner <= NREGS;
+      spi_ul_reg_inner <= x"0000";
+      --send CMD to load address ....5000
+      spi_cmd_fifo_in_cfg_ul <= x"5000";
+      cfg_upload_state <= S_READN;
+     
+    when S_READN =>
+      spi_cmd_fifo_write_en_cfg_ul <= '1';
+      spi_readback_fifo_read_en_cfg_ul <= '0';
+      --send CMD to read 16 words
+      spi_cmd_fifo_in_cfg_ul <= x"01C4";
+      cfg_upload_state <= S_WAIT_READ_BUSY;
+      
+    when S_WAIT_READ_BUSY =>
+      spi_cmd_fifo_write_en_cfg_ul <= '0';
+      spi_readback_fifo_read_en_cfg_ul <= '0';
+      spi_cfg_ul_pulse_inner <= '0';
+      spi_cfg_reg_we_inner <= NREGS;
+      spi_ul_reg_inner <= x"0000";
+      --wait for spi_ctrl to start reading
+      spi_cmd_fifo_in_cfg_ul <= x"0000";
+      if (SPI_READ_BUSY='1') then
+        cfg_upload_state <= S_WAIT_READ_DONE;      
+      else
+        cfg_upload_state <= S_WAIT_READ_BUSY;
+      end if;
+      
+    when S_WAIT_READ_DONE =>
+        spi_cmd_fifo_write_en_cfg_ul <= '0';
+        spi_readback_fifo_read_en_cfg_ul <= '0';
+        spi_cfg_ul_pulse_inner <= '0';
+        spi_cfg_reg_we_inner <= NREGS;
+        spi_ul_reg_inner <= x"0000";
+        --wait for spi_ctrl to finish reading
+        spi_cmd_fifo_in_cfg_ul <= x"0000";
+        if (SPI_READ_BUSY='1') then
+          readback_fifo_stall_counter <= x"F";
+          cfg_upload_state <= S_WAIT_READ_STALL;      
+        else
+          cfg_upload_state <= S_WAIT_READ_DONE;
+        end if;
+        
+    when S_WAIT_READ_STALL => 
+      --need to wait for some reason. FIFO propagation maybe?
+      spi_cmd_fifo_write_en_cfg_ul <= '0';
+      spi_readback_fifo_read_en_cfg_ul <= '0';
+      spi_cfg_ul_pulse_inner <= '0';
+      spi_cfg_reg_we_inner <= NREGS;
+      spi_ul_reg_inner <= x"0000";
+      spi_cmd_fifo_in_cfg_ul <= x"0000";
+      if (readback_fifo_stall_counter=x"0") then
+        cfg_upload_state <= S_READBACK;           
+        readback_fifo_stall_counter <= x"F";
+      else
+        cfg_upload_state <= S_WAIT_READ_STALL;
+        readback_fifo_stall_counter <= readback_fifo_stall_counter - 1;
+      end if;
+  
+    when S_READBACK =>
+      spi_cmd_fifo_write_en_cfg_ul <= '0';
+      spi_readback_fifo_read_en_cfg_ul <= '1';
+      spi_cmd_fifo_in_cfg_ul <= x"0000";
+      spi_cfg_ul_pulse_inner <= '1';
+      spi_cfg_reg_we_inner <= upload_cfg_reg_index;
+      spi_ul_reg_inner <= SPI_READBACK_FIFO_OUT;
+      --read values from readback fifo and send to CFG registers
+      spi_cmd_fifo_in_cfg_ul <= SPI_CFG_REGS(download_cfg_reg_index);
+      if (upload_cfg_reg_index=15) then
+        upload_cfg_reg_index <= 0;
+        cfg_upload_State <= S_IDLE;
+      else
+        upload_cfg_reg_index <= upload_cfg_reg_index + 1;
+        cfg_upload_state <= S_READBACK;
+      end if;
+  
+    end case;
+  end if;
   end process;
+
+
+  --multiplex signals to spi_ctrl
+  SPI_CMD_FIFO_WRITE_EN <= spi_cmd_fifo_write_en_cmd or spi_cmd_fifo_write_en_cfg_dl or spi_cmd_fifo_write_en_cfg_ul;
+  SPI_CMD_FIFO_IN <= spi_cmd_fifo_in_cmd when (spi_cmd_fifo_write_en_cmd='1') else
+                     spi_cmd_fifo_in_cfg_dl when (spi_cmd_fifo_write_en_cfg_dl='1') else 
+                     spi_cmd_fifo_in_cfg_ul when (spi_cmd_fifo_write_en_cfg_ul='1') else
+                     x"0000";
+  SPI_READBACK_FIFO_READ_EN <= spi_readback_fifo_read_en_cmd or spi_readback_fifo_read_en_cfg_ul;
+  
+  
+  --signals to VMECONFREGS
+  SPI_UL_REG <=  spi_ul_reg_inner when (spi_cfg_reg_we_inner /= NREGS) else x"0000";
+  SPI_CONST_BUSY <= '0';
+  SPI_CFG_BUSY <= '0';
+  SPI_CONST_UL_PULSE <= '0'; --never upload CONST REGs
+  SPI_CONST_REG_WE <= NREGS;
+  SPI_CFG_UL_PULSE <= spi_cfg_ul_pulse_inner;
+  SPI_CFG_REG_WE <= spi_cfg_reg_we_inner;
+  
+  
+  --TODO: upload CFG registers on reset
+  
   
   -- DTACK: always just issue on second SLOWCLK edge after STROBE
   ce_d_dtack <= STROBE and DEVICE;
