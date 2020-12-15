@@ -31,11 +31,20 @@ other devices in the future. LUTs are used to provide VME commands to the ODMB, 
     - [X] Import VME simulation
     - [X] Import DCFEB simulation (only user code reading)
   - [ ] Device 2: ODMBJTAG
-  - [x] Device 3: VMEMON
-  - [ ] Device 4: VMECONFREGS
+  - [X] Device 3: VMEMON
+  - [X] Device 4: VMECONFREGS
   - [ ] Device 5: TESTFIFOS
   - [ ] Device 6: SPI_PORT
+    - [X] CFG Register upload/download
+    - [X] Write Command FIFO
+    - [X] Read readback FIFO
+    - [ ] SPI state machine commands
+    - [ ] Read SPI status/timer
   - [ ] Device 7: SYSTEM_MON
   - [ ] Device 8: LVDBMON
   - [ ] Device 9: SYSTEM_TEST
+  - [ ] SPI_CTRL
+    - [X] Read/write/erase PROM commands
+    - [ ] Other PROM commands (status/lock/unlock/check)
+    - [ ] Timer commands
 
