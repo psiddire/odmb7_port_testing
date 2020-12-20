@@ -28,65 +28,38 @@ end SPI_CTRL;
 
 architecture SPI_CTRL_Arch of SPI_CTRL is
 
-  component spiflashprogrammer_test is
-  port
-  (
-    Clk         : in std_logic; -- untouch
-    fifoclk     : in std_logic; -- TODO, make it 6MHz as in example, or use the same as spiclk
-    ------------------------------------
-    data_to_fifo : in std_logic_vector(15 downto 0); -- until sectorcountvalid, all hardcoded
-    startaddr   : in std_logic_vector(31 downto 0);
-    startaddrvalid   : in std_logic;
-    pagecount   : in std_logic_vector(17 downto 0);
-    pagecountvalid   : in std_logic;
-    sectorcount : in std_logic_vector(13 downto 0);
-    sectorcountvalid : in std_logic;
-    ------------------------------------
-    fifowren    : in Std_logic;
-    fifofull    : out std_logic;
-    fifoempty   : out std_logic;
-    fifoafull   : out std_logic;
-    fifowrerr   : out std_logic;
-    fiforderr   : out std_logic;
-    writedone   : out std_logic;
-    ------------------------------------
-    reset       : in  std_logic;
-    read       : in std_logic;
-    readdone   : out std_logic;
-    write      : in std_logic;
-    erase     : in std_logic; 
-    eraseing     : out std_logic; 
-    erasedone     : out std_logic; 
-    ------------------------------------
-    write_nwords : in unsigned(11 downto 0);
-    ------------------------------------
-    startwrite : out std_logic;
-    out_read_inprogress : out std_logic;
-    out_rd_SpiCsB: out std_logic;
-    out_SpiCsB_N: out std_logic;
-    out_read_start: out std_logic;
-    out_SpiMosi: out std_logic;
-    out_SpiMiso: out std_logic;
-    out_CmdSelect: out std_logic_vector(7 downto 0);
-    in_CmdIndex: in std_logic_vector(3 downto 0);
-    in_rdAddr: in std_logic_vector(31 downto 0);
-    in_wdlimit: in std_logic_vector(31 downto 0);
-    out_SpiCsB_FFDin: out std_logic;
-    out_rd_data_valid_cntr: out std_logic_vector(3 downto 0);
-    out_rd_data_valid: out std_logic;
-    out_nword_cntr: out std_logic_vector(31 downto 0);
-    out_cmdreg32: out std_logic_vector(39 downto 0);
-    out_cmdcntr32: out std_logic_vector(5 downto 0);
-    out_rd_rddata: out std_logic_vector(15 downto 0);
-    out_rd_rddata_all: out std_logic_vector(15 downto 0);
-    out_er_status: out std_logic_vector(1 downto 0);
-    out_wr_statusdatavalid: out std_logic;
-    out_wr_spistatus: out std_logic_vector(1 downto 0);
-    out_wrfifo_dout: out std_logic_vector(3 downto 0);
-    out_wrfifo_rden: out std_logic
-  ); 
-  end component spiflashprogrammer_test;
-  
+  component spi_interface is
+    port
+    (
+      CLK                     : in std_logic;
+      RST                     : in std_logic;
+      ------------------ Signals to FIFO
+      WRITE_FIFO_INPUT        : in std_logic_vector(15 downto 0);
+      WRITE_FIFO_WRITE_ENABLE : in std_logic;
+      ------------------ Address loading signals
+      START_ADDRESS           : in std_logic_vector(31 downto 0);
+      START_ADDRESS_VALID     : in std_logic;
+      --PAGE_COUNT              : in std_logic_vector(17 downto 0);
+      --PAGE_COUNT_VALID        : in std_logic;
+      --SECTOR_COUNT            : in std_logic_vector(13 downto 0);
+      --SECTOR_COUNT_VALID      : in std_logic;
+      ------------------ Commands
+      WRITE_NWORDS            : in unsigned(11 downto 0);
+      START_WRITE             : in std_logic;
+      OUT_WRITE_DONE          : out std_logic;
+      READ_NWORDS             : in unsigned(11 downto 0);
+      START_READ              : in std_logic;
+      OUT_READ_DONE           : out std_logic;
+      START_ERASE             : in std_logic;
+      OUT_ERASE_DONE          : out std_logic;
+      ------------------ Read output
+      OUT_READ_DATA           : out std_logic_vector(15 downto 0);
+      OUT_READ_DATA_VALID     : out std_logic;
+      ------------------ Debug
+      DIAGOUT                 : out std_logic_vector(17 downto 0)
+     ); 	
+  end component spi_interface;
+
   component spi_cmd_fifo
     port (
       srst : IN STD_LOGIC;
@@ -130,8 +103,12 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
   signal temp_pagecount : std_logic_vector(17 downto 0) := x"0000" & "01";
   signal temp_sectorcount : std_logic_vector(13 downto 0) := x"000" & "01";
   signal temp_cmdindex : std_logic_vector(3 downto 0) := x"4"; --RDFR24QUAD
-  signal read_nwords : std_logic_vector(31 downto 0) := (others => '0');
-  type cmd_fifo_states is (S_IDLE, S_LOAD_ADDR_STALL, S_LOAD_ADDR_LOWER, S_READ_LOW, S_READ_WAIT, S_WRITE_STALL, S_WRITE_WORD, S_WRITE_LOW, S_WRITE_WAIT, S_ERASE_LOW, S_ERASE_WAIT);
+  signal read_nwords : unsigned(11 downto 0) := (others => '0');
+  type cmd_fifo_states is (
+    S_IDLE, S_LOAD_ADDR_STALL, S_LOAD_ADDR_LOWER, S_LOAD_ADDR_STALL_2,
+    S_READ_LOW, S_READ_WAIT, S_WRITE_STALL, S_WRITE_WORD, S_WRITE_LOW, 
+    S_WRITE_WAIT, S_ERASE_LOW, S_ERASE_WAIT
+  );
   signal cmd_fifo_state : cmd_fifo_states := S_IDLE;
   signal write_word_counter : unsigned(11 downto 0) := (others => '0');
   
@@ -143,7 +120,6 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
   --READ signals
   signal wr_dvalid_cnt : unsigned(31 downto 0) := x"00000000";
   signal load_rd_fifo : std_logic := '0';
-  signal controller_read_start : std_logic := '0';
   type rd_fifo_states is (S_FIFOIDLE, S_FIFOWRITE_PRE, S_FIFOWRITE);
   signal rd_fifo_state : rd_fifo_states := S_FIFOIDLE;
 
@@ -187,7 +163,7 @@ begin
         case "000" & cmd_fifo_out(4 downto 0) is
         when x"04" =>
           --read n
-          read_nwords <= x"00000" & "0" & cmd_fifo_out(15 downto 5);
+          read_nwords <= "0" & unsigned(cmd_fifo_out(15 downto 5));
           prom_read_en <= '1';
           cmd_fifo_state <= S_READ_LOW;
         when x"0A" =>
@@ -277,7 +253,7 @@ begin
       end if;
       
     when S_LOAD_ADDR_STALL => 
-      --need to wait because empty takes an extra cycle to go low?
+      --need to wait because empty takes an extra cycle to go low
       cmd_fifo_read_en <= '0';
       cmd_fifo_state <= S_LOAD_ADDR_LOWER;
             
@@ -286,11 +262,16 @@ begin
         cmd_fifo_read_en <= '1';
         prom_addr(15 downto 0) <= cmd_fifo_out;
         prom_load_addr <= '1';
-        cmd_fifo_state <= S_IDLE;
+        cmd_fifo_state <= S_LOAD_ADDR_STALL_2;
       else
         cmd_fifo_read_en <= '0';     
         cmd_fifo_state <= S_LOAD_ADDR_LOWER;
       end if;
+      
+    when S_LOAD_ADDR_STALL_2 =>
+      --need to wait because empty takes an extra cycle to go low
+      cmd_fifo_read_en <= '0';
+      cmd_fifo_state <= S_IDLE;
     
     when others =>
       --unimplemented state
@@ -301,43 +282,42 @@ begin
   end process;
   
   
-  --readback FIFO and controlling FSM
-  --when controller_read_start received from SPI wrapper, read a word to FIFO
-  process_read : process (CLK40)
-  begin
-  if rising_edge(CLK40) then
-    case rd_fifo_state is
-      when S_FIFOIDLE =>
-        wr_dvalid_cnt <= x"00000000";
-        load_rd_fifo <= '0';
-        if (controller_read_start = '1') then
-          rd_fifo_state <= S_FIFOWRITE_PRE;
-	    else
-          rd_fifo_state <= S_FIFOIDLE;
-        end if;
-      when S_FIFOWRITE_PRE =>
-        wr_dvalid_cnt <= x"00000000";
-        load_rd_fifo <= '1';
-        rd_fifo_state <= S_FIFOWRITE;
-      when S_FIFOWRITE =>
-        if ((wr_dvalid_cnt-1) = unsigned(read_nwords)) then
-          rd_fifo_state <= S_FIFOIDLE;
-          load_rd_fifo <= '0';
-          wr_dvalid_cnt <= x"00000000";
-	    else
-          if (rd_data_valid = '1') then
-            wr_dvalid_cnt <= wr_dvalid_cnt + 1;
-	      else 
-            wr_dvalid_cnt <= wr_dvalid_cnt;
-          end if;
-          load_rd_fifo <= '1';
-          rd_fifo_state <= S_FIFOWRITE;
-        end if;
-    end case;
-  end if;
-  end process;
+--  --readback FIFO and controlling FSM
+--  process_read : process (CLK40)
+--  begin
+--  if rising_edge(CLK40) then
+--    case rd_fifo_state is
+--      when S_FIFOIDLE =>
+--        wr_dvalid_cnt <= x"00000000";
+--        load_rd_fifo <= '0';
+--        if (prom_read_en = '1') then
+--          rd_fifo_state <= S_FIFOWRITE_PRE;
+--	    else
+--          rd_fifo_state <= S_FIFOIDLE;
+--        end if;
+--      when S_FIFOWRITE_PRE =>
+--        wr_dvalid_cnt <= x"00000000";
+--        load_rd_fifo <= '1';
+--        rd_fifo_state <= S_FIFOWRITE;
+--      when S_FIFOWRITE =>
+--        if (read_done = '1') then
+--          rd_fifo_state <= S_FIFOIDLE;
+--          load_rd_fifo <= '0';
+--          wr_dvalid_cnt <= x"00000000";
+--	    else
+--          if (rd_data_valid = '1') then
+--            wr_dvalid_cnt <= wr_dvalid_cnt + 1;
+--	      else 
+--            wr_dvalid_cnt <= wr_dvalid_cnt;
+--          end if;
+--          load_rd_fifo <= '1';
+--          rd_fifo_state <= S_FIFOWRITE;
+--        end if;
+--    end case;
+--  end if;
+--  end process;
 
-  readback_fifo_wr_en <= '1' when (rd_data_valid = '1' and load_rd_fifo = '1') else '0';
+  --readback_fifo_wr_en <= '1' when (rd_data_valid = '1' and load_rd_fifo = '1') else '0';
   spi_readback_fifo_i : spi_readback_fifo
       PORT MAP (
         srst => RST,
@@ -354,69 +334,47 @@ begin
         rd_rst_busy => readback_fifo_rd_rst_busy
       );
 
-  spiflashprogrammer_inst: spiflashprogrammer_test port map
-  (
-    clk => CLK40,
-    fifoclk => CLK40, --drck,
-    data_to_fifo => cmd_fifo_out,
-    startaddr => prom_addr,
-    startaddrvalid => prom_load_addr,
-    pagecount => temp_pagecount,
-    pagecountvalid => prom_load_addr,
-    sectorcount => temp_sectorcount,
-    sectorcountvalid => prom_load_addr,
-    fifowren => write_fifo_write_en,
-    fifofull => open,
-    fifoempty => open,
-    fifoafull => open,
-    fifowrerr => open,
-    fiforderr => open,
-    writedone => write_done,
-    reset => RST,
-    read => prom_read_en,
-    readdone => read_done,
-    write => prom_write_en,
-    eraseing => open,
-    erasedone => erase_done,
-    erase => prom_erase_en,
-    startwrite => open,
-    write_nwords => program_nwords,
-    out_read_inprogress => open,
-    out_rd_SpiCsB => open,
-    out_SpiCsB_N => DIAGOUT(2),
-    out_read_start => controller_read_start,
-    out_SpiMosi => DIAGOUT(1),
-    out_SpiMiso => DIAGOUT(0),
-    out_CmdSelect => open,
-    in_CmdIndex => temp_cmdindex,
-    in_rdAddr => x"00000000",
-    in_wdlimit => read_nwords,
-    out_SpiCsB_FFDin => open,
-    out_rd_data_valid_cntr => open,
-    out_rd_data_valid => rd_data_valid,
-    out_nword_cntr => open,
-    out_cmdreg32 => open,
-    out_cmdcntr32 => open,
-    out_rd_rddata => spi_readdata,
-    out_rd_rddata_all => open,
-    out_er_status => open,
-    out_wr_statusdatavalid => open,
-    out_wr_spistatus => open,
-    out_wrfifo_dout => open,
-    out_wrfifo_rden => open
+  spi_interface_inst: spi_interface 
+  port map(
+    CLK => CLK40,
+    RST => RST,
+    ------------------ Signals to FIFO
+    WRITE_FIFO_INPUT => cmd_fifo_out,
+    WRITE_FIFO_WRITE_ENABLE => write_fifo_write_en,
+    ------------------ Address loading signals
+    START_ADDRESS => prom_addr,
+    START_ADDRESS_VALID => prom_load_addr,
+    --PAGE_COUNT => temp_pagecount,
+    --PAGE_COUNT_VALID => prom_load_addr,
+    --SECTOR_COUNT => temp_sectorcount,
+    --SECTOR_COUNT_VALID => prom_load_addr,
+    ------------------ Commands
+    WRITE_NWORDS => program_nwords,
+    START_WRITE => prom_write_en,
+    OUT_WRITE_DONE => write_done,
+    READ_NWORDS => read_nwords,
+    START_READ => prom_read_en,
+    OUT_READ_DONE => read_done,
+    START_ERASE => prom_erase_en,
+    OUT_ERASE_DONE => erase_done,
+    ------------------ Read output
+    OUT_READ_DATA => spi_readdata,
+    OUT_READ_DATA_VALID => readback_fifo_wr_en,
+    ------------------ Debug
+    DIAGOUT => DIAGOUT
     );
     
   --read busy signal
   READ_BUSY <= not read_done;
     
   --debug
-  DIAGOUT(10 downto 3) <= spi_readdata(7 downto 0);
-  DIAGOUT(11) <= cmd_fifo_empty;
-  DIAGOUT(12) <= controller_read_start;
-  DIAGOUT(13) <= load_rd_fifo;
-  DIAGOUT(14) <= readback_fifo_wr_en;
-  DIAGOUT(15) <= READBACK_FIFO_READ_EN;
-  DIAGOUT(16) <= '0';
-  DIAGOUT(17) <= prom_write_en;
+  --DIAGOUT(10 downto 3) <= spi_readdata(7 downto 0);
+  --DIAGOUT(11) <= cmd_fifo_empty;
+  --DIAGOUT(12) <= '0';
+  --DIAGOUT(13) <= load_rd_fifo;
+  --DIAGOUT(14) <= readback_fifo_wr_en;
+  --DIAGOUT(15) <= READBACK_FIFO_READ_EN;
+  --DIAGOUT(16) <= '0';
+  --DIAGOUT(17) <= prom_write_en;
   
 end SPI_CTRL_Arch;

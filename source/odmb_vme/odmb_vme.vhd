@@ -486,7 +486,7 @@ begin
       TMS       => dl_jtag_tms_inner,
       FEBTDO    => DCFEB_TDO,
 
-      DIAGOUT => diagout_buf,
+      DIAGOUT => open,
       LED     => led_cfebjtag
       );
 
@@ -640,7 +640,7 @@ begin
       READBACK_FIFO_OUT => spi_readback_fifo_out,
       READBACK_FIFO_READ_EN => spi_readback_fifo_read_en,
       READ_BUSY => spi_read_busy,
-      DIAGOUT => open
+      DIAGOUT => diagout_buf
       );
 
 

@@ -1,0 +1,701 @@
+------------------------------------------------------------------------
+--   This module provides an interface for SPI communication with
+--   an EPROM. It uses the Xilinx STARTUPE3 module to output 
+--   to the normal data, clock, and chip select lines and contains
+--   processes to generate the appropriate commands.
+--
+------------------------------------------------------------------------
+
+library ieee;
+Library UNISIM;
+use ieee.std_logic_1164.all;
+use ieee.std_logic_unsigned.all;
+use ieee.numeric_std.all;
+use UNISIM.vcomponents.all;
+
+use work.Firmware_pkg.all;     -- for switch between sim and synthesis
+
+entity spi_interface is
+  port
+  (
+    CLK                     : in std_logic;
+    RST                     : in std_logic;
+    ------------------ Signals to FIFO
+    WRITE_FIFO_INPUT        : in std_logic_vector(15 downto 0);
+    WRITE_FIFO_WRITE_ENABLE : in std_logic;
+    ------------------ Address loading signals
+    START_ADDRESS           : in std_logic_vector(31 downto 0);
+    START_ADDRESS_VALID     : in std_logic;
+    --PAGE_COUNT              : in std_logic_vector(17 downto 0);
+    --PAGE_COUNT_VALID        : in std_logic;
+    --SECTOR_COUNT            : in std_logic_vector(13 downto 0);
+    --SECTOR_COUNT_VALID      : in std_logic;
+    ------------------ Commands
+    WRITE_NWORDS            : in unsigned(11 downto 0);
+    START_WRITE             : in std_logic;
+    OUT_WRITE_DONE          : out std_logic;
+    READ_NWORDS             : in unsigned(11 downto 0);
+    START_READ              : in std_logic;
+    OUT_READ_DONE           : out std_logic;
+    START_ERASE             : in std_logic;
+    OUT_ERASE_DONE          : out std_logic;
+    ------------------ Read output
+    OUT_READ_DATA           : out std_logic_vector(15 downto 0);
+    OUT_READ_DATA_VALID     : out std_logic;
+    ------------------ Debug
+    DIAGOUT                 : out std_logic_vector(17 downto 0)
+   ); 	
+end spi_interface;
+
+architecture behavioral of spi_interface is
+  attribute mark_debug : string;
+  attribute dont_touch : string;
+  attribute keep : string;
+  attribute shreg_extract : string;
+  attribute async_reg     : string;
+
+component oneshot is
+port (
+  trigger: in  std_logic;
+  clk : in std_logic;
+  pulse: out std_logic
+);
+end component oneshot;
+ 
+COMPONENT writeSpiFIFO
+  PORT (
+      srst : IN STD_LOGIC;
+      wr_clk : IN STD_LOGIC;
+      read_clk : IN STD_LOGIC;
+      din : IN STD_LOGIC_VECTOR(15 DOWNTO 0);
+      wr_en : IN STD_LOGIC;
+      read_en : IN STD_LOGIC;
+      dout : OUT STD_LOGIC_VECTOR(3 DOWNTO 0);
+      full : OUT STD_LOGIC;
+      empty : OUT STD_LOGIC;
+      prog_full : OUT STD_LOGIC;
+      wr_rst_busy : OUT STD_LOGIC;
+      read_rst_busy : OUT STD_LOGIC
+        );
+END COMPONENT;
+
+  -- SPI COMMAND ADDRESS WIDTH (IN BITS): Ensure setting is correct for the target flash
+  constant  AddrWidth        : integer   := 32;  -- 24 or 32 (3 or 4 byte addr mode)
+  -- SPI SECTOR SIZE (IN Bits)
+  constant  SectorSize       : integer := 65536; -- 64K bits
+  constant  SizeSector       : std_logic_vector(31 downto 0) := X"00010000"; -- 65536 bits
+  constant  SubSectorSize    : integer := 4096; -- 4K bits
+  constant  SizeSubSector    : std_logic_vector(31 downto 0) := X"00001000"; -- 4K bits
+  constant  NumberofSectors  : std_logic_vector(8 downto 0) := "000000000";  -- 512 Sectors total
+  constant  PageSize         : std_logic_vector(31 downto 0) := X"00000100"; -- 
+  constant  NumberofPages    : std_logic_vector(16 downto 0) := "10000000000000000"; -- 256 bytes pages = 20000h
+  constant  AddrStart32      : std_logic_vector(31 downto 0) := X"00000000"; -- First address in SPI
+  constant  AddrEnd32        : std_logic_vector(31 downto 0) := X"01FFFFFF"; -- Last address in SPI (256Mb)
+  -- SPI flash information
+  constant  Idcode25NQ256    : std_logic_vector(23 downto 0) := X"20BB19";  -- RDID N256Q 256 MB
+  
+  -- Device command opcodes
+  constant  CmdREAD24        : std_logic_vector(7 downto 0)  := X"03";
+  constant  CmdFASTREAD      : std_logic_vector(7 downto 0)  := X"0B";
+  constant  CmdREAD32        : std_logic_vector(7 downto 0)  := X"13";
+  constant  CmdRDID          : std_logic_vector(7 downto 0)  := X"9F";
+  constant  CmdRDFlashPara   : std_logic_vector(7 downto 0)  := X"5A";
+  constant  CmdRDFR24Quad    : std_logic_vector(7 downto 0)  := X"0C";
+  constant  CmdFLAGStatus    : std_logic_vector(7 downto 0)  := X"70";
+  constant  CmdStatus        : std_logic_vector(7 downto 0)  := X"05";
+  constant  CmdWE            : std_logic_vector(7 downto 0)  := X"06";
+  constant  CmdSE24          : std_logic_vector(7 downto 0)  := X"D8";
+  constant  CmdSE32          : std_logic_vector(7 downto 0)  := X"DC";
+  constant  CmdSSE24         : std_logic_vector(7 downto 0)  := X"20";
+  constant  CmdSSE32         : std_logic_vector(7 downto 0)  := X"21";
+  constant  CmdPP24          : std_logic_vector(7 downto 0)  := X"02";
+  constant  CmdPP32          : std_logic_vector(7 downto 0)  := X"12";
+  constant  CmdPP24Quad      : std_logic_vector(7 downto 0)  := X"32"; 
+  constant  CmdPP32Quad      : std_logic_vector(7 downto 0)  := X"34"; 
+  constant  Cmd4BMode        : std_logic_vector(7 downto 0)  := X"B7";
+  constant  CmdExit4BMode    : std_logic_vector(7 downto 0)  := X"E9";
+
+  ------------- STARTUPE3/SPI signals -------------------- 
+  signal spi_miso         : std_logic;
+  signal spi_mosi         : std_logic;
+  signal spi_cs_bar       : std_logic;
+  signal spi_cs_bar_input : std_logic := '1';
+  signal spi_cs_bar_delay : std_logic := '1';
+  signal di_out           : std_logic_vector(3 downto 0) := X"0";
+  signal do_in            : std_logic_vector(3 downto 0) := (others => '0');
+  signal dopin_ts         : std_logic_vector(3 downto 0) := "1110";
+  
+  ------------- Write FIFO signals -------------------- 
+  signal fifo_dout        : std_logic_vector(63 downto 0) := X"0000000000000000";
+
+  ------------- Read signals -------------------- 
+  signal read_spi_cs_bar         : std_logic := '1';
+  signal read_done               : std_logic := '1';
+  signal read_word_limit         : unsigned(31 downto 0) := x"00000000";
+  signal read_word_counter       : unsigned(31 downto 0) := x"00000000";
+  signal read_data               : std_logic_vector(15 downto 0) := X"0000";
+  signal read_data_valid         : std_logic := '0';
+  signal read_data_valid_delayed : std_logic := '0';
+  signal read_data_counter       : std_logic_vector(3 downto 0) := "0000";
+  signal read_address            : std_logic_vector(31 downto 0) := X"00000000";
+  signal read_cmdcounter         : unsigned(5 downto 0) := "111111";
+  signal read_cmdreg             : std_logic_vector(39 downto 0) := X"1111111111";
+
+  ------------- Erase signals -------------------- 
+  signal erase_spi_cs_bar       : std_logic := '1';
+  signal erase_done             : std_logic := '1';
+  signal erase_address          : std_logic_vector(31 downto 0) := x"00000000";
+  signal erase_cmdcounter       : unsigned(5 downto 0) := "111111";
+  signal erase_cmdreg           : std_logic_vector(39 downto 0) := x"1111111111";
+  signal erase_status_bit_index : std_logic_vector(7 downto 0) := x"00";
+
+  ------------- Write signals -------------------- 
+  signal write_done             : std_logic := '1';
+
+  --------------- select read command and address -------------------- 
+  --signal CmdIndex    : std_logic_vector(3 downto 0) := "0001";  
+  --signal CmdSelect    : std_logic_vector(7 downto 0) := x"FF";  
+  --signal AddSelect: std_logic_vector(31 downto 0) := x"00000000";  -- 32 bit command/addr
+  --------------- other signals/regs/counters  ------------------------
+  --signal cmdcounter    : std_logic_vector(5 downto 0) := "100111";  -- 32 bit command/addr
+  --signal cmdreg        : std_logic_vector(39 downto 0) := X"1111111111";  -- avoid LSB removal
+  --signal data_valid_cntr : std_logic_vector(2 downto 0) := "000";
+  --signal rddata          : std_logic_vector(1 downto 0) := "00";
+  --signal wrdata_count    : std_logic_vector(2 downto 0) := "000"; -- SPI from FIFO Nibble count
+  --signal spi_wrdata      : std_logic_vector(31 downto 0) := X"00000000";
+  --signal page_count      : std_logic_vector(17 downto 0) := "111111111111111111";
+  --signal Current_Addr    : std_logic_vector(31 downto 0) := X"00000000";
+  --signal StatusDataValid : std_logic := '0';
+  --signal spi_status      : std_logic_vector(1 downto 0) := "11";
+  --signal write_done : std_logic := '0';
+  --signal write_nwords_limit : unsigned(13 downto 0) := (others => '0');
+  --   ------- erase ----------------------------
+  --signal er_sector_count          : std_logic_vector(13 downto 0) := "00000000000001";    -- subsector count
+  --signal erase_address   : std_logic_vector(31 downto 0) := X"00000000"; -- start addr of current sector
+  --signal erase_spi_cs_bar       : std_logic;
+  --signal erase_start     : std_logic := '0';
+  --signal er_data_valid_cntr       : std_logic_vector(2 downto 0) := "000";
+  --signal er_rddata       : std_logic_vector(1 downto 0) := "00";
+  --signal er_status       : std_logic_vector(1 downto 0) := "11";
+  --signal erase_inprogress: std_logic := '0';
+  --signal erase_done: std_logic := '0';
+  -------------- StartupE2 signals  ---------------------------
+  --signal SpiCsB          : std_logic := '1';
+  --signal spi_mosi_int     : std_logic;
+  ------------- FIFO signals  ---------------------
+  --signal fifo_rden       : std_logic := '0';
+  --signal fifo_empty      : std_logic := '0';
+  --signal fifo_full       : std_logic := '0';
+  --signal fifo_almostfull : std_logic := '0';
+  --signal fifo_almostempty : std_logic := '0';
+  --signal fifo_unconned   : std_logic_vector(15 downto 0) := X"0000";
+  ------- Misc signal
+  --signal reset_design    : std_logic := '0';
+  --signal wrerr           : std_logic := '0';
+  --signal rderr           : std_logic := '0';
+  ----  syncers
+  ----  place sync regs close together and no SRLs
+  --signal synced_fifo_almostfull : std_logic_vector(1 downto 0) := "00";
+  --  attribute keep of synced_fifo_almostfull : signal is "true";
+  --  attribute async_reg of synced_fifo_almostfull : signal is "true";   
+  --  attribute shreg_extract of synced_fifo_almostfull : signal is "no";
+
+  --signal synced_read : std_logic_vector(1 downto 0) := "00";
+  --  attribute keep of synced_read : signal is "true";
+  --  attribute async_reg of synced_read : signal is "true";   
+  --  attribute shreg_extract of synced_read : signal is "no";
+
+  --signal synced_erase : std_logic_vector(1 downto 0) := "00";
+  --  attribute keep of synced_erase : signal is "true";
+  --  attribute async_reg of synced_erase : signal is "true";   
+  --  attribute shreg_extract of synced_erase : signal is "no";
+
+  --type wrstates is
+  --(
+  --  S_WR_IDLE, S_WR_ASSCS1, S_WR_WRCMD,  S_WR_S4BMode_ASSCS1, S_WR_S4BMode_WRCMD,S_WR_S4BMode_ASSCS2, S_WR_S4BMode_WR4BADDR,
+  --  S_WR_ASSCS2, S_WR_PROGRAM, S_WR_DATA, S_WR_PPDONE, S_WR_PPDONEPRE, S_WR_PPDONESTATUS, S_WR_PPDONE_WAIT , S_EXIT4BMode_ASSCS1, S_EXIT4BMODE
+  --);
+  --signal wrstate  : wrstates := S_WR_IDLE;
+
+  type read_states is
+  (
+    S_READ_IDLE, S_READ_ASSERT_CS, S_READ_SHIFT_READ
+  );
+  signal read_state : read_states := S_READ_IDLE;
+  
+  type erase_states is
+  (
+    S_ERASE_IDLE, S_ERASE_ASSERT_CS_WRITE_ENABLE, S_ERASE_SHIFT_WRITE_ENABLE, S_ERASE_ASSERT_CS_ERASE,
+    S_ERASE_SHIFT_ERASE, S_ERASE_ASSERT_CS_READ_STATUS, S_ERASE_SHIFT_READ_STATUS  --  
+  );
+  signal erase_state  : erase_states := S_ERASE_IDLE;
+
+ begin
+
+  STARTUPE3_inst : STARTUPE3
+  port map (
+          CFGCLK => open,
+          CFGMCLK => open,
+          EOS => open,
+          DI => di_out,  -- inspi_miso D01 pin to Fabric
+          PREQ => open,
+          -- End outputs to fabric ports
+          DO => do_in,
+          DTS => dopin_ts,
+          FCSBO => spi_cs_bar,
+          FCSBTS =>  '0',
+          GSR => '0',
+          GTS => '0',
+          KEYCLEARB => '1',
+          PACK => '1',
+          USRCCLKO => CLK,
+          USRCCLKTS => '0',  -- Clk_ts,
+          USRDONEO => '1',
+          USRDONETS => '0'    
+  );
+  
+  do_in <= fifo_dout(3 downto 1) & spi_mosi;
+  spi_miso <= di_out(1);
+
+  spi_cs_falling_edge_flipflop : process (CLK)
+  begin
+    if falling_edge(CLK) then
+      spi_cs_bar <= spi_cs_bar_input;
+    end if;
+  end process spi_cs_falling_edge_flipflop;
+  
+--  flipflop_spi_cs_bar : process (CLK)
+--  begin
+--    if rising_edge(CLK) then
+--      spi_cs_bar_delay <= spi_cs_bar_input;
+--    end if;
+--  end process flipflop_spi_cs_bar;
+
+  mux_mosi : process(CLK)
+  begin
+    if rising_edge(CLK) then
+      if (read_done = '0') then spi_mosi <= read_cmdreg(39);
+      else spi_mosi <= erase_cmdreg(39);
+  --   else 
+  --     case wrstate is
+  --       when S_WR_DATA =>
+  --         spi_mosi <= fifo_dout(0);
+  --       when others =>
+  --         spi_mosi <= write_cmdreg(39);
+  --     end case;
+      end if;
+    end if; --CLK
+  end process mux_mosi;
+
+  
+  mux_cs_bar: process (CLK)
+  begin
+    if rising_edge(CLK) then
+      if (read_done = '0') then spi_cs_bar_input <= read_spi_cs_bar;
+      else spi_cs_bar_input <= erase_spi_cs_bar;
+  --    else spi_cs_bar_input <= write_spi_cs_bar;
+  --    end if;
+      end if;
+    end if; --CLK
+  end process mux_cs_bar;
+
+--writeFIFO_i : writeSpiFIFO
+--  PORT MAP (
+--    srst => RST,
+--    wr_clk => CLK,
+--    read_clk => CLK,
+--    din => fifo_unconned,
+--    wr_en => fifowren,
+--    read_en => fifo_rden,
+--    dout => fifo_dout(3 downto 0),
+--    full => fifo_full,
+--    empty => fifo_empty,
+--    prog_full => fifo_almostfull,
+--    wr_rst_busy => open,
+--    read_rst_busy => open 
+--  );
+
+-----------------------------  pass output signals  --------------------------------------------------
+--    readdone                <= read_done;
+--    out_read_spi_cs_bar           <= read_spi_cs_bar;
+--    out_spi_cs_bar            <= spi_cs_b; 
+--    out_spi_mosi             <= spi_mosi; 
+--    out_spi_miso             <= spi_miso; 
+--    out_CmdSelect          <= CmdSelect;
+--    out_spi_cs_bar_input        <= spi_cs_bar_input; 
+--    --out_read_data_counter <= read_data_counter;
+--    out_read_data_counter(2 downto 0) <= er_data_valid_cntr;
+--    out_cmdreg <= cmdreg;
+--    out_cmdcntr32 <= read_cmdcounter;
+--
+--    out_wrfifo_rden <= fifo_rden;
+--
+--    out_wr_statusdatavalid <= StatusDataValid;
+--    out_wr_rddata <= rddata;
+--    out_wr_spistatus <= spi_status; 
+
+--read_data_valid_delayed <= read_data_valid when rising_edge(CLK);
+
+OUT_READ_DATA <= read_data;
+OUT_READ_DATA_VALID <= read_data_valid;
+OUT_READ_DONE <= read_done;
+OUT_ERASE_DONE <= erase_done;
+OUT_WRITE_DONE <= write_done;
+
+---------------------------------  PROM READ FSM  ----------------------------------------------
+--CmdSelect <= CmdStatus when CmdIndex = x"1" else
+--             CmdRDID   when CmdIndex = x"2" else
+--             CmdRDFlashPara   when CmdIndex = x"3" else
+--             --CmdRDFR24Quad  when CmdIndex = x"4" else
+--             CmdFASTREAD    when CmdIndex = x"4" else
+--             x"FF";
+
+process_read : process (CLK)
+  begin
+  if rising_edge(CLK) then
+  case read_state is 
+   when S_READ_IDLE =>
+        --when START_READ received, initiate read process
+        read_spi_cs_bar <= '1';
+        if (START_ADDRESS_VALID = '1') then read_address <= START_ADDRESS(23 downto 0) & x"00"; end if; --currently 3-byte addressing
+        if (START_READ = '1') then 
+          read_data_counter <= "0000";
+          read_word_limit(31 downto 0) <= (x"00000" & READ_NWORDS(11 downto 0)) + 1; 
+          read_data <= x"0000";
+          read_state <= S_READ_ASSERT_CS;
+          read_done <= '0';
+         end if;
+
+   when S_READ_ASSERT_CS =>
+        --assert cs_bar and prep FASTREAD command
+        read_cmdcounter <= "101001";  -- 40 bits = 8 command + 24 address + 8 dummy (10 dummy?? why?)
+        read_cmdreg <=  CmdFASTREAD & read_address; --fast read
+        read_spi_cs_bar <= '0';
+        read_state <= S_READ_SHIFT_READ;
+
+   when S_READ_SHIFT_READ =>
+        --shift FASTREAD command, address, then data back
+        if (read_cmdcounter /= 0) then 
+           read_cmdcounter <= read_cmdcounter - 1;
+           read_cmdreg <= read_cmdreg(38 downto 0) & '0';
+        else
+          --command+address are finished shifting, shift data back
+          read_data_counter <= read_data_counter + 1;
+          read_data <= read_data(14 downto 0) & spi_miso;
+          if (read_data_counter = 15) then
+              read_data_valid <= '1';
+              read_word_counter <= read_word_counter + 1;
+          else
+              read_data_valid <= '0';
+          end if;
+          if (read_word_counter = read_word_limit) then
+            read_state <= S_READ_IDLE;   -- Done. All info read 
+            read_done <= '1';
+            read_word_counter <= x"00000000";
+            read_data_counter <= "0000";
+            read_spi_cs_bar <= '1';
+          end if;  -- if rddata valid
+        end if; -- cmdcounter /= 32
+
+   end case;  
+ end if;  --rising_edge(CLK)
+end process process_read;
+
+-------------------------------  ERASE PROM FSM  --------------------------------------------------
+processerase : process (CLK)
+  begin
+  if rising_edge(CLK) then
+  case erase_state is 
+   when S_ERASE_IDLE =>
+        --when START_ERASE received, initiate erase process
+        erase_spi_cs_bar <= '1';
+        if (START_ADDRESS_VALID = '1') then erase_address <= START_ADDRESS(23 downto 0) & x"00"; end if; --currently 3-byte addressing
+        if (START_ERASE = '1') then
+          erase_done <= '0';
+          erase_state <= S_ERASE_ASSERT_CS_WRITE_ENABLE;
+         end if;
+                       
+   when S_ERASE_ASSERT_CS_WRITE_ENABLE =>
+        --assert CS and prep write enable commmand
+        erase_cmdcounter <= "000111"; --8 bits of command
+        erase_cmdreg <=  CmdWE & X"00000000";
+        erase_spi_cs_bar <= '0';
+        erase_state <= S_ERASE_SHIFT_WRITE_ENABLE;
+                  
+   when S_ERASE_SHIFT_WRITE_ENABLE =>
+         --shift write enable
+         if (erase_cmdcounter /= 0) then 
+           erase_cmdcounter <= erase_cmdcounter - 1;  
+           erase_cmdreg <= erase_cmdreg(38 downto 0) & '0';
+         else 
+           erase_spi_cs_bar <= '1';
+           erase_state <= S_ERASE_ASSERT_CS_ERASE;        
+         end if;
+                   
+   when S_ERASE_ASSERT_CS_ERASE =>
+        --assert CS and prepare for erase
+        erase_spi_cs_bar <= '0';   
+        erase_cmdreg <=  CmdSE24 & erase_address; 
+        erase_cmdcounter <= "011111"; --32 bits: 8 command + 24 address
+        erase_state <= S_ERASE_SHIFT_ERASE;
+                      
+   when S_ERASE_SHIFT_ERASE =>     
+        --shift erase command
+        if (erase_cmdcounter /= 0) then 
+          erase_cmdcounter <= erase_cmdcounter - 1;
+          erase_cmdreg <= erase_cmdreg(38 downto 0) & '0';
+        else
+          erase_spi_cs_bar <= '1';
+          erase_state <= S_ERASE_ASSERT_CS_READ_STATUS;
+        end if;
+                                      
+   when S_ERASE_ASSERT_CS_READ_STATUS =>
+        --assert cs and prepare for read status
+        erase_spi_cs_bar <= '0';   
+        erase_status_bit_index <= x"00";
+        erase_cmdcounter <= "001111"; --16 bits = 8 command + 8 to skip first read cycle
+        erase_cmdreg <=  CmdStatus & X"00000000";  -- Read Status register
+        erase_state <= S_ERASE_SHIFT_READ_STATUS;
+                  
+   when S_ERASE_SHIFT_READ_STATUS =>
+        --shift read status command and read back status register
+        if (erase_cmdcounter /= 0) then 
+          erase_cmdcounter <= erase_cmdcounter - 1;
+          erase_cmdreg <= erase_cmdreg(38 downto 0) & '0';
+        else
+          --once command is shifted and first read cycle skipped, check bit 0 on each cycle to see if done
+          erase_status_bit_index <= erase_status_bit_index + 1;
+          if (erase_status_bit_index = 0) then 
+            --status(0) is write in progress flag bit
+            --note: Hualin's firmware only checks this on bit 0 of the next cycle. Not sure if necessary
+            if (spi_miso = '0' or in_simulation) then
+              erase_state <= S_ERASE_IDLE;
+              erase_done <= '1';
+            end if;
+            --erase_in_progress_bit <= spi_miso;
+          end if;
+        end if;
+   end case;  
+ end if;  -- Clk
+end process processerase;
+
+--------------------------------------  Write Data to Program Pages  ----------------------              
+--processProgram  : process (Clk)
+--  begin
+--  if rising_edge(Clk) then
+--  case wrstate is 
+--   when S_WR_IDLE =>
+--        SpiCsB <= '1';
+--        write_done <= '0';
+--        if (START_ADDRESS_VALID = '1') then Current_Addr <= START_ADDRESS; end if;  -- no sync required. lots of time spent in _top
+--        if (pagecountvalid = '1') then page_count <= pagecount; end if;  -- no sync required
+--        --if (synced_fifo_almostfull(1) = '1') then         -- some  starting point     
+--        if (write = '1') then         -- some  starting point           
+--          dopin_ts <= "1110";
+--          data_valid_cntr <= "000";
+--          cmdcounter <= "100111";  -- 32 bit command
+--          rddata <= "00";
+--          cmdreg <=  CmdWE & X"00000000";  -- Set WE bit
+--          fifo_rden <= '0';
+--          wrdata_count <= "000";
+--          write_nwords_limit <= write_nwords & "00";
+--          spi_wrdata <= X"00000000";
+--          wrstate <= S_WR_S4BMode_ASSCS1;
+--          --wrstate <= S_WR_ASSCS1;
+--        end if;
+--                       
+-------------------   Set 4 Byte mode first -----------------------------------------------------
+--   when S_WR_S4BMode_ASSCS1 =>
+--        SpiCsB <= '0';
+--        wrstate <= S_WR_S4BMode_WRCMD;
+--          
+--   when S_WR_S4BMode_WRCMD =>    -- Set WE bit
+--        if (cmdcounter /= 32) then cmdcounter <= cmdcounter - 1; 
+--          cmdreg <= cmdreg(38 downto 0) & '0'; 
+--        else
+--          cmdreg <=  Cmd4BMode  & X"00000000";  -- Flag Status register
+--          cmdcounter <= "100111";  -- 40 bit command+addr
+--          SpiCsB <= '1';   -- turn off SPI 
+--          wrstate <= S_WR_S4BMode_ASSCS2; 
+--        end if;
+--        
+--   when S_WR_S4BMode_ASSCS2 =>
+--        SpiCsB <= '0';
+--        wrstate <= S_WR_S4BMode_WR4BADDR;
+--                        
+--   when S_WR_S4BMode_WR4BADDR =>    -- Set 4-Byte address Mode
+--        if (cmdcounter /= 32) then cmdcounter <= cmdcounter - 1;  
+--           cmdreg <= cmdreg(38 downto 0) & '0';
+--        else 
+--          SpiCsB <= '1';   -- turn off SPI
+--          cmdcounter <= "100111";  -- 32 bit command
+--          cmdreg <=  CmdWE & X"00000000";  -- Write Enable 
+--          wrstate <= S_WR_ASSCS1;  
+--        end if;  
+---------------------------  end set 4 byte Mode
+--
+--   when S_WR_ASSCS1 =>
+--        --if (page_count /= 0) then 
+--        --  if (synced_fifo_almostfull(1) = '1') then
+--        --    SpiCsB <= '0';
+--        --    wrstate <= S_WR_WRCMD;
+--        --  end if;
+--        --else 
+--        --don't wait for fifo anymore?
+--          SpiCsB <= '0';
+--          wrstate <= S_WR_WRCMD;
+--        --end if;
+--                  
+--   when S_WR_WRCMD =>    -- Set WE bit
+--        if (cmdcounter /= 32) then cmdcounter <= cmdcounter - 1;  
+--          cmdreg <= cmdreg(38 downto 0) & '0';
+--        elsif (write_nwords_limit /= 0) then    -- Next PP
+--          SpiCsB <= '1';   -- turn off SPI
+--          cmdreg <=  CmdPP32Quad & Current_Addr;  -- Program Page at Current_Addr
+--          --cmdreg <=  CmdPP24Quad & Current_Addr;  -- Program Page at Current_Addr
+--          cmdcounter <= "100111";
+--          wrstate <= S_WR_ASSCS2;
+--        else                              -- Done with writing Program Pages. Turn off 4 byte Mode
+--          cmdcounter <= "100111";
+--          cmdreg <= CmdExit4BMode & X"00000000";
+--          SpiCsB <= '1';
+--          write_done <= '1';
+--          --wrstate <= S_WR_IDLE;  
+--          wrstate <= S_EXIT4BMode_ASSCS1;        
+--        end if;
+--                   
+--   when S_WR_ASSCS2 =>
+--        SpiCsB <= '0';
+--        wrstate <= S_WR_PROGRAM;
+--                                                 
+--   when S_WR_PROGRAM =>  -- send Program command
+--        if (cmdcounter /= 0) then cmdcounter <= cmdcounter - 1;
+--          cmdreg <= cmdreg(38 downto 0) & '0';
+--        else 
+--          fifo_rden <= '1';
+--          wrstate <= S_WR_DATA;
+--          dopin_ts <= "0000";
+--        end if;
+--                          
+--   when S_WR_DATA =>
+--        SpiCsB <= '0';
+--        wrdata_count <= wrdata_count +1;
+--        if (wrdata_count = 7) then -- 8x4 bits from FIFO.  wrdata_count rolls over to 0
+--          Current_Addr <= Current_Addr + 4;  -- 4 bytes out of 256 bytes per page   
+--          if (write_nwords_limit /= 0) then
+--            write_nwords_limit <= write_nwords_limit - 1;
+--          end if;
+--          if ((Current_Addr(7 downto 0) = 252)) then   -- every 256 bytes (1 PP) written, only check lower bits = mod 256
+--            SpiCsB <= '1';
+--            fifo_rden <= '0';
+--            dopin_ts <= "1110";
+--            cmdreg <=  CmdStatus & X"00000000";  -- Read Status register next
+--            --cmdreg <=  CmdFLAGStatus & X"00000000";  -- Read Status register next
+--            wrstate <= S_WR_PPDONEPRE;  -- one PP done
+--          end if;
+--        end if;
+----                    
+---- this part is strange, if only do read stataus once, will get 11111111 always from miso
+--   when S_WR_PPDONEPRE =>
+--        SpiCsB <= '0';
+--        cmdcounter <= "100111";
+--        wrstate <= S_WR_PPDONESTATUS;
+--                       
+--   when S_WR_PPDONESTATUS =>    
+--        if (cmdcounter /= 32) then cmdcounter <= cmdcounter - 1; 
+--          cmdreg <= cmdreg(38 downto 0) & '0'; 
+--        else
+--          cmdreg <=  CmdStatus  & X"00000000";  
+--          cmdcounter <= "100111";  
+--          SpiCsB <= '1';   -- turn off SPI 
+--          wrstate <= S_WR_PPDONE; 
+--        end if;
+--
+--   when S_WR_PPDONE =>
+--        dopin_ts <= "1110";
+--        SpiCsB <= '0';
+--        data_valid_cntr <= "000";
+--        cmdcounter <= "100111";
+--        wrstate <= S_WR_PPDONE_WAIT;
+----                    
+--   when S_WR_PPDONE_WAIT => 
+--        fifo_rden <= '0';  
+--        if (reset_design = '1') then wrstate <= S_WR_IDLE;
+--        else 
+--          if (cmdcounter /= 31) then cmdcounter <= cmdcounter - 1; 
+--            cmdreg <= cmdreg(38 downto 0) & '0';
+--          else -- keep reading the status register
+--            data_valid_cntr <= data_valid_cntr + 1;  -- rolls over to 0
+--            rddata <= rddata(1) & spi_miso;  -- deser 1:8  
+--            --rddata <= rddata(1) & "0" ;  -- deser 1:8  
+--            if (data_valid_cntr = 7) then  -- catch status byte
+--              StatusDataValid <= '1';    -- copy WE and Write in progress one cycle after rddate
+--            else 
+--              StatusDataValid <= '0';
+--            end if;
+--            if (StatusDataValid = '1') then spi_status <= rddata; end if;  --  rddata valid from previous cycle
+--            if (spi_status = 0 or in_simulation) then    -- Done with page program
+--            --if spi_status = 1 then    -- Done with page program
+--              SpiCsB <= '1';   -- turn off SPI
+--              cmdcounter <= "100111";
+--              cmdreg <=  CmdWE & X"00000000";  -- Set WE bit
+--              data_valid_cntr <= "000";
+--              StatusDataValid <= '0';
+--              spi_status <= "11";
+--              page_count <= page_count - 1;
+--              wrstate <= S_WR_ASSCS1;
+--            end if;  -- spi_status
+--          end if;  -- cmdcounter
+--        end if;  -- reset_design
+--                          
+-------------------   Exit 4 Byte mode ------------------------------------    
+--   when S_EXIT4BMode_ASSCS1 =>
+--        SpiCsB <= '0';   
+--        wrstate <= S_EXIT4BMODE;
+--         
+--   when S_EXIT4BMODE =>    -- Back to 3 Byte Mode
+--        if (cmdcounter /= 32) then cmdcounter <= cmdcounter - 1;  
+--          cmdreg <= cmdreg(38 downto 0) & '0';
+--        else 
+--          SpiCsB <= '1';   -- turn off SPI 
+--          write_done <= '1';
+--          wrstate <= S_WR_IDLE;  
+--        end if; 
+--    end case;
+--   end if;  -- Clk
+--end process processProgram;
+--
+-------------------------------  write sectors end  --------------------------------------------------
+
+--------------********* misc **************---------------------
+--fifo_unconned(15 downto 0) <= data_to_fifo;
+---- to top design. Some may require syncronizers when used   
+--fifofull    <= fifo_full;
+--fifoempty   <= fifo_empty;        -- May require synconizer when used
+--fifoafull   <= fifo_almostfull;   -- May require synconizer when used
+--fifowrerr   <= wrerr;
+--fiforderr   <= rderr;             -- May require synconizer when used
+
+--DIAGOUT(3 downto 0) <= do_in;
+--DIAGOUT(4) <= di_out(1);
+--DIAGOUT(5) <= spi_cs_bar;
+--DIAGOUT(6) <= START_READ;
+--DIAGOUT(7) <= read_done;
+--DIAGOUT(8) <= START_ERASE;
+--DIAGOUT(9) <= erase_done;
+--DIAGOUT(10) <= START_WRITE;
+--DIAGOUT(11) <= write_done;
+--DIAGOUT(12) <= WRITE_FIFO_WRITE_ENABLE;
+--DIAGOUT(13) <= read_data_valid;
+--DIAGOUT(14) <= START_ADDRESS_VALID;
+--DIAGOUT(17 downto 15) <= read_data(2 downto 0);
+DIAGOUT(7 downto 0) <= START_ADDRESS(23 downto 16);
+DIAGOUT(8) <= read_data_valid;
+DIAGOUT(9) <= START_READ;
+DIAGOUT(11 downto 10) <= read_data(1 downto 0);
+DIAGOUT(15 downto 12) <= do_in;
+DIAGOUT(16) <= spi_cs_bar;
+DIAGOUT(17) <= START_ADDRESS_VALID;
+
+end behavioral;
+

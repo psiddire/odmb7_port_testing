@@ -27,10 +27,10 @@ proc execute_vme_command {ADDR DATA} {
     commit_hw_vio [get_hw_probes {vio_vme_data} -of_objects [get_hw_vios -of_objects [get_hw_devices xcku040_0] -filter {CELL_NAME=~"vio_input_i"}]]
     set_property OUTPUT_VALUE 1 [get_hw_probes vio_issue_vme_cmd_vector -of_objects [get_hw_vios -of_objects [get_hw_devices xcku040_0] -filter {CELL_NAME=~"vio_input_i"}]]
     commit_hw_vio [get_hw_probes {vio_issue_vme_cmd_vector} -of_objects [get_hw_vios -of_objects [get_hw_devices xcku040_0] -filter {CELL_NAME=~"vio_input_i"}]]
-    after 1
+    after 100
     set_property OUTPUT_VALUE 0 [get_hw_probes vio_issue_vme_cmd_vector -of_objects [get_hw_vios -of_objects [get_hw_devices xcku040_0] -filter {CELL_NAME=~"vio_input_i"}]]
     commit_hw_vio [get_hw_probes {vio_issue_vme_cmd_vector} -of_objects [get_hw_vios -of_objects [get_hw_devices xcku040_0] -filter {CELL_NAME=~"vio_input_i"}]]
-    after 1
+    after 200
   }
 }
 
