@@ -106,7 +106,7 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
   signal read_nwords : unsigned(11 downto 0) := (others => '0');
   type cmd_fifo_states is (
     S_IDLE, S_LOAD_ADDR_STALL, S_LOAD_ADDR_LOWER, S_LOAD_ADDR_STALL_2,
-    S_READ_LOW, S_READ_WAIT, S_WRITE_STALL, S_WRITE_WORD, S_WRITE_LOW, 
+    S_READ_LOW, S_READ_WAIT, S_WRITE_STALL, S_WRITE_WORD,
     S_WRITE_WAIT, S_ERASE_LOW, S_ERASE_WAIT
   );
   signal cmd_fifo_state : cmd_fifo_states := S_IDLE;
@@ -116,7 +116,7 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
   signal write_fifo_write_en : std_logic := '0';
   signal prom_read_en, prom_erase_en, prom_write_en : std_logic := '0';
   signal read_done, erase_done, write_done : std_logic := '0';
-
+  
   --READ signals
   signal wr_dvalid_cnt : unsigned(31 downto 0) := x"00000000";
   signal load_rd_fifo : std_logic := '0';
@@ -150,9 +150,16 @@ begin
       );
 
   --FSM to handle command FIFO
-  process_cmd_fifo : process(CLK40)
+  process_cmd_fifo : process(CLK40, RST)
   begin
-  if (rising_edge(CLK40)) then
+  if (RST='1') then
+    cmd_fifo_state <= S_IDLE;
+    prom_read_en <= '0';
+    prom_write_en <= '0';
+    prom_erase_en <= '0';
+    write_fifo_write_en <= '0';
+    prom_load_addr <= '0';
+  elsif (rising_edge(CLK40)) then
     case cmd_fifo_state is
     
     when S_IDLE =>
@@ -228,7 +235,7 @@ begin
         if (write_word_counter = program_nwords) then
           write_word_counter <= x"000";
           prom_write_en <= '1';
-          cmd_fifo_state <= S_WRITE_LOW;
+          cmd_fifo_state <= S_WRITE_WAIT;
         else
           write_word_counter <= write_word_counter + 1;
           cmd_fifo_state <= S_WRITE_STALL;
@@ -239,13 +246,10 @@ begin
         cmd_fifo_state <= S_WRITE_WORD;
       end if;
       
-    when S_WRITE_LOW => 
-      prom_write_en <= '0';
-      cmd_fifo_read_en <= '0';
-      cmd_fifo_state <= S_WRITE_WAIT;
-      
     when S_WRITE_WAIT => 
+      prom_write_en <= '0';
       write_fifo_write_en <= '0';
+      cmd_fifo_read_en <= '0';
       if (write_done='1') then
         cmd_fifo_state <= S_IDLE;
       else 
@@ -334,34 +338,36 @@ begin
         rd_rst_busy => readback_fifo_rd_rst_busy
       );
 
+  --SPI program shifts bytes in 2 nibbles with MSB at beginning
+
   spi_interface_inst: spi_interface 
   port map(
-    CLK => CLK40,
-    RST => RST,
+    CLK                     => CLK40,
+    RST                     => RST,
     ------------------ Signals to FIFO
-    WRITE_FIFO_INPUT => cmd_fifo_out,
+    WRITE_FIFO_INPUT        => cmd_fifo_out,
     WRITE_FIFO_WRITE_ENABLE => write_fifo_write_en,
     ------------------ Address loading signals
-    START_ADDRESS => prom_addr,
-    START_ADDRESS_VALID => prom_load_addr,
-    --PAGE_COUNT => temp_pagecount,
-    --PAGE_COUNT_VALID => prom_load_addr,
-    --SECTOR_COUNT => temp_sectorcount,
-    --SECTOR_COUNT_VALID => prom_load_addr,
+    START_ADDRESS           => prom_addr,
+    START_ADDRESS_VALID     => prom_load_addr,
+    --PAGE_COUNT            => temp_pagecount,
+    --PAGE_COUNT_VALID      => prom_load_addr,
+    --SECTOR_COUNT          => temp_sectorcount,
+    --SECTOR_COUNT_VALID    => prom_load_addr,
     ------------------ Commands
-    WRITE_NWORDS => program_nwords,
-    START_WRITE => prom_write_en,
-    OUT_WRITE_DONE => write_done,
-    READ_NWORDS => read_nwords,
-    START_READ => prom_read_en,
-    OUT_READ_DONE => read_done,
-    START_ERASE => prom_erase_en,
-    OUT_ERASE_DONE => erase_done,
+    WRITE_NWORDS            => program_nwords,
+    START_WRITE             => prom_write_en,
+    OUT_WRITE_DONE          => write_done,
+    READ_NWORDS             => read_nwords,
+    START_READ              => prom_read_en,
+    OUT_READ_DONE           => read_done,
+    START_ERASE             => prom_erase_en,
+    OUT_ERASE_DONE          => erase_done,
     ------------------ Read output
-    OUT_READ_DATA => spi_readdata,
-    OUT_READ_DATA_VALID => readback_fifo_wr_en,
+    OUT_READ_DATA           => spi_readdata,
+    OUT_READ_DATA_VALID     => readback_fifo_wr_en,
     ------------------ Debug
-    DIAGOUT => DIAGOUT
+    DIAGOUT                 => DIAGOUT
     );
     
   --read busy signal

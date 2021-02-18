@@ -118,6 +118,7 @@ architecture Behavioral of ODMB7_UCSB_DEV is
       CLK40       : in std_logic;  -- NEW (fastclk -> 40MHz)
       CLK10       : in std_logic;  -- NEW (midclk -> fastclk/4 -> 10MHz)
       CLK2P5      : in std_logic;  -- 2.5 MHz clock
+      CLK1P25     : in std_logic;
 
       --------------------
       -- VME signals  <-- relevant ones only
@@ -161,8 +162,6 @@ architecture Behavioral of ODMB7_UCSB_DEV is
       LVMB_SCLK  : out std_logic;
       LVMB_SDIN  : out std_logic;
       LVMB_SDOUT : in  std_logic;
-
-      -- DIAGOUT_LVDBMON  : out std_logic_vector(17 downto 0);
 
       --------------------
       -- TODO: DCFEB PRBS signals
@@ -222,7 +221,8 @@ architecture Behavioral of ODMB7_UCSB_DEV is
       -- Other
       --------------------
       DIAGOUT     : out std_logic_vector (17 downto 0); -- for debugging
-      RST         : in std_logic
+      RST         : in std_logic;
+      PON_RESET   : in std_logic
       );
   end component;
 
@@ -641,7 +641,8 @@ begin
       CLK160         => CLK160,
       CLK40          => CLK40,
       CLK10          => CLK10,
-      CLK2P5	     => clk2p5,
+      CLK2P5	       => clk2p5,
+      CLK1P25        => clk1p25,
 
       VME_DATA_IN    => vme_data_in_buf,
       VME_DATA_OUT   => vme_data_out_buf,
@@ -718,8 +719,9 @@ begin
       CHANGE_REG_DATA => change_reg_data,
       CHANGE_REG_INDEX => change_reg_index,
 
-      DIAGOUT  => diagout_inner,
-      RST      => reset
+      DIAGOUT   => diagout_inner,
+      RST       => reset,
+      PON_RESET => pon_reset
       );
 
   MBC : ODMB_CTRL 

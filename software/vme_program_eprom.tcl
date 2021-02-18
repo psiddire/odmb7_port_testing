@@ -21,16 +21,19 @@ proc execute_vme_command {ADDR DATA} {
   if {$DEBUG_MODE == 1} {
     puts "VME $ADDR $DATA"
   } else {
+    puts "VME $ADDR $DATA"
     set_property OUTPUT_VALUE $ADDR [get_hw_probes vio_vme_addr -of_objects [get_hw_vios -of_objects [get_hw_devices xcku040_0] -filter {CELL_NAME=~"vio_input_i"}]]
     commit_hw_vio [get_hw_probes {vio_vme_addr} -of_objects [get_hw_vios -of_objects [get_hw_devices xcku040_0] -filter {CELL_NAME=~"vio_input_i"}]]
+    after 100
     set_property OUTPUT_VALUE $DATA [get_hw_probes vio_vme_data -of_objects [get_hw_vios -of_objects [get_hw_devices xcku040_0] -filter {CELL_NAME=~"vio_input_i"}]]
     commit_hw_vio [get_hw_probes {vio_vme_data} -of_objects [get_hw_vios -of_objects [get_hw_devices xcku040_0] -filter {CELL_NAME=~"vio_input_i"}]]
+    after 100
     set_property OUTPUT_VALUE 1 [get_hw_probes vio_issue_vme_cmd_vector -of_objects [get_hw_vios -of_objects [get_hw_devices xcku040_0] -filter {CELL_NAME=~"vio_input_i"}]]
     commit_hw_vio [get_hw_probes {vio_issue_vme_cmd_vector} -of_objects [get_hw_vios -of_objects [get_hw_devices xcku040_0] -filter {CELL_NAME=~"vio_input_i"}]]
-    after 100
+    after 200
     set_property OUTPUT_VALUE 0 [get_hw_probes vio_issue_vme_cmd_vector -of_objects [get_hw_vios -of_objects [get_hw_devices xcku040_0] -filter {CELL_NAME=~"vio_input_i"}]]
     commit_hw_vio [get_hw_probes {vio_issue_vme_cmd_vector} -of_objects [get_hw_vios -of_objects [get_hw_devices xcku040_0] -filter {CELL_NAME=~"vio_input_i"}]]
-    after 200
+    after 700
   }
 }
 
@@ -88,8 +91,8 @@ proc main {} {
   #startup stuff
   #firmware/block/write size in words
   set FIRMWARE_SIZE [expr 5464972 / 2]
-  set BLOCK_SIZE 0x10000
-  set WRITE_SIZE 0x400
+  set BLOCK_SIZE 0x8000 ;#half the size of the old sectors
+  set WRITE_SIZE 0x40 ;#1/2 page, previously 0x400. Could go higher
   set input_file [open "../cfg_reg_prom_test.bin" r]
   fconfigure $input_file -translation binary
   set bindata [read $input_file] ;#hopefully no memory issues??
@@ -105,10 +108,14 @@ proc main {} {
     incr blocks
   }
   puts "Erasing EPROM..."
+  set fulladdr 0
   for {set i 0} {$i<$blocks} {incr i} {
-    odmbeprom_loadaddress $i 0
+    set uaddr [expr $fulladdr >> 16]
+    set laddr [expr $fulladdr & 0xFFFF]
+    odmbeprom_loadaddress $uaddr $laddr
     execute_vme_command "602C" "0014" ;#BPI unlock
     execute_vme_command "602C" "000A" ;#BPI block erase
+    set fulladdr [expr $fulladdr + [expr 2 * $BLOCK_SIZE]]
     after 2000
     #if {$i == 1} {
     #  break
@@ -130,9 +137,9 @@ proc main {} {
     odmbeprom_loadaddress $uaddr $laddr
     odmbeprom_bufferprogram $nwords $bindata [expr $i * $WRITE_SIZE]
     after 120
-    set fulladdr [expr $fulladdr + $WRITE_SIZE]
+    set fulladdr [expr $fulladdr + [expr 2 * $WRITE_SIZE]]
     #progress bar here
-    if {$i == 1} {
+    if {$i == 4} {
       break
     }
   }
@@ -144,7 +151,7 @@ proc main {} {
   after 100
   execute_vme_command "6024" "0000" ;#BPI disable
   if {$DEBUG_MODE == 0} {
-    #close_hw
+    close_hw
   }
 }
 

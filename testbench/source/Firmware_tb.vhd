@@ -377,7 +377,10 @@ begin
               PROBE_OUT2 => vio_vme_addr,
               PROBE_OUT3 => vio_vme_data
             );
+  
+  --in simulation, VIO always outputs 0, even though this output is default 1
   use_vio_input <= use_vio_input_vector(0);
+
   vio_issue_vme_cmd <= vio_issue_vme_cmd_vector(0);
             
   -- Process to generate counter and initialization

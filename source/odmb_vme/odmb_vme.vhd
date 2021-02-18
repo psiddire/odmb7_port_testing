@@ -40,6 +40,7 @@ entity ODMB_VME is
     CLK40       : in std_logic;  -- NEW (fastclk -> 40MHz)
     CLK10       : in std_logic;  -- NEW (midclk -> fastclk/4 -> 10MHz)
     CLK2P5      : in std_logic;  -- 2.5 MHz clock
+    CLK1P25     : in std_logic;
 
     --------------------
     -- VME signals  <-- relevant ones only
@@ -83,8 +84,6 @@ entity ODMB_VME is
     LVMB_SCLK  : out std_logic;
     LVMB_SDIN  : out std_logic;
     LVMB_SDOUT : in  std_logic;
-
-    -- DIAGOUT_LVDBMON  : out std_logic_vector(17 downto 0);
 
     --------------------
     -- TODO: DCFEB PRBS signals
@@ -145,7 +144,8 @@ entity ODMB_VME is
     -- Other
     --------------------
     DIAGOUT     : out std_logic_vector (17 downto 0); -- for debugging
-    RST         : in std_logic
+    RST         : in std_logic;
+    PON_RESET   : in std_logic
     );
 end ODMB_VME;
 
@@ -324,6 +324,29 @@ architecture Behavioral of ODMB_VME is
       );
   end component;
 
+  component LVDBMON is
+    port (
+      SLOWCLK   : in std_logic;
+      RST       : in std_logic;
+      PON_RESET : in std_logic;
+      DEVICE  : in std_logic;
+      STROBE  : in std_logic;
+      COMMAND : in std_logic_vector(9 downto 0);
+      WRITER  : in std_logic;
+      INDATA  : in  std_logic_vector(15 downto 0);
+      OUTDATA : out std_logic_vector(15 downto 0);
+      DTACK : out std_logic;
+
+      LVADCEN : out std_logic_vector(6 downto 0);
+      ADCCLK  : out std_logic;
+      ADCDATA : out std_logic;
+      ADCIN   : in  std_logic;
+      LVTURNON   : out std_logic_vector(8 downto 1);
+      R_LVTURNON : in  std_logic_vector(8 downto 1);
+      LOADON     : out std_logic
+      );
+  end component;
+
   component COMMAND_MODULE is
     port (
       FASTCLK : in std_logic;
@@ -438,8 +461,9 @@ begin
   outdata_dev(0) <= (others => '0');
   outdata_dev(2) <= (others => '0');
   outdata_dev(5) <= (others => '0');
+  outdata_dev(7) <= (others => '0');
   -- This will not be needed when all devs are ready --devtmp
-  GEN_OUTDATA_DEV : for dev in 7 to num_dev generate --devtmp
+  GEN_OUTDATA_DEV : for dev in 9 to num_dev generate --devtmp
     outdata_dev(dev) <= (others => '0');             --devtmp
   end generate GEN_OUTDATA_DEV;                      --devtmp
   idx_dev <= to_integer(unsigned(cmd_adrs_inner(15 downto 12)));
@@ -452,6 +476,7 @@ begin
   ----------------------------------
   -- misc
   ----------------------------------
+  PON_OE_B <= '1';
   ODMB_ID <= odmb_id_inner;
 
   ----------------------------------
@@ -575,9 +600,9 @@ begin
         SPI_CFG_REGS        => spi_cfg_regs
       );      
       
-      DEV6_SPI_PORT_I : SPI_PORT
-      generic map (NREGS => NREGS)
-      port map (
+  DEV6_SPI_PORT_I : SPI_PORT
+    generic map (NREGS => NREGS)
+    port map (
         SLOWCLK => CLK2P5,
         CLK => CLK40,
         RST => RST, 
@@ -603,6 +628,28 @@ begin
         SPI_READBACK_FIFO_READ_EN => spi_readback_fifo_read_en,
         SPI_READ_BUSY => spi_read_busy
       );
+  
+  DEV8_LVDBMON:LVDBMON
+    port map(
+      SLOWCLK => CLK1P25,
+      RST => RST,
+      PON_RESET => PON_RESET,
+      DEVICE => device(8),
+      STROBE => strobe,
+      COMMAND => cmd,
+      WRITER => vme_write_b,
+      INDATA => VME_DATA_IN,
+      OUTDATA => outdata_dev(8),
+      DTACK => dtack_dev(8),
+      --LVMB signals
+      LVADCEN => LVMB_CSB,
+      ADCCLK => LVMB_SCLK,
+      ADCDATA => LVMB_SDIN,
+      ADCIN => LVMB_SDOUT,
+      LVTURNON => LVMB_PON,
+      R_LVTURNON => R_LVMB_PON,
+      LOADON => PON_LOAD
+    );
 
   COMMAND_PM : COMMAND_MODULE
     port map (
