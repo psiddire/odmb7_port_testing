@@ -37,6 +37,46 @@ architecture Behavioral of Firmware_tb is
     probe1 : in std_logic_vector(4095 downto 0) := (others => '0')
   );
   end component;
+
+  component DCFEB_DS_WRAPPER is
+  port (
+    clk          : in std_logic;
+    dcfebclk     : in std_logic;
+    rst          : in std_logic;
+    l1a_p        : in std_logic;
+    l1a_n        : in std_logic;
+    l1a_match_p  : in std_logic;
+    l1a_match_n  : in std_logic;
+    tx_ack       : in std_logic;
+    nwords_dummy : in std_logic_vector(15 downto 0);
+    dcfeb_dv      : out std_logic;
+    dcfeb_data    : out std_logic_vector(15 downto 0);
+    adc_mask      : out std_logic_vector(11 downto 0);
+    dcfeb_fsel    : out std_logic_vector(63 downto 0);
+    dcfeb_jtag_ir : out std_logic_vector(9 downto 0);
+    trst          : in  std_logic;
+    tck_p         : in  std_logic;
+    tck_n         : in  std_logic;
+    tms_p         : in  std_logic;
+    tms_n         : in  std_logic;
+    tdi_p         : in  std_logic;
+    tdi_n         : in  std_logic;
+    tdo_p         : out std_logic;
+    tdo_n         : out std_logic;
+    rtn_shft_en   : out std_logic;
+    done          : out std_logic;
+    INJPLS_P      : in std_logic;
+    INJPLS_N      : in std_logic;
+    EXTPLS_P      : in std_logic;
+    EXTPLS_N      : in std_logic;
+    BC0_P         : in std_logic;
+    BC0_N         : in std_logic;
+    RESYNC_P      : in std_logic;
+    RESYNC_N      : in std_logic;
+    DIAGOUT       : out std_logic_vector(17 downto 0)
+  );
+  end component;
+  
   component dcfeb_v6 is
   port (
       CLK          : in std_logic;
@@ -64,6 +104,23 @@ architecture Behavioral of Firmware_tb is
       RESYNC        : in std_logic;
       DIAGOUT       : out std_logic_vector(17 downto 0)
    );
+   end component;
+   component LVMB is
+     generic (
+       NFEB : integer := NCFEB
+       );  
+     port (
+       RST : in std_logic;
+       LVMB_SCLK     : in  std_logic;
+       LVMB_SDIN     : in  std_logic;
+       LVMB_SDOUT_P  : out std_logic;
+       LVMB_SDOUT_N  : out std_logic;
+       LVMB_CSB      : in std_Logic_vector((NFEB-1) downto 0);
+       LVMB_PON      : in std_Logic_vector(NFEB downto 0);
+       MON_LVMB_PON  : out std_Logic_vector(NFEB downto 0);
+       PON_LOAD_B    : in std_logic;
+       PON_OE        : in std_logic
+       );
    end component;
    component vme_master is
    port (
@@ -246,14 +303,15 @@ architecture Behavioral of Firmware_tb is
 
   signal dcfeb_done       : std_logic_vector (NCFEB downto 1) := (others => '0');
 
-  signal lvmb_pon   : std_logic_vector(7 downto 0);
-  signal pon_load   : std_logic;
-  signal pon_oe_B   : std_logic;
-  signal r_lvmb_PON : std_logic_vector(7 downto 0);
-  signal lvmb_csb   : std_logic_vector(6 downto 0);
-  signal lvmb_sclk  : std_logic;
-  signal lvmb_sdin  : std_logic;
-  signal lvmb_sdout : std_logic;
+  signal lvmb_pon     : std_logic_vector(7 downto 0);
+  signal pon_load     : std_logic;
+  signal pon_oe       : std_logic;
+  signal r_lvmb_PON   : std_logic_vector(7 downto 0);
+  signal lvmb_csb     : std_logic_vector(6 downto 0);
+  signal lvmb_sclk    : std_logic;
+  signal lvmb_sdin    : std_logic;
+  signal lvmb_sdout_p : std_logic;
+  signal lvmb_sdout_n : std_logic;
 
   signal dcfeb_prbs_FIBER_SEL : std_logic_vector(3 downto 0);
   signal dcfeb_prbs_EN        : std_logic;
@@ -275,14 +333,13 @@ architecture Behavioral of Firmware_tb is
   signal lut_input2_dout_c : std_logic_vector(bw_input2-1 downto 0) := (others=> '0');
 
   --signals for generating input to VME
-  signal input_dav : std_logic := '0';
   signal cmddev    : std_logic_vector(15 downto 0) := (others=> '0');
   attribute mark_debug of cmddev : signal is "true";
   signal nextcmd   : std_logic := '1';
   signal cack      : std_logic := 'H';
   attribute mark_debug of cack : signal is "true";
   signal cack_reg  : std_logic := 'H';
-  signal cack_i  : std_logic := '1';
+  signal cack_i    : std_logic := '1';
 
   -- Checker bit
   signal checker  : std_logic := '0';
@@ -338,7 +395,13 @@ begin
   trig0(31 downto 16) <= vme_data_io_in;
   trig0(15 downto 0) <= cmddev;
   --
-  data(4095 downto 102) <= (others => '0');
+  data(4095 downto 122) <= (others => '0');
+  data(121) <= pon_load;
+  data(120 downto 113) <= r_lvmb_pon;
+  data(112 downto 105) <= lvmb_pon;
+  data(104) <= lvmb_sdout_p;
+  data(103) <= lvmb_sdin;
+  data(102) <= lvmb_sclk;
   data(101) <= vme_dtack;
   data(100) <= rst_global;
   data(99) <= cack;
@@ -423,7 +486,6 @@ begin
                 lut_input_addr1_s <= to_unsigned(0,bw_addr);
                 lut_input_addr2_s <= to_unsigned(0,bw_addr);
                 cmddev <= std_logic_vector(init_input1);
-                input_dav <= '0';
               else
                 if lut_input_addr1_s = bw_addr_entries-1 then
                   lut_input_addr1_s <= x"0";
@@ -434,15 +496,12 @@ begin
                 end if;
                 cmddev <= lut_input1_dout_c;
                 vme_data_in <= lut_input2_dout_c;
-                input_dav <= '1';
               end if;
             else
               cmddev <= std_logic_vector(init_input1);
-              input_dav <= '0';
             end if;
           else
             cmddev <= std_logic_vector(init_input1);
-            input_dav <= '0';
             waitCounter <= waitCounter - 1;
           end if;
         else
@@ -464,7 +523,6 @@ begin
         end if;
       else
         inputCounter <= to_unsigned(0,bw_count);
-        input_dav <= '0';
       end if;
     end if;
   end process;
@@ -494,7 +552,7 @@ begin
 
   --aVME signal management
   rstn <= not rst_global;
-  vc_cmd <= '1' when (cmddev(15 downto 12) = x"1" or cmddev(15 downto 12) = x"4" or cmddev(15 downto 12) = x"3" or cmddev(15 downto 12) = x"6") else '0';
+  vc_cmd <= '1' when (cmddev(15 downto 12) = x"1" or cmddev(15 downto 12) = x"4" or cmddev(15 downto 12) = x"3" or cmddev(15 downto 12) = x"6" or cmddev(15 downto 12) = x"8") else '0';
   vc_addr <= x"A8" & cmddev(15 downto 1);
   vc_rd <=  '1' when vme_data_in = x"2EAD" else '0';
 
@@ -512,120 +570,87 @@ begin
     vme_data_io_out_buf <= vme_data_io_out;
   end generate vcc_data_kcu_i;
 
-  -- DCFEB simulation
-  -- Manage ODMB<->PPIB<->DCFEB signals----------------------------------------------------------------
-  -- in simulation/real ODMB, use I/OBUFDS
-  cfebjtag_conn_simulation_i : if in_simulation generate
-    IB_DCFEB_TMS: IBUFDS port map (O => dl_jtag_tms, I => dcfeb_tms_p, IB => dcfeb_tms_n);
-    IB_DCFEB_TDI: IBUFDS port map (O => dl_jtag_tdi, I => dcfeb_tdi_p, IB => dcfeb_tdi_n);
-    IB_DCFEB_INJPLS: IBUFDS port map (O => injpls, I => injpls_p, IB => injpls_n);
-    IB_DCFEB_EXTPLS: IBUFDS port map (O => extpls, I => extpls_p, IB => extpls_n);
-    IB_DCFEB_RESYNC: IBUFDS port map (O => dcfeb_resync, I => resync_p, IB => resync_n);
-    IB_DCFEB_BC0: IBUFDS port map (O => dcfeb_bc0, I => bc0_p, IB => bc0_n);
-    IB_DCFEB_L1A: IBUFDS port map (O => dcfeb_l1a, I => l1a_p, IB => l1a_n);
-    GEN_DCFEB_7 : for I in 1 to NCFEB generate
-    begin
-      IB_DCFEB_TCK: IBUFDS port map (O => dl_jtag_tck(I), I => dcfeb_tck_p(I), IB => dcfeb_tck_n(I));
-      OB_DCFEB_TDO: OBUFDS port map (I => dl_jtag_tdo(I), O => dcfeb_tdo_p(I), OB => dcfeb_tdo_n(I));
-      IB_DCFEB_L1A_MATCH: IBUFDS port map (O => dcfeb_l1a_match(I), I => l1a_match_p(I), IB => l1a_match_n(I));
-      -- OB_DCFEB_TDO: OBUFTDS port map (I => dl_jtag_tdo(I), O => dcfeb_tdo_p(I), OB => dcfeb_tdo_n(I), T => dcfeb_tdo_t(I));
-      -- dcfeb_tdo_t(I) <= '0' when dl_jtag_tdo(I) = '1' or dl_jtag_tdo(I) = '0' else '1';
-    end generate GEN_DCFEB_7;
-  end generate cfebjtag_conn_simulation_i;
-  -- on KCU use the P lines as signals
-  cfebjtag_conn_kcu_i : if in_synthesis generate
-    dl_jtag_tms <= dcfeb_tms_p;
-    dl_jtag_tdi <= dcfeb_tdi_p;
-    dl_jtag_tck <= dcfeb_tck_p;
-    dcfeb_tdo_p <= dl_jtag_tdo;
-    dcfeb_tdo_n <= (others => '0');
-    injpls <= injpls_p;
-    extpls <= extpls_p;
-    dcfeb_resync <= resync_p;
-    dcfeb_bc0 <= bc0_p;
-    dcfeb_l1a <= l1a_p;
-    dcfeb_l1a_match <= l1a_match_p;
-  end generate cfebjtag_conn_kcu_i;
-  
-
   -- ODMB Firmware module
   odmb_i: entity work.ODMB7_UCSB_DEV
   port map(
     -- Clock
-    CLK160         => sysclkQuad,
-    CLK80          => sysclkDouble,
-    CLK40          => sysclk,
-    CLK10          => sysclkQuarter,
-    RST            => rst_global,
-    VME_DATA       => vme_data_io,
-    VME_GAP_B      => vme_ga(5),
-    VME_GA_B       => vme_ga(4 downto 0),
-    VME_ADDR       => vme_addr,
-    VME_AM         => vme_am,
-    VME_AS_B       => vme_as,
-    VME_DS_B       => vme_ds,
-    VME_LWORD_B    => vme_lword,
-    VME_WRITE_B    => vme_write_b,
-    VME_IACK_B     => vme_iack,
-    VME_BERR_B     => vme_berr,
-    VME_SYSRST_B   => vme_sysrst,
-    VME_SYSFAIL_B  => vme_sysfail,
-    VME_DTACK_KUS_B => vme_dtack,
-    VME_CLK_B       => vme_clk_b,
-    KUS_VME_OE_B    => kus_vme_oe_b,
-    KUS_VME_DIR     => vme_dir,
-    DCFEB_TCK_P     => dcfeb_tck_p,
-    DCFEB_TCK_N     => dcfeb_tck_n,
-    DCFEB_TMS_P     => dcfeb_tms_p,
-    DCFEB_TMS_N     => dcfeb_tms_n,
-    DCFEB_TDI_P     => dcfeb_tdi_p,
-    DCFEB_TDI_N     => dcfeb_tdi_n,
-    DCFEB_TDO_P     => dcfeb_tdo_p,
-    DCFEB_TDO_N     => dcfeb_tdo_n,
-    DCFEB_DONE      => dcfeb_done,
-    RESYNC_P        => resync_p,
-    RESYNC_N        => resync_n,
-    BC0_P           => bc0_p,
-    BC0_N           => bc0_n,
-    INJPLS_P        => injpls_p,
-    INJPLS_N        => injpls_n,
-    EXTPLS_P        => extpls_p,
-    EXTPLS_N        => extpls_n,
-    L1A_P           => l1a_p,
-    L1A_N           => l1a_n,
-    L1A_MATCH_P     => l1a_match_p,
-    L1A_MATCH_N     => l1a_match_n,
-    PPIB_OUT_EN_B   => open,
-    LVMB_PON        => lvmb_pon,
-    PON_LOAD        => pon_load,
-    PON_OE_B        => pon_oe_B,
-    R_LVMB_PON      => r_lvmb_PON,
-    LVMB_CSB        => lvmb_csb,
-    LVMB_SCLK       => lvmb_sclk,
-    LVMB_SDIN       => lvmb_sdin,
-    LVMB_SDOUT      => lvmb_sdout,
+    CLK160               => sysclkQuad,
+    CLK80                => sysclkDouble,
+    CLK40                => sysclk,
+    CLK10                => sysclkQuarter,
+    RST                  => rst_global,
+    VME_DATA             => vme_data_io,
+    VME_GAP_B            => vme_ga(5),
+    VME_GA_B             => vme_ga(4 downto 0),
+    VME_ADDR             => vme_addr,
+    VME_AM               => vme_am,
+    VME_AS_B             => vme_as,
+    VME_DS_B             => vme_ds,
+    VME_LWORD_B          => vme_lword,
+    VME_WRITE_B          => vme_write_b,
+    VME_IACK_B           => vme_iack,
+    VME_BERR_B           => vme_berr,
+    VME_SYSRST_B         => vme_sysrst,
+    VME_SYSFAIL_B        => vme_sysfail,
+    VME_DTACK_KUS_B      => vme_dtack,
+    VME_CLK_B            => vme_clk_b,
+    KUS_VME_OE_B         => kus_vme_oe_b,
+    KUS_VME_DIR          => vme_dir,
+    DCFEB_TCK_P          => dcfeb_tck_p,
+    DCFEB_TCK_N          => dcfeb_tck_n,
+    DCFEB_TMS_P          => dcfeb_tms_p,
+    DCFEB_TMS_N          => dcfeb_tms_n,
+    DCFEB_TDI_P          => dcfeb_tdi_p,
+    DCFEB_TDI_N          => dcfeb_tdi_n,
+    DCFEB_TDO_P          => dcfeb_tdo_p,
+    DCFEB_TDO_N          => dcfeb_tdo_n,
+    DCFEB_DONE           => dcfeb_done,
+    RESYNC_P             => resync_p,
+    RESYNC_N             => resync_n,
+    BC0_P                => bc0_p,
+    BC0_N                => bc0_n,
+    INJPLS_P             => injpls_p,
+    INJPLS_N             => injpls_n,
+    EXTPLS_P             => extpls_p,
+    EXTPLS_N             => extpls_n,
+    L1A_P                => l1a_p,
+    L1A_N                => l1a_n,
+    L1A_MATCH_P          => l1a_match_p,
+    L1A_MATCH_N          => l1a_match_n,
+    PPIB_OUT_EN_B        => open,
+    LVMB_PON             => lvmb_pon,
+    PON_LOAD             => pon_load,
+    PON_OE               => pon_oe,
+    R_LVMB_PON           => r_lvmb_PON,
+    LVMB_CSB             => lvmb_csb,
+    LVMB_SCLK            => lvmb_sclk,
+    LVMB_SDIN            => lvmb_sdin,
+    LVMB_SDOUT_P         => lvmb_sdout_p,
+    LVMB_SDOUT_N         => lvmb_sdout_n,
     DCFEB_PRBS_FIBER_SEL => dcfeb_prbs_FIBER_SEL,
     DCFEB_PRBS_EN        => dcfeb_prbs_EN,
     DCFEB_PRBS_RST       => dcfeb_prbs_RST,
     DCFEB_PRBS_RD_EN     => dcfeb_prbs_RD_EN,
     DCFEB_RXPRBSERR      => dcfeb_rxprbserr,
     DCFEB_PRBS_ERR_CNT   => dcfeb_prbs_ERR_CNT,
-    OTMB_TX         => otmb_tx,
-    OTMB_RX         => otmb_rx,
+    OTMB_TX              => otmb_tx,
+    OTMB_RX              => otmb_rx,
     --KCU only signals
-    DIAGOUT        => diagout,
-    VME_DATA_IN    => vme_data_io_in,        --unused/open in real ODMB
-    VME_DATA_OUT   => vme_data_io_out       --unused/open in real ODMB
+    DIAGOUT              => diagout,
+    VME_DATA_IN          => vme_data_io_in,        --unused/open in real ODMB
+    VME_DATA_OUT         => vme_data_io_out       --unused/open in real ODMB
     );
    
-  -- DCFEB simulation
-  dcfeb_i: dcfeb_v6
+  -- DCFEB simulation slot 2
+  dcfeb_i: DCFEB_DS_WRAPPER
   port map (
     CLK             => sysclk,  
     DCFEBCLK        => sysclkQuad,
     RST             => rst_global,
-    L1A             => dcfeb_l1a,
-    L1A_MATCH       => dcfeb_l1a_match(2),
+    L1A_P           => l1a_p,
+    L1A_N           => l1a_n,
+    L1A_MATCH_P     => l1a_match_p(2),
+    L1A_MATCH_N     => l1a_match_n(2),
     TX_ACK          => '0',
     NWORDS_DUMMY    => x"0000",
     DCFEB_DV        => open,
@@ -634,17 +659,41 @@ begin
     DCFEB_FSEL      => open,
     DCFEB_JTAG_IR   => open,
     TRST            => dcfeb_initjtag,
-    TCK             => dl_jtag_tck(2),  -- between ODMB and DCFEB (through PPIB)
-    TMS             => dl_jtag_tms,     -- between ODMB and DCFEB (through PPIB)
-    TDI             => dl_jtag_tdi,     -- between ODMB and DCFEB (through PPIB)
-    TDO             => dl_jtag_tdo(2),  -- between ODMB and DCFEB (through PPIB)
+    TCK_P           => dcfeb_tck_p(2),  -- between ODMB and DCFEB (through PPIB)
+    TCK_N           => dcfeb_tck_n(2),
+    TMS_P           => dcfeb_tms_p,     -- between ODMB and DCFEB (through PPIB)
+    TMS_N           => dcfeb_tms_n,
+    TDI_P           => dcfeb_tdi_p,     -- between ODMB and DCFEB (through PPIB)
+    TDI_N           => dcfeb_tdi_n,
+    TDO_P           => dcfeb_tdo_p(2),  -- between ODMB and DCFEB (through PPIB)
+    TDO_N           => dcfeb_tdo_n(2),
     RTN_SHFT_EN     => open,
     DONE            => dcfeb_done(2),
-    INJPLS          => injpls,
-    EXTPLS          => extpls,
-    BC0             => dcfeb_bc0,
-    RESYNC          => dcfeb_resync,
+    INJPLS_P        => injpls_p,
+    INJPLS_N        => injpls_n,
+    EXTPLS_P        => extpls_p,
+    EXTPLS_N        => extpls_n,
+    BC0_P           => bc0_p,
+    BC0_N           => bc0_n,
+    RESYNC_P        => resync_p,
+    RESYNC_N        => resync_n,
     DIAGOUT         => dcfeb_diagout
+  );
+
+  -- LVMB simulation
+  lvmb_i : LVMB
+  generic map (NFEB => NCFEB)
+  port map (
+    RST            => rst_global,
+    LVMB_SCLK      => lvmb_sclk,
+    LVMB_SDIN      => lvmb_sdin,
+    LVMB_SDOUT_P   => lvmb_sdout_p,
+    LVMB_SDOUT_N   => lvmb_sdout_n,
+    LVMB_CSB       => lvmb_csb,
+    LVMB_PON       => lvmb_pon,
+    MON_LVMB_PON   => r_lvmb_pon,
+    PON_LOAD_B     => pon_load,
+    PON_OE         => pon_oe
   );
   
   -- VME simulation

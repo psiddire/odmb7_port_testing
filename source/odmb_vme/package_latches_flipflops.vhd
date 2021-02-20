@@ -251,23 +251,25 @@ package body Latches_Flipflops is
     if (CLR='1') then
       Q <= "0000000000000000" after 100 ps;
     elsif (CLR='0') then
-      if (CE='1' and C='1' and C'event) then
-        Q(15) <= Q_in(14) after 100 ps;
-        Q(14) <= Q_in(13) after 100 ps;
-        Q(13) <= Q_in(12) after 100 ps;
-        Q(12) <= Q_in(11) after 100 ps;
-        Q(11) <= Q_in(10) after 100 ps;
-        Q(10) <= Q_in(9) after 100 ps;
-        Q(9) <= Q_in(8) after 100 ps;
-        Q(8) <= Q_in(7) after 100 ps;
-        Q(7) <= Q_in(6) after 100 ps;
-        Q(6) <= Q_in(5) after 100 ps;
-        Q(5) <= Q_in(4) after 100 ps;
-        Q(4) <= Q_in(3) after 100 ps;
-        Q(3) <= Q_in(2) after 100 ps;
-        Q(2) <= Q_in(1) after 100 ps;
-        Q(1) <= Q_in(0) after 100 ps;
-        Q(0) <= SLI;
+      if (C='1' and C'event) then
+        if (CE='1') then
+          Q(15) <= Q_in(14) after 100 ps;
+          Q(14) <= Q_in(13) after 100 ps;
+          Q(13) <= Q_in(12) after 100 ps;
+          Q(12) <= Q_in(11) after 100 ps;
+          Q(11) <= Q_in(10) after 100 ps;
+          Q(10) <= Q_in(9) after 100 ps;
+          Q(9) <= Q_in(8) after 100 ps;
+          Q(8) <= Q_in(7) after 100 ps;
+          Q(7) <= Q_in(6) after 100 ps;
+          Q(6) <= Q_in(5) after 100 ps;
+          Q(5) <= Q_in(4) after 100 ps;
+          Q(4) <= Q_in(3) after 100 ps;
+          Q(3) <= Q_in(2) after 100 ps;
+          Q(2) <= Q_in(1) after 100 ps;
+          Q(1) <= Q_in(0) after 100 ps;
+          Q(0) <= SLI;
+        end if;
       end if;
     end if;
     
@@ -368,20 +370,26 @@ package body Latches_Flipflops is
   
     if (CLR='1') then
 			Q <= "00000000" after 100 ps;
-		elsif (CE = '1' and C='1' and C'event) then
-			Q <= Q_in + 1 after 100 ps;
+		elsif (C='1' and C'event) then
+		    if (CE = '1') then
+		    	Q <= Q_in + 1 after 100 ps;
+			end if;
 		end if;
 		
 		if (CLR = '1') then
 			TC <= '0' after 100 ps;
-		elsif (CE = '1' and C='1' and C'event and Q_in="11111110") then
-			TC <= '1' after 100 ps;
+		elsif (C='1' and C'event) then
+		    if (CE = '1' and Q_in="11111110") then
+			    TC <= '1' after 100 ps;
+			end if;
 		end if;
 	 
 		if (CLR = '1') or (CE = '0')then
 			CEO <= '0' after 100 ps;
-		elsif (CE = '1' and C='1' and C'event and Q_in="11111110") then
-			CEO <= '1' after 100 ps;
+		elsif (C='1' and C'event) then
+			if (CE = '1' and Q_in="11111110") then
+			    CEO <= '1' after 100 ps;
+			end if;
 		end if;
 
  end CB8CE;

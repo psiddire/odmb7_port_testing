@@ -71,12 +71,13 @@ entity ODMB7_UCSB_DEV is
 
     LVMB_PON   : out std_logic_vector(7 downto 0);
     PON_LOAD   : out std_logic;
-    PON_OE_B   : out std_logic;
+    PON_OE     : out std_logic;
     R_LVMB_PON : in  std_logic_vector(7 downto 0);
     LVMB_CSB   : out std_logic_vector(6 downto 0);
     LVMB_SCLK  : out std_logic;
     LVMB_SDIN  : out std_logic;
-    LVMB_SDOUT : in  std_logic;
+    LVMB_SDOUT_P : in std_logic;
+    LVMB_SDOUT_N : in std_logic;
 
     DCFEB_PRBS_FIBER_SEL : out std_logic_vector(3 downto 0);
     DCFEB_PRBS_EN        : out std_logic;
@@ -154,14 +155,14 @@ architecture Behavioral of ODMB7_UCSB_DEV is
       --------------------
       -- From/To LVMB: ODMB & ODMB7 design, ODMB5 to be seen
       --------------------
-      LVMB_PON   : out std_logic_vector(7 downto 0);
-      PON_LOAD   : out std_logic;
-      PON_OE_B   : out std_logic;
-      R_LVMB_PON : in  std_logic_vector(7 downto 0);
-      LVMB_CSB   : out std_logic_vector(6 downto 0);
-      LVMB_SCLK  : out std_logic;
-      LVMB_SDIN  : out std_logic;
-      LVMB_SDOUT : in  std_logic;
+      LVMB_PON     : out std_logic_vector(7 downto 0);
+      PON_LOAD     : out std_logic;
+      PON_OE       : out std_logic;
+      R_LVMB_PON   : in  std_logic_vector(7 downto 0);
+      LVMB_CSB     : out std_logic_vector(6 downto 0);
+      LVMB_SCLK    : out std_logic;
+      LVMB_SDIN    : out std_logic;
+      LVMB_SDOUT   : in  std_logic;
 
       --------------------
       -- TODO: DCFEB PRBS signals
@@ -343,6 +344,11 @@ architecture Behavioral of ODMB7_UCSB_DEV is
   signal dcfeb_initjtag : std_logic := '0';
   signal dcfeb_initjtag_d : std_logic := '0';
   signal dcfeb_initjtag_dd : std_logic := '0';
+
+  --------------------------------------
+  -- LVMB signals
+  --------------------------------------
+  signal lvmb_sdout : std_logic := '0';
 
   --------------------------------------
   -- Triggers
@@ -575,6 +581,18 @@ begin
   PULSE_DCFEB_INITJTAG : NPULSE2FAST port map(DOUT => dcfeb_initjtag, CLK_DOUT => clk2p5, RST => '0', NPULSE => 5, DIN => dcfeb_initjtag_d);
 
   -------------------------------------------------------------------------------------------
+  -- Handle LVMB signals
+  -------------------------------------------------------------------------------------------
+
+  -- on ODMB7/simulation, use IBUFDS while on KCU105, use p line
+  lvmb_kcu_i : if in_synthesis generate
+    lvmb_sdout <= LVMB_SDOUT_P;
+  end generate lvmb_kcu_i;
+  lvmb_simu_i : if in_simulation generate
+    IB_LVMB_SDOUT: IBUFDS port map (O => lvmb_sdout, I => LVMB_SDOUT_P, IB => LVMB_SDOUT_N);
+  end generate lvmb_simu_i;
+
+  -------------------------------------------------------------------------------------------
   -- Handle Triggers
   -------------------------------------------------------------------------------------------
 
@@ -668,14 +686,15 @@ begin
       DCFEB_DONE     => DCFEB_DONE,
       DCFEB_INITJTAG => dcfeb_initjtag,
 
+      --FIXME: rename PON_OE_B and PON_LOAD in odmb_vme to match board outputs
       LVMB_PON    => LVMB_PON,
       PON_LOAD    => PON_LOAD,
-      PON_OE_B    => PON_OE_B,
+      PON_OE      => PON_OE,
       R_LVMB_PON  => R_LVMB_PON,
       LVMB_CSB    => LVMB_CSB,
       LVMB_SCLK   => LVMB_SCLK,
       LVMB_SDIN   => LVMB_SDIN,
-      LVMB_SDOUT  => LVMB_SDOUT,
+      LVMB_SDOUT  => lvmb_sdout,
 
       DCFEB_PRBS_FIBER_SEL  => DCFEB_PRBS_FIBER_SEL,
       DCFEB_PRBS_EN         => DCFEB_PRBS_EN,

@@ -78,7 +78,7 @@ entity ODMB_VME is
     --------------------
     LVMB_PON   : out std_logic_vector(7 downto 0);
     PON_LOAD   : out std_logic;
-    PON_OE_B   : out std_logic;
+    PON_OE     : out std_logic;
     R_LVMB_PON : in  std_logic_vector(7 downto 0);
     LVMB_CSB   : out std_logic_vector(6 downto 0);
     LVMB_SCLK  : out std_logic;
@@ -343,7 +343,8 @@ architecture Behavioral of ODMB_VME is
       ADCIN   : in  std_logic;
       LVTURNON   : out std_logic_vector(8 downto 1);
       R_LVTURNON : in  std_logic_vector(8 downto 1);
-      LOADON     : out std_logic
+      LOADON     : out std_logic;
+      DIAGOUT    : out std_logic_vector(17 downto 0)
       );
   end component;
 
@@ -476,7 +477,7 @@ begin
   ----------------------------------
   -- misc
   ----------------------------------
-  PON_OE_B <= '1';
+  PON_OE  <= '1';
   ODMB_ID <= odmb_id_inner;
 
   ----------------------------------
@@ -648,7 +649,8 @@ begin
       ADCIN => LVMB_SDOUT,
       LVTURNON => LVMB_PON,
       R_LVTURNON => R_LVMB_PON,
-      LOADON => PON_LOAD
+      LOADON => PON_LOAD,
+      DIAGOUT => diagout_buf
     );
 
   COMMAND_PM : COMMAND_MODULE
@@ -687,7 +689,7 @@ begin
       READBACK_FIFO_OUT => spi_readback_fifo_out,
       READBACK_FIFO_READ_EN => spi_readback_fifo_read_en,
       READ_BUSY => spi_read_busy,
-      DIAGOUT => diagout_buf
+      DIAGOUT => open
       );
 
 

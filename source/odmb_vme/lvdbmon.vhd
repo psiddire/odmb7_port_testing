@@ -36,7 +36,8 @@ entity LVDBMON is
 
     LVTURNON   : out std_logic_vector(8 downto 1);
     R_LVTURNON : in  std_logic_vector(8 downto 1);
-    LOADON     : out std_logic
+    LOADON     : out std_logic;
+    DIAGOUT    : out std_logic_vector(17 downto 0)
     );
 end LVDBMON;
 
@@ -196,5 +197,7 @@ begin  --Architecture
   ADCCLK   <= ADCCLK_INNER;
 
   DTACK <= Q_OUTDATA or Q_DTACK_2 or Q_OUTDATA_2 or Q_DTACK_4 or RDMONBK or Q4_LOAD;
+  
+  DIAGOUT <= "000" & LOAD & CE1_BUSY & CLKMON & BUSY & Q1_BUSY & Q2_BUSY & RST & QTIME;
 
 end LVDBMON_Arch;
