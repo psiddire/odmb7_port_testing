@@ -395,7 +395,9 @@ begin
   trig0(31 downto 16) <= vme_data_io_in;
   trig0(15 downto 0) <= cmddev;
   --
-  data(4095 downto 122) <= (others => '0');
+  data(4095 downto 125) <= (others => '0');
+  data(124 downto 123) <= vme_ds;
+  data(122) <= vme_as;
   data(121) <= pon_load;
   data(120 downto 113) <= r_lvmb_pon;
   data(112 downto 105) <= lvmb_pon;

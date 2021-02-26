@@ -320,7 +320,11 @@ architecture Behavioral of ODMB_VME is
       SPI_CMD_FIFO_IN      : out std_logic_vector(15 downto 0);
       SPI_READBACK_FIFO_OUT     : in std_logic_vector(15 downto 0);
       SPI_READBACK_FIFO_READ_EN : out std_logic;
-      SPI_READ_BUSY             : in std_logic
+      SPI_READ_BUSY             : in std_logic;
+      SPI_NCMDS_SPICTRL         : in unsigned(15 downto 0);
+      SPI_NCMDS_SPIINTR         : in unsigned(15 downto 0);
+      --debug
+      DIAGOUT                   : out std_logic_vector(17 downto 0)
       );
   end component;
 
@@ -393,6 +397,8 @@ architecture Behavioral of ODMB_VME is
     READBACK_FIFO_READ_EN : in std_logic;
     READ_BUSY : out std_logic;
       
+    NCMDS_SPICTRL : out unsigned(15 downto 0);
+    NCMDS_SPIINTR : out unsigned(15 downto 0);
     DIAGOUT : out std_logic_vector(17 downto 0)
     );
   end component;
@@ -433,6 +439,8 @@ architecture Behavioral of ODMB_VME is
   signal spi_const_reg_we           : integer range 0 to NREGS := 0;
   signal spi_const_regs             : cfg_regs_array;
   signal spi_cfg_regs               : cfg_regs_array;
+  signal spi_ncmds_spictrl          : unsigned (15 downto 0);
+  signal spi_ncmds_spiintr          : unsigned (15 downto 0);
   
   --------------------------------------
   -- PROM signals
@@ -620,17 +628,20 @@ begin
         SPI_CFG_BUSY => spi_cfg_busy,
         SPI_CONST_BUSY => spi_const_busy,
         SPI_CONST_REG_WE => spi_const_reg_we,
-        SPI_CFG_REG_WE   => spi_cfg_reg_we,
+        SPI_CFG_REG_WE => spi_cfg_reg_we,
         SPI_CFG_REGS => spi_cfg_regs,
         SPI_CONST_REGS => spi_const_regs,
         SPI_CMD_FIFO_WRITE_EN => spi_cmd_fifo_write_en,
         SPI_CMD_FIFO_IN => spi_cmd_fifo_in,
         SPI_READBACK_FIFO_OUT => spi_readback_fifo_out,
         SPI_READBACK_FIFO_READ_EN => spi_readback_fifo_read_en,
-        SPI_READ_BUSY => spi_read_busy
+        SPI_READ_BUSY => spi_read_busy,
+        SPI_NCMDS_SPICTRL => spi_ncmds_spictrl,
+        SPI_NCMDS_SPIINTR => spi_ncmds_spiintr,
+        DIAGOUT => open
       );
   
-  DEV8_LVDBMON:LVDBMON
+  DEV8_LVDBMON : LVDBMON
     port map(
       SLOWCLK => CLK1P25,
       RST => RST,
@@ -650,7 +661,7 @@ begin
       LVTURNON => LVMB_PON,
       R_LVTURNON => R_LVMB_PON,
       LOADON => PON_LOAD,
-      DIAGOUT => diagout_buf
+      DIAGOUT => open
     );
 
   COMMAND_PM : COMMAND_MODULE
@@ -689,7 +700,9 @@ begin
       READBACK_FIFO_OUT => spi_readback_fifo_out,
       READBACK_FIFO_READ_EN => spi_readback_fifo_read_en,
       READ_BUSY => spi_read_busy,
-      DIAGOUT => open
+      NCMDS_SPICTRL => spi_ncmds_spictrl,
+      NCMDS_SPIINTR => spi_ncmds_spiintr,
+      DIAGOUT => diagout_buf
       );
 
 

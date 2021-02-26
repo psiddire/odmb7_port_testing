@@ -38,7 +38,11 @@ entity SPI_PORT is
     SPI_CMD_FIFO_IN           : out std_logic_vector(15 downto 0);
     SPI_READBACK_FIFO_OUT     : in std_logic_vector(15 downto 0);
     SPI_READBACK_FIFO_READ_EN : out std_logic;
-    SPI_READ_BUSY             : in std_logic
+    SPI_READ_BUSY             : in std_logic;
+    SPI_NCMDS_SPICTRL         : in unsigned(15 downto 0);
+    SPI_NCMDS_SPIINTR         : in unsigned(15 downto 0);
+    --debug
+    DIAGOUT                   : out std_logic_vector(17 downto 0)
     );
 end SPI_PORT;
 
@@ -58,31 +62,46 @@ architecture SPI_PORT_Arch of SPI_PORT is
   
   --CFG register upload signals
   type cfg_upload_states is (S_IDLE, S_SET_ADDR_LOWER, S_READN, S_WAIT_READ_BUSY, S_WAIT_READ_DONE, S_WAIT_READ_STALL, S_READBACK);
-  signal cfg_upload_state  : cfg_upload_states := S_IDLE;
-  signal spi_cmd_fifo_write_en_cfg_ul : std_logic := '0';
-  signal spi_cmd_fifo_in_cfg_ul : std_logic_vector(15 downto 0) := x"0000";
-  signal upload_cfg_reg_index : integer := 0;  
+  signal cfg_upload_state                 : cfg_upload_states := S_IDLE;
+  signal spi_cmd_fifo_write_en_cfg_ul     : std_logic := '0';
+  signal spi_cmd_fifo_in_cfg_ul           : std_logic_vector(15 downto 0) := x"0000";
+  signal upload_cfg_reg_index             : integer := 0;  
   signal spi_readback_fifo_read_en_cfg_ul : std_logic := '0';
-  signal spi_cfg_ul_pulse_inner : std_logic := '0';
-  signal spi_cfg_reg_we_inner : integer := NREGS;
-  signal spi_ul_reg_inner : std_logic_vector(15 downto 0) := x"0000";
-  signal readback_fifo_stall_counter : unsigned(3 downto 0) := x"0";
+  signal spi_cfg_ul_pulse_inner           : std_logic := '0';
+  signal spi_cfg_reg_we_inner             : integer := NREGS;
+  signal spi_ul_reg_inner                 : std_logic_vector(15 downto 0) := x"0000";
+  signal readback_fifo_stall_counter      : unsigned(3 downto 0) := x"0";
   
   --SPI command command signals
-  signal strobe_q, strobe_pulse : std_logic := '0';
+  signal strobe_meta               : std_logic := '0';
+  signal strobe_q                  : std_logic := '0';
+  signal strobe_qq                 : std_logic := '0';
+  signal strobe_pulse              : std_logic := '0';
   signal spi_cmd_fifo_write_en_cmd : std_logic := '0';
-  signal spi_cmd_fifo_in_cmd : std_logic_vector(15 downto 0) := x"0000";
+  signal spi_cmd_fifo_in_cmd       : std_logic_vector(15 downto 0) := x"0000";
   
   --SPI read signals
-  signal spi_read_data : std_logic_vector(15 downto 0) := x"0000";
+  signal spi_read_data                 : std_logic_vector(15 downto 0) := x"0000";
   signal spi_readback_fifo_read_en_cmd : std_logic := '0';
   
   --command parsing signals
-  signal cmddev : std_logic_vector(15 downto 0) := x"0000";
-  signal do_cfg_upload, do_cfg_download, do_cfg_erase, do_spi_cmd, do_spi_read : std_logic := '0';
+  signal cmddev          : std_logic_vector(15 downto 0) := x"0000";
+  signal do_cfg_upload   : std_logic := '0';
+  signal do_cfg_download : std_logic := '0'; 
+  signal do_cfg_erase    : std_logic := '0';
+  signal do_spi_cmd      : std_logic := '0';
+  signal do_spi_read     : std_logic := '0';
   
   --dtack signals
-  signal ce_d_dtack, d_dtack, q_dtack : std_logic := '0';
+  signal ce_d_dtack : std_logic := '0'; 
+  signal d_dtack    : std_logic := '0';
+  signal q_dtack    : std_logic := '0';
+  
+  --debugging signals
+  signal ncmds_spiport         : unsigned(15 downto 0) := x"0000";
+  signal do_ncmds_spiport_read : std_logic := '0';
+  signal do_ncmds_spictrl_read : std_logic := '0';
+  signal do_ncmds_spiintr_read : std_logic := '0';
 
 begin
 
@@ -95,20 +114,37 @@ begin
   do_cfg_erase <= '1' when (cmddev=x"1008" and STROBE='1') else '0';
   do_spi_cmd <= '1' when (cmddev=x"102C") else '0';
   do_spi_read <= '1' when (cmddev=x"1030") else '0';
+  do_ncmds_spiport_read <= '1' when (cmddev=x"1100") else '0';
+  do_ncmds_spictrl_read <= '1' when (cmddev=x"1104") else '0';
+  do_ncmds_spiintr_read <= '1' when (cmddev=x"1108") else '0';
 
-
-  --generate strobe_pulse
-  strobe_q <= STROBE when rising_edge(SLOWCLK);
-  strobe_pulse <= strobe and not strobe_q;
-  
+  --generate strobe_pulse, note STROBE comes from FASTCLK clock domain
+  strobe_meta <= STROBE when rising_edge(SLOWCLK);
+  strobe_q <= strobe_meta when rising_edge(SLOWCLK);
+  strobe_qq <= strobe_q when rising_edge(SLOWCLK);
+  strobe_pulse <= (not strobe_qq) and strobe_q;
   
   --handle SPI command command
   spi_cmd_fifo_write_en_cmd <= do_spi_cmd and strobe_pulse;
   spi_cmd_fifo_in_cmd <= INDATA;
   
+  spi_count_proc : process (SLOWCLK)
+  begin
+  if rising_edge(SLOWCLK) then
+    if (do_spi_cmd='1' and strobe_pulse='1') then
+      ncmds_spiport <= ncmds_spiport + 1;
+    else
+      ncmds_spiport <= ncmds_spiport;
+    end if;
+  end if;
+  end process;            
   
   --handle SPI read command
-  OUTDATA <= spi_read_data; --currently the only output in this module, will fix later
+  OUTDATA <= std_logic_vector(ncmds_spiport) when (do_ncmds_spiport_read = '1') else
+             std_logic_vector(SPI_NCMDS_SPICTRL) when (do_ncmds_spictrl_read = '1') else
+             std_logic_vector(SPI_NCMDS_SPIINTR) when (do_ncmds_spiintr_read = '1') else
+             spi_read_data; --currently the only output in this module, will fix later
+             
   spi_read_proc : process (SLOWCLK)
   begin
   if rising_edge(SLOWCLK) then
@@ -303,9 +339,13 @@ begin
   
   
   -- DTACK: always just issue on second SLOWCLK edge after STROBE
-  ce_d_dtack <= STROBE and DEVICE;
-  FD_D_DTACK : FDCE port map(Q => d_dtack, C => SLOWCLK, CE => ce_d_dtack, CLR => q_dtack, D => '1');
-  FD_Q_DTACK : FD port map(Q => q_dtack, C => SLOWCLK, D => d_dtack);
+  d_dtack <= strobe_qq when (rising_edge(SLOWCLK) and DEVICE = '1');
+  q_dtack <= d_dtack when rising_edge(SLOWCLK);
+  
+  --FD_D_DTACK : FDCE port map(Q => d_dtack, C => SLOWCLK, CE => ce_d_dtack, CLR => q_dtack, D => '1');
+  --FD_Q_DTACK : FD port map(Q => q_dtack, C => SLOWCLK, D => d_dtack);
   DTACK    <= q_dtack;
+
+  DIAGOUT <= "0" & spi_cmd_fifo_in_cmd(11 downto 0) & q_dtack & spi_cmd_fifo_write_en_cmd & STROBE & strobe_pulse & do_spi_cmd;
 
 end SPI_PORT_Arch;

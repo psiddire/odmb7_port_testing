@@ -69,13 +69,13 @@ entity ODMB7_UCSB_DEV is
     L1A_MATCH_N    : out std_logic_vector(NCFEB downto 1); -- Bank 66, ODMB CTRL
     PPIB_OUT_EN_B  : out std_logic;                        -- Bank 68
 
-    LVMB_PON   : out std_logic_vector(7 downto 0);
-    PON_LOAD   : out std_logic;
-    PON_OE     : out std_logic;
-    R_LVMB_PON : in  std_logic_vector(7 downto 0);
-    LVMB_CSB   : out std_logic_vector(6 downto 0);
-    LVMB_SCLK  : out std_logic;
-    LVMB_SDIN  : out std_logic;
+    LVMB_PON     : out std_logic_vector(7 downto 0);
+    PON_LOAD     : out std_logic;
+    PON_OE       : out std_logic;
+    R_LVMB_PON   : in  std_logic_vector(7 downto 0);
+    LVMB_CSB     : out std_logic_vector(6 downto 0);
+    LVMB_SCLK    : out std_logic;
+    LVMB_SDIN    : out std_logic;
     LVMB_SDOUT_P : in std_logic;
     LVMB_SDOUT_N : in std_logic;
 

@@ -9,6 +9,8 @@
 #settings
 set DEBUG_MODE 0
 
+set num_spi_cmds 0
+
 #
 #function that executes a VME commands by communication with the VIO on the KCU105
 #
@@ -16,7 +18,9 @@ proc execute_vme_command {ADDR DATA} {
   #upvar $DEBUG_MODE DEBUG_MODE
   global DEBUG_MODE
   if {$DATA == "2EAD"} {
-    puts "Executing read command."
+    if {$DEBUG_MODE == 1} {
+      puts "Executing read command."
+    }
   }
   if {$DEBUG_MODE == 1} {
     puts "VME $ADDR $DATA"
@@ -30,10 +34,30 @@ proc execute_vme_command {ADDR DATA} {
     after 100
     set_property OUTPUT_VALUE 1 [get_hw_probes vio_issue_vme_cmd_vector -of_objects [get_hw_vios -of_objects [get_hw_devices xcku040_0] -filter {CELL_NAME=~"vio_input_i"}]]
     commit_hw_vio [get_hw_probes {vio_issue_vme_cmd_vector} -of_objects [get_hw_vios -of_objects [get_hw_devices xcku040_0] -filter {CELL_NAME=~"vio_input_i"}]]
-    after 200
+    after 100
     set_property OUTPUT_VALUE 0 [get_hw_probes vio_issue_vme_cmd_vector -of_objects [get_hw_vios -of_objects [get_hw_devices xcku040_0] -filter {CELL_NAME=~"vio_input_i"}]]
     commit_hw_vio [get_hw_probes {vio_issue_vme_cmd_vector} -of_objects [get_hw_vios -of_objects [get_hw_devices xcku040_0] -filter {CELL_NAME=~"vio_input_i"}]]
-    after 700
+    after 400
+  }
+}
+
+#
+#function that adds to the number of spi commands executed and checks value against firmware
+#
+proc add_to_spi_cmd_num {ADDAND} {
+  global num_spi_cmds
+  set num_spi_cmds [expr $num_spi_cmds + $ADDAND]
+  execute_vme_command "6108" "2EAD"
+  set fpga_num_spi_cmds [get_property INPUT_VALUE [get_hw_probes vio_vme_out]]
+  scan $fpga_num_spi_cmds %x fpga_num_spi_cmds_dec
+  if {$fpga_num_spi_cmds_dec != $num_spi_cmds} {
+    puts "ERROR: $num_spi_cmds SPI commands sent, but $fpga_num_spi_cmds_dec received"
+    #execute_vme_command "6104" "2EAD"
+    #set fpga_num_cmds [get_property INPUT_VALUE [get_hw_probes vio_vme_out]]
+    #scan $fpga_num_cmds %x fpga_num_cmds_dec
+    #puts "Note: $fpga_num_cmds_dev total 602C commands received"
+    close_hw
+    exit
   }
 }
 
@@ -46,6 +70,7 @@ proc odmbeprom_loadaddress {uaddr laddr} {
   set laddr [format %04X $laddr]
   execute_vme_command "602C" $upper_load_addr
   execute_vme_command "602C" $laddr
+  add_to_spi_cmd_num 1
 }
 
 #
@@ -65,6 +90,7 @@ proc odmbeprom_bufferprogram {nwords bindata position} {
     append hex_string $second_char
     execute_vme_command "602C" $hex_string
   }
+  add_to_spi_cmd_num 1
 }
 
 #
@@ -90,7 +116,8 @@ proc main {} {
   }
   #startup stuff
   #firmware/block/write size in words
-  set FIRMWARE_SIZE [expr 5464972 / 2]
+  #set FIRMWARE_SIZE [expr 5464972 / 2]
+  set FIRMWARE_SIZE [expr 0x8000]
   set BLOCK_SIZE 0x8000 ;#half the size of the old sectors
   set WRITE_SIZE 0x40 ;#1/2 page, previously 0x400. Could go higher
   set input_file [open "../cfg_reg_prom_test.bin" r]
@@ -102,6 +129,7 @@ proc main {} {
   execute_vme_command "602C" "001A" ;#BPI timer stop
   execute_vme_command "602C" "001B" ;#BPI timer reset
   execute_vme_command "602C" "0019" ;#BPI timer start
+  add_to_spi_cmd_num 3
   #erase EPROM memory
   set blocks [expr $FIRMWARE_SIZE / $BLOCK_SIZE]
   if { [expr $FIRMWARE_SIZE % $BLOCK_SIZE] > 0 } {
@@ -115,8 +143,9 @@ proc main {} {
     odmbeprom_loadaddress $uaddr $laddr
     execute_vme_command "602C" "0014" ;#BPI unlock
     execute_vme_command "602C" "000A" ;#BPI block erase
+    add_to_spi_cmd_num 2
     set fulladdr [expr $fulladdr + [expr 2 * $BLOCK_SIZE]]
-    after 2000
+    after 1000
     #if {$i == 1} {
     #  break
     #}
@@ -136,7 +165,7 @@ proc main {} {
     set laddr [expr $fulladdr & 0xFFFF]
     odmbeprom_loadaddress $uaddr $laddr
     odmbeprom_bufferprogram $nwords $bindata [expr $i * $WRITE_SIZE]
-    after 120
+    after 100
     set fulladdr [expr $fulladdr + [expr 2 * $WRITE_SIZE]]
     #progress bar here
     if {$i == 4} {
@@ -148,6 +177,7 @@ proc main {} {
   set laddr [expr $fulladdr & 0xFFFF]
   odmbeprom_loadaddress $uaddr $laddr
   execute_vme_command "602C" "0013" ;#BPI lock
+  add_to_spi_cmd_num 1
   after 100
   execute_vme_command "6024" "0000" ;#BPI disable
   if {$DEBUG_MODE == 0} {
