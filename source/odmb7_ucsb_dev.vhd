@@ -69,6 +69,33 @@ entity ODMB7_UCSB_DEV is
     L1A_MATCH_N    : out std_logic_vector(NCFEB downto 1); -- Bank 66, ODMB CTRL
     PPIB_OUT_EN_B  : out std_logic;                        -- Bank 68
 
+    --------------------
+    -- CCB Signals
+    --------------------
+      
+    CCB_CMD        : in  std_logic_vector(5 downto 0);     -- Bank 44
+    CCB_CMD_S      : in  std_logic;                        -- Bank 46
+    CCB_DATA       : in  std_logic_vector(7 downto 0);     -- Bank 44
+    CCB_DATA_S     : in  std_logic;                        -- Bank 46
+    CCB_CAL        : in  std_logic_vector(2 downto 0);     -- Bank 44
+    CCB_CRSV       : in  std_logic_vector(3 downto 0);     -- Bank 44
+    CCB_DRSV       : in  std_logic_vector(1 downto 0);     -- Bank 45
+    CCB_RSVO       : in  std_logic_vector(4 downto 0);     -- Bank 45
+    CCB_RSVI       : out std_logic_vector(2 downto 0);     -- Bank 45
+    CCB_BX0_B      : in  std_logic;                        -- Bank 46
+    CCB_BX_RST_B   : in  std_logic;                        -- Bank 46
+    CCB_L1A_RST_B  : in  std_logic;                        -- Bank 46
+    CCB_L1A_B      : in  std_logic;                        -- Bank 46
+    CCB_L1A_RLS    : out std_logic;                        -- Bank 45
+    CCB_CLKEN      : in  std_logic;                        -- Bank 46
+    CCB_EVCNTRES_B : in  std_logic;                        -- Bank 46
+    --CCB_HARDRST  : in std_logic;                         -- Bank 45
+    CCB_SOFTRST_B  : in std_logic;                         -- Bank 45
+
+    --------------------
+    -- LVMB Signals
+    --------------------
+
     LVMB_PON     : out std_logic_vector(7 downto 0);
     PON_LOAD     : out std_logic;
     PON_OE       : out std_logic;
@@ -324,12 +351,27 @@ architecture Behavioral of ODMB7_UCSB_DEV is
   signal dcfeb_tdo    : std_logic_vector (NCFEB downto 1) := (others => '0');
   -- signal dcfeb_tms_t  : std_logic := '0';
 
-  signal reset_pulse, reset_pulse_q : std_logic := '0';
-  signal l1acnt_rst, l1a_reset_pulse, l1a_reset_pulse_q : std_logic := '0';
-  signal premask_injpls, premask_extpls, dcfeb_injpls, dcfeb_extpls : std_logic := '0';
-  signal test_bc0, pre_bc0, dcfeb_bc0, dcfeb_resync : std_logic := '0';
-  signal dcfeb_l1a, masked_l1a, odmbctrl_l1a : std_logic := '0';
-  signal dcfeb_l1a_match, masked_l1a_match, odmbctrl_l1a_match : std_logic_vector(NCFEB downto 1) := (others => '0');
+  signal reset_pulse        : std_logic := '0';
+  signal reset_pulse_q      : std_logic := '0';
+  signal l1acnt_rst         : std_logic := '0';
+  signal l1a_reset_pulse    : std_logic := '0';
+  signal l1a_reset_pulse_q  : std_logic := '0';
+  signal premask_injpls     : std_logic := '0';
+  signal premask_extpls     : std_logic := '0';
+  signal dcfeb_injpls       : std_logic := '0';
+  signal dcfeb_extpls       : std_logic := '0';
+  signal test_bc0           : std_logic := '0';
+  signal pre_bc0            : std_logic := '0';
+  signal dcfeb_bc0          : std_logic := '0';
+  signal dcfeb_resync       : std_logic := '0';
+  signal dcfeb_l1a          : std_logic := '0';
+  signal masked_l1a         : std_logic := '0';
+  signal odmbctrl_l1a       : std_logic := '0';
+  signal dcfeb_l1a_match    : std_logic_vector(NCFEB downto 1) := (others => '0');
+  signal masked_l1a_match   : std_logic_vector(NCFEB downto 1) := (others => '0');
+  signal odmbctrl_l1a_match : std_logic_vector(NCFEB downto 1) := (others => '0');
+  signal ccb_bx0            : std_logic := '0';
+  signal ccb_bx0_q          : std_logic := '0';
 
   -- signals to generate dcfeb_initjtag when DCFEBs are done programming
   signal pon_rst_reg : std_logic_vector(31 downto 0) := x"00FFFFFF";
@@ -344,6 +386,20 @@ architecture Behavioral of ODMB7_UCSB_DEV is
   signal dcfeb_initjtag : std_logic := '0';
   signal dcfeb_initjtag_d : std_logic := '0';
   signal dcfeb_initjtag_dd : std_logic := '0';
+
+  --------------------------------------
+  -- CCB production test signals
+  --------------------------------------
+
+  signal ccb_cmd_bxev    : std_logic_vector(7 downto 0) := (others => '0');
+  signal ccb_cmd_reg     : std_logic_vector(15 downto 0) := (others => '0');
+  signal ccb_data_reg    : std_logic_vector(15 downto 0) := (others => '0');
+  signal ccb_rsv         : std_logic_vector(15 downto 0) := (others => '0');
+  signal ccb_other       : std_logic_vector(15 downto 0) := (others => '0');
+  signal ccb_rsv_reg     : std_logic_vector(15 downto 0) := (others => '0');
+  signal ccb_other_reg   : std_logic_vector(15 downto 0) := (others => '0');
+  signal ccb_rsv_reg_b   : std_logic_vector(15 downto 0) := (others => '0');
+  signal ccb_other_reg_b : std_logic_vector(15 downto 0) := (others => '0');
 
   --------------------------------------
   -- LVMB signals
@@ -493,12 +549,16 @@ begin
   dcfeb_extpls <= '0' when mask_pls = '1' else premask_extpls;
   
   --generate RESYNC, BC0, L1A, and L1A match signals to DCFEBs
+  ccb_bx0   <= not CCB_BX0_B;
+  FD_CCBBX0 : FD port map(Q => ccb_bx0_q, C => CLK40, D => ccb_bx0);
+
   RESETPULSE : PULSE2SAME port map(DOUT => reset_pulse, CLK_DOUT => clk40, RST => '0', DIN => reset);
   FD_RESETPULSE_Q : FD port map (Q => reset_pulse_q,     C => CLK40, D => reset_pulse);
   FD_L1APULSE_Q   : FD port map (Q => l1a_reset_pulse_q, C => CLK40, D => l1a_reset_pulse);
 
+  --TODO: fix l1acnt_rst, 20MHz clock using ccb_bx0, and all other effects thereof)
   l1acnt_rst <= clk20 and (l1a_reset_pulse or l1a_reset_pulse_q or reset_pulse or reset_pulse_q);
-  pre_bc0    <= test_bc0;
+  pre_bc0    <= test_bc0 or ccb_bx0_q;
   masked_l1a <= '0' when mask_l1a(0)='1' else odmbctrl_l1a;
 
   DS_RESYNC : DELAY_SIGNAL generic map (NCYCLES_MAX => 1) port map (DOUT => dcfeb_resync, CLK => CLK40, NCYCLES => cable_dly, DIN => l1acnt_rst);
@@ -609,8 +669,31 @@ begin
   change_reg_index <= NREGS;
 
   -------------------------------------------------------------------------------------------
+  -- Handle CCB production test
+  -------------------------------------------------------------------------------------------
+
+  -- From CCB - for production tests
+  ccb_cmd_bxev <= CCB_CMD & CCB_EVCNTRES_B & CCB_BX_RST_B;
+  GEN_CCB : for index in 0 to 7 generate
+    FDCMD : FDC port map(Q => ccb_cmd_reg(index), C => CCB_CMD_S, CLR => reset, D => ccb_cmd_bxev(index));
+    FDDAT : FDC port map(Q => ccb_data_reg(index), C => CCB_DATA_S, CLR => reset, D => CCB_DATA(index));
+  end generate GEN_CCB;
+
+  ccb_rsv   <= "00000" & CCB_CRSV(3 downto 0) & CCB_DRSV(1 downto 0) & CCB_RSVO(4 downto 0);
+  ccb_other <= "00000" & CCB_CAL(2 downto 0) & CCB_BX0_B & CCB_BX_RST_B & CCB_L1A_RST_B & CCB_L1A_B
+               & CCB_CLKEN & CCB_EVCNTRES_B & CCB_CMD_S & CCB_DATA_S;
+  GEN_CCB_FD : for index in 0 to 15 generate
+    FDOTHER : FDC port map(Q => ccb_other_reg(index), C => ccb_other(index), CLR => reset, D => ccb_other_reg_b(index));
+    FDRSV   : FDC port map(Q => ccb_rsv_reg(index), C => ccb_rsv(index), CLR => reset, D => ccb_rsv_reg_b(index));
+    ccb_other_reg_b(index) <= not ccb_other_reg(index);
+    ccb_rsv_reg_b(index)   <= not ccb_rsv_reg(index);
+  end generate GEN_CCB_FD;
+
+  -------------------------------------------------------------------------------------------
   -- Handle reset signals
   -------------------------------------------------------------------------------------------
+
+  FD_CCB_SOFTRST : FD generic map(INIT => '1') port map (Q => ccb_softrst_b_q, C => CLK40, D => CCB_SOFTRST_B);
 
   FD_FW_RESET : FD port map (Q => fw_reset_q, C => CLK40, D => fw_reset);
   fw_rst_reg <= x"3FFFF000" when ((fw_reset_q = '0' and fw_reset = '1') or ccb_softrst_b_q = '0') else
@@ -642,6 +725,10 @@ begin
       when x"06" => odmb_data <= x"7E57";
 
       when x"20" => odmb_data <= "0000000000" & VME_GAP_B & VME_GA_B;
+      when x"5A" => odmb_data <= ccb_cmd_reg;
+      when x"5B" => odmb_data <= ccb_data_reg;
+      when x"5C" => odmb_data <= ccb_other_reg;
+      when x"5D" => odmb_data <= ccb_rsv_reg;
 
       when others => odmb_data <= (others => '1');
     end case;

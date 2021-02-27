@@ -535,17 +535,17 @@ begin
     OUT_READ_DATA           => spi_readdata,
     OUT_READ_DATA_VALID     => readback_fifo_wr_en,
     ------------------ Debug
-    DIAGOUT                 => open
+    DIAGOUT                 => DIAGOUT
     );
     
   --read busy signal
   READ_BUSY <= not read_done;
     
   --debug
-  DIAGOUT(7 downto 0) <= cmd_fifo_out(7 downto 0);
-  DIAGOUT(12 downto 8) <= cmd_fifo_read_en & prom_read_en & prom_write_en & prom_erase_en & write_done;
-  DIAGOUT(16 downto 13) <= std_logic_vector(write_word_counter(3 downto 0));
-  DIAGOUT(17) <= cmd_fifo_read_en_pulse;
+  --DIAGOUT(7 downto 0) <= cmd_fifo_out(7 downto 0);
+  --DIAGOUT(12 downto 8) <= cmd_fifo_read_en & prom_read_en & prom_write_en & prom_erase_en & write_done;
+  --DIAGOUT(16 downto 13) <= std_logic_vector(write_word_counter(3 downto 0));
+  --DIAGOUT(17) <= cmd_fifo_read_en_pulse;
   
   NCMDS_SPICTRL <= ncmds_spictrl_inner;
   NCMDS_SPIINTR <= ncmds_spiintr_inner;

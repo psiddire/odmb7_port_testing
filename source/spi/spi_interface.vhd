@@ -538,7 +538,6 @@ process_write : process (CLK)
             --finish shifting data when we reach word limit or hit the end of a page
             write_fifo_read_enable <= '0';
             write_spi_cs_bar <= '1'; --latched otherwise
-            dopin_ts <= "1110"; --latched otherwise
             write_state <= S_WRITE_ASSERT_CS_READ_STATUS;
           else
             write_fifo_read_enable <= '1';
@@ -550,7 +549,6 @@ process_write : process (CLK)
             --finish shifting data when we reach word limit or hit the end of a page
             write_fifo_read_enable <= '0';
             write_spi_cs_bar <= '1'; --latched otherwise
-            dopin_ts <= "1110"; --latched otherwise
             write_state <= S_WRITE_ASSERT_CS_READ_STATUS;
           else
             write_fifo_read_enable <= '1';
@@ -564,6 +562,7 @@ process_write : process (CLK)
         -- this part is strange, if only do read status once, will get 11111111 always from miso
         write_fifo_read_enable <= '0';
         write_spi_cs_bar <= '0';
+        dopin_ts <= "1110"; --latched otherwise
         write_cmdcounter <= "011111"; --16 bits: 8 command + 8 to skip the first cycle
         write_cmdreg <=  CmdStatus & X"00000000";
         write_state <= S_WRITE_SHIFT_READ_STATUS;
