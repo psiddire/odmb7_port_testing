@@ -58,7 +58,7 @@ entity ODMB_VME is
     VME_IACK_B    : in std_logic;
     VME_BERR_B    : in std_logic;
     VME_SYSFAIL_B : in std_logic;
-    VME_DTACK_B   : inout std_logic;
+    VME_DTACK_B   : out std_logic;
     VME_OE_B      : out std_logic;
     VME_DIR_B     : out std_logic;
 
@@ -88,18 +88,18 @@ entity ODMB_VME is
     --------------------
     -- TODO: DCFEB PRBS signals
     --------------------
-    DCFEB_PRBS_FIBER_SEL : out std_logic_vector(3 downto 0);
-    DCFEB_PRBS_EN        : out std_logic;
-    DCFEB_PRBS_RST       : out std_logic;
-    DCFEB_PRBS_RD_EN     : out std_logic;
-    DCFEB_RXPRBSERR      : in  std_logic;
-    DCFEB_PRBS_ERR_CNT   : in  std_logic_vector(15 downto 0);
+    --DCFEB_PRBS_FIBER_SEL : out std_logic_vector(3 downto 0);
+    --DCFEB_PRBS_EN        : out std_logic;
+    --DCFEB_PRBS_RST       : out std_logic;
+    --DCFEB_PRBS_RD_EN     : out std_logic;
+    --DCFEB_RXPRBSERR      : in  std_logic;
+    --DCFEB_PRBS_ERR_CNT   : in  std_logic_vector(15 downto 0);
 
     --------------------
     -- TODO: OTMB PRBS signals
     --------------------
-    OTMB_TX : in  std_logic_vector(48 downto 0);
-    OTMB_RX : out std_logic_vector(5 downto 0);
+    --OTMB_TX : in  std_logic_vector(48 downto 0);
+    --OTMB_RX : out std_logic_vector(5 downto 0);
 
     --------------------
     -- VMEMON Configuration signals for top level and input from top level

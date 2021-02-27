@@ -323,6 +323,9 @@ architecture Behavioral of Firmware_tb is
   signal otmb_tx    : std_logic_vector(48 downto 0);
   signal otmb_rx    : std_logic_vector(5 downto 0);
 
+  signal cms_clk_fpga_p : std_logic;
+  signal cms_clk_fpga_n : std_logic;
+
   -- ILA
   signal trig0 : std_logic_vector(255 downto 0) := (others=> '0');
   signal data  : std_logic_vector(4095 downto 0) := (others=> '0');
@@ -349,33 +352,41 @@ begin
   --generate clock in simulation
   input_clk_simulation_i : if in_simulation generate
     process
-      constant clk_period_by_2 : time := 1.666 ns;
+      --constant clk_period_by_2 : time := 1.666 ns;
+      constant clk_period_by_2 : time := 12.5 ns;
       begin
       while 1=1 loop
-        clk_in_buf <= '0';
+        cms_clk_fpga_p <= '0';
+        cms_clk_fpga_n <= '1';
         wait for clk_period_by_2;
-        clk_in_buf <= '1';
+        cms_clk_fpga_p <= '1';
+        cms_clk_fpga_n <= '0';
         wait for clk_period_by_2;
       end loop;
     end process;
   end generate input_clk_simulation_i;
   input_clk_synthesize_i : if in_synthesis generate
-    ibufg_i : IBUFGDS
-    port map (
-               I => CLK_IN_P,
-               IB => CLK_IN_N,
-               O => clk_in_buf
-             );
+    cms_clk_fpga_p <= CLK_IN_P;
+    cms_clk_fpga_n <= CLK_IN_N;
   end generate input_clk_synthesize_i;
+  
+  --input_clk_synthesize_i : if in_synthesis generate
+  --  ibufg_i : IBUFGDS
+  --  port map (
+  --             I => CLK_IN_P,
+  --             IB => CLK_IN_N,
+  --             O => clk_in_buf
+  --           );
+  --end generate input_clk_synthesize_i;
 
-  ClockManager_i : clockManager
-  port map(
-            CLK_IN300 => clk_in_buf,
-            CLK_OUT40 => sysclk,
-            CLK_OUT10 => sysclkQuarter,
-            CLK_OUT80 => sysclkDouble,
-            CLK_OUT160 => sysclkQuad
-          );
+  --ClockManager_i : clockManager
+  --port map(
+  --          CLK_IN300 => clk_in_buf,
+  --          CLK_OUT40 => sysclk,
+  --          CLK_OUT10 => sysclkQuarter,
+  --          CLK_OUT80 => sysclkDouble,
+  --          CLK_OUT160 => sysclkQuad
+  --        );
 
   J36_USER_SMA_GPIO_P <= sysclk;
 
@@ -576,10 +587,10 @@ begin
   odmb_i: entity work.ODMB7_UCSB_DEV
   port map(
     -- Clock
-    CLK160               => sysclkQuad,
-    CLK80                => sysclkDouble,
-    CLK40                => sysclk,
-    CLK10                => sysclkQuarter,
+    CMS_CLK_FPGA_P       => cms_clk_fpga_p,
+    CMS_CLK_FPGA_N       => cms_clk_fpga_n,
+    GP_CLK_6_P           => '0',
+    GP_CLK_6_N           => '0',
     RST                  => rst_global,
     VME_DATA             => vme_data_io,
     VME_GAP_B            => vme_ga(5),
@@ -620,6 +631,10 @@ begin
     L1A_MATCH_P          => l1a_match_p,
     L1A_MATCH_N          => l1a_match_n,
     PPIB_OUT_EN_B        => open,
+    KUS_DL_SEL_B         => open,
+    DONE                 => '1',
+    FPGA_SEL_18          => open,
+    RST_CLKS_18_B        => open,
     CCB_CMD              => "011000",
     CCB_CMD_S            => sysclkQuarter,
     CCB_DATA             => x"00",
@@ -636,35 +651,37 @@ begin
     CCB_L1A_RLS          => open,
     CCB_CLKEN            => '0',
     CCB_EVCNTRES_B       => '1',
-    CCB_SOFTRST_B        => '1',
+    CCB_HARDRST          => '0',
+    CCB_SOFT_RST_B       => '1',
     LVMB_PON             => lvmb_pon,
     PON_LOAD             => pon_load,
     PON_OE               => pon_oe,
-    R_LVMB_PON           => r_lvmb_PON,
+    MON_LVMB_PON         => r_lvmb_PON,
     LVMB_CSB             => lvmb_csb,
     LVMB_SCLK            => lvmb_sclk,
     LVMB_SDIN            => lvmb_sdin,
     LVMB_SDOUT_P         => lvmb_sdout_p,
     LVMB_SDOUT_N         => lvmb_sdout_n,
-    DCFEB_PRBS_FIBER_SEL => dcfeb_prbs_FIBER_SEL,
-    DCFEB_PRBS_EN        => dcfeb_prbs_EN,
-    DCFEB_PRBS_RST       => dcfeb_prbs_RST,
-    DCFEB_PRBS_RD_EN     => dcfeb_prbs_RD_EN,
-    DCFEB_RXPRBSERR      => dcfeb_rxprbserr,
-    DCFEB_PRBS_ERR_CNT   => dcfeb_prbs_ERR_CNT,
-    OTMB_TX              => otmb_tx,
-    OTMB_RX              => otmb_rx,
+    --DCFEB_PRBS_FIBER_SEL => dcfeb_prbs_FIBER_SEL,
+    --DCFEB_PRBS_EN        => dcfeb_prbs_EN,
+    --DCFEB_PRBS_RST       => dcfeb_prbs_RST,
+    --DCFEB_PRBS_RD_EN     => dcfeb_prbs_RD_EN,
+    --DCFEB_RXPRBSERR      => dcfeb_rxprbserr,
+    --DCFEB_PRBS_ERR_CNT   => dcfeb_prbs_ERR_CNT,
+    --OTMB_TX              => otmb_tx,
+    --OTMB_RX              => otmb_rx,
     --KCU only signals
     DIAGOUT              => diagout,
     VME_DATA_IN          => vme_data_io_in,        --unused/open in real ODMB
-    VME_DATA_OUT         => vme_data_io_out       --unused/open in real ODMB
+    VME_DATA_OUT         => vme_data_io_out,       --unused/open in real ODMB
+    SYSCLK               => sysclk
     );
    
   -- DCFEB simulation slot 2
   dcfeb_i: DCFEB_DS_WRAPPER
   port map (
     CLK             => sysclk,  
-    DCFEBCLK        => sysclkQuad,
+    DCFEBCLK        => '0', --160 MHz 
     RST             => rst_global,
     L1A_P           => l1a_p,
     L1A_N           => l1a_n,
