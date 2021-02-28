@@ -22,24 +22,20 @@ library unisim;
 use unisim.vcomponents.all;
 use work.ucsb_types.all;
 
--- library UNISIM;
--- use UNISIM.VComponents.all;
-
-use work.Firmware_pkg.all;     -- for switch between sim and synthesis
-
 entity ODMB_VME is
   generic (
     NCFEB       : integer range 1 to 7 := 7;  -- Number of DCFEBS, 7 for ME1/1, 5
     NREGS       : integer := 16
   );
-  PORT (
+  port (
     --------------------
     -- Clock
     --------------------
     CLK160      : in std_logic;  -- For dcfeb prbs (160MHz)
-    CLK40       : in std_logic;  -- NEW (fastclk -> 40MHz)
-    CLK10       : in std_logic;  -- NEW (midclk -> fastclk/4 -> 10MHz)
+    CLK40       : in std_logic;  -- fastclk -> 40MHz
+    CLK10       : in std_logic;  -- midclk -> fastclk/4 -> 10MHz
     CLK2P5      : in std_logic;  -- 2.5 MHz clock
+    CLK1P25     : in std_logic;  -- 1.25 MHz clock
 
     --------------------
     -- VME signals  <-- relevant ones only
@@ -75,32 +71,26 @@ entity ODMB_VME is
     --------------------
     -- From/To LVMB: ODMB & ODMB7 design, ODMB5 to be seen
     --------------------
-    LVMB_PON   : out std_logic_vector(7 downto 0);
-    PON_LOAD   : out std_logic;
-    PON_OE_B   : out std_logic;
-    R_LVMB_PON : in  std_logic_vector(7 downto 0);
-    LVMB_CSB   : out std_logic_vector(6 downto 0);
-    LVMB_SCLK  : out std_logic;
-    LVMB_SDIN  : out std_logic;
-    LVMB_SDOUT : in  std_logic;
-
-    -- DIAGOUT_LVDBMON  : out std_logic_vector(17 downto 0);
-
-    --------------------
-    -- TODO: DCFEB PRBS signals
-    --------------------
-    DCFEB_PRBS_FIBER_SEL : out std_logic_vector(3 downto 0);
-    DCFEB_PRBS_EN        : out std_logic;
-    DCFEB_PRBS_RST       : out std_logic;
-    DCFEB_PRBS_RD_EN     : out std_logic;
-    DCFEB_RXPRBSERR      : in  std_logic;
-    DCFEB_PRBS_ERR_CNT   : in  std_logic_vector(15 downto 0);
+    LVMB_PON     : out std_logic_vector(7 downto 0);
+    PON_LOAD     : out std_logic;
+    PON_OE_B     : out std_logic;
+    MON_LVMB_PON : in  std_logic_vector(7 downto 0);
+    LVMB_CSB     : out std_logic_vector(6 downto 0);
+    LVMB_SCLK    : out std_logic;
+    LVMB_SDIN    : out std_logic;
+    LVMB_SDOUT_P : in  std_logic;
+    LVMB_SDOUT_N : in  std_logic;
 
     --------------------
-    -- TODO: OTMB PRBS signals
+    -- OTMB signals
     --------------------
-    OTMB_TX : in  std_logic_vector(48 downto 0);
-    OTMB_RX : out std_logic_vector(5 downto 0);
+    OTMB        : in  std_logic_vector(35 downto 0);      -- "TMB[35:0]" in Bank 44-45
+    RAWLCT      : in  std_logic_vector(NCFEB-1 downto 0); -- Bank 45
+    OTMB_DAV    : in  std_logic;                          -- "TMB_DAV" in Bank 45
+    OTMB_FF_CLK : in  std_logic;                          -- "TMB_FF_CLK" in Bank 45, not used
+    RSVTD_IN    : in  std_logic_vector(7 downto 3);       -- "RSVTD[7:3]" in Bank 44-45
+    RSVTD_OUT   : out std_logic_vector(2 downto 0);       -- "RSVTD[2:0]" in Bank 44-45
+    LCT_RQST    : out std_logic_vector(2 downto 1);       -- Bank 45
 
     --------------------
     -- VMEMON Configuration signals for top level and input from top level
@@ -141,6 +131,25 @@ entity ODMB_VME is
     CHANGE_REG_INDEX     : in integer range 0 to NREGS;
 
     --------------------
+    -- DDU/SPY/DCFEB/ALCT Optical PRBS test signals
+    --------------------
+    MGT_PRBS_TYPE        : out std_logic_vector(3 downto 0); -- DDU/SPY/DCFEB/ALCT Common PRBS type
+    DDU_PRBS_TX_EN       : out std_logic_vector(3 downto 0);
+    DDU_PRBS_RX_EN       : out std_logic_vector(3 downto 0);
+    DDU_PRBS_TST_CNT     : out std_logic_vector(15 downto 0);
+    DDU_PRBS_ERR_CNT     : in  std_logic_vector(15 downto 0);
+    SPY_PRBS_TX_EN       : out std_logic;
+    SPY_PRBS_RX_EN       : out std_logic;
+    SPY_PRBS_TST_CNT     : out std_logic_vector(15 downto 0);
+    SPY_PRBS_ERR_CNT     : in  std_logic_vector(15 downto 0);
+    DCFEB_PRBS_FIBER_SEL : out std_logic_vector(3 downto 0);
+    DCFEB_PRBS_EN        : out std_logic;
+    DCFEB_PRBS_RST       : out std_logic;
+    DCFEB_PRBS_RD_EN     : out std_logic;
+    DCFEB_RXPRBSERR      : in  std_logic;
+    DCFEB_PRBS_ERR_CNT   : in  std_logic_vector(15 downto 0);
+
+    --------------------
     -- Other
     --------------------
     DIAGOUT     : out std_logic_vector (17 downto 0); -- for debugging
@@ -153,22 +162,6 @@ architecture Behavioral of ODMB_VME is
   constant bw_data  : integer := 16; -- data bit width
   constant num_dev  : integer := 9;  -- number of devices (exclude dev0)
 
---  component CONFREGS_DUMMY is
---    port (
---      SLOWCLK              : in std_logic;
---      DEVICE               : in std_logic;
---      STROBE               : in std_logic;
---      COMMAND              : in std_logic_vector(9 downto 0);
---      OUTDATA              : inout std_logic_vector(15 downto 0);
---      DTACK                : out std_logic;
---      LCT_L1A_DLY          : out std_logic_vector(5 downto 0);
---      INJ_DLY              : out std_logic_vector(4 downto 0);
---      EXT_DLY              : out std_logic_vector(4 downto 0);
---      CALLCT_DLY           : out std_logic_vector(3 downto 0);
---      CABLE_DLY            : out integer range 0 to 1
---    );
---  end component;
-  
   component QSPI_DUMMY is
     generic (
       NREGS  : integer := 16
@@ -326,6 +319,50 @@ architecture Behavioral of ODMB_VME is
       );
   end component;
 
+  component SYSTEM_TEST is
+    port (
+      DEVICE  : in std_logic;
+      COMMAND : in std_logic_vector(9 downto 0);
+      INDATA  : in std_logic_vector(15 downto 0);
+      STROBE  : in std_logic;
+      WRITER  : in std_logic;
+      SLOWCLK : in std_logic;
+      CLK     : in std_logic;
+      CLK160  : in std_logic;
+      RST     : in std_logic;
+
+      OUTDATA : out std_logic_vector(15 downto 0);
+      DTACK   : out std_logic;
+
+      -- DDU/PC/DCFEB COMMON PRBS
+      MGT_PRBS_TYPE : out std_logic_vector(3 downto 0);
+
+      -- DDU PRBS signals
+      DDU_PRBS_TX_EN   : out std_logic;
+      DDU_PRBS_RX_EN   : out std_logic;
+      DDU_PRBS_TST_CNT : out std_logic_vector(15 downto 0);
+      DDU_PRBS_ERR_CNT : in  std_logic_vector(15 downto 0);
+
+      -- PC PRBS signals
+      PC_PRBS_TX_EN   : out std_logic;
+      PC_PRBS_RX_EN   : out std_logic;
+      PC_PRBS_TST_CNT : out std_logic_vector(15 downto 0);
+      PC_PRBS_ERR_CNT : in  std_logic_vector(15 downto 0);
+
+      -- DCFEB PRBS signals
+      DCFEB_PRBS_FIBER_SEL : out std_logic_vector(3 downto 0);
+      DCFEB_PRBS_EN        : out std_logic;
+      DCFEB_PRBS_RST       : out std_logic;
+      DCFEB_PRBS_RD_EN     : out std_logic;
+      DCFEB_RXPRBSERR      : in  std_logic;
+      DCFEB_PRBS_ERR_CNT   : in  std_logic_vector(15 downto 0);
+
+      -- OTMB PRBS signals
+      OTMB_TX : in  std_logic_vector(48 downto 0);
+      OTMB_RX : out std_logic_vector(5 downto 0)
+      );
+  end component;
+
   component COMMAND_MODULE is
     port (
       FASTCLK : in std_logic;
@@ -364,6 +401,9 @@ architecture Behavioral of ODMB_VME is
   signal tovme_b, doe_b : std_logic := '0';
   signal vme_data_out_buf : std_logic_vector(15 downto 0) := (others => '0'); --comment for real ODMB, needed for KCU
 
+  -- lvmb signals
+  signal lvmb_sdout : std_logic;
+
   type dev_array is array(0 to num_dev) of std_logic_vector(15 downto 0);
   signal outdata_dev : dev_array;
   signal dtack_dev   : std_logic_vector(num_dev downto 0) := (others => '0');
@@ -382,6 +422,11 @@ architecture Behavioral of ODMB_VME is
   
   signal odmb_id_inner : std_logic_vector(15 downto 0);
   
+  -- OTMB signals assembly
+  signal alct : std_logic_vector(17 downto 0);
+  signal otmb_tx : std_logic_vector(48 downto 0);
+  signal otmb_rx : std_logic_vector(5 downto 0);
+
   --temp bpi signals
   signal qspi_cfg_ul_pulse_inner : std_logic := '0';
   signal qspi_cfg_dl_pulse_inner : std_logic := '0';
@@ -394,6 +439,13 @@ architecture Behavioral of ODMB_VME is
   signal qspi_const_reg_we : integer range 0 to NREGS := 0;
   signal const_regs_inner       : cfg_regs_array;
   signal cfg_regs_inner         : cfg_regs_array;
+
+  -- VMEMON signals
+  signal cafifo_l1a          : std_logic := '0';
+  signal cafifo_l1a_match_in : std_logic_vector(NCFEB+2 downto 1) := (others => '0');
+
+  signal otmb_lct_rqst : std_logic;
+  signal otmb_ext_trig : std_logic;
 
 begin
 
@@ -419,6 +471,44 @@ begin
 
   VME_DTACK_B <= not or_reduce(dtack_dev);
   
+  u_lvmb_sdout : IBUFDS port map (I => LVMB_SDOUT_P, IB => LVMB_SDOUT_N, O => lvmb_sdout);
+
+  ----------------------------------
+  -- OTMB backplane pins
+  ----------------------------------
+  LCT_RQST(1)  <= otmb_lct_rqst                when otmb_rx(0) = '0' else otmb_rx(0);
+  LCT_RQST(2)  <= otmb_ext_trig                when otmb_rx(0) = '0' else otmb_rx(1);
+  RSVTD_OUT(0) <= cafifo_l1a                   when otmb_rx(0) = '0' else otmb_rx(3); -- TODO: cafifo_l1a is place holder only
+  RSVTD_OUT(1) <= cafifo_l1a_match_in(NCFEB+1) when otmb_rx(0) = '0' else otmb_rx(4); -- TODO: cafifo_l1a is place holder only
+  RSVTD_OUT(2) <= cafifo_l1a_match_in(NCFEB+2) when otmb_rx(0) = '0' else otmb_rx(5); -- TODO: cafifo_l1a is place holder only
+
+  -- Output referred to odmb_device.vhd: dmb_tx_odmb(48 downto 0)
+  -- dmb_tx_odmb_inner <= "101" & lct(7 downto 6) & alct_dav & eof_alct_data(16 downto 15) &
+  --                      eof_alct_data_valid_b & lct(5 downto 0) & eof_otmb_data_valid_b & otmb_dav &
+  --                      eof_otmb_data(16 downto 15) & eof_alct_data(14 downto 0) & eof_otmb_data(14 downto 0);
+
+  -- otmb_tx <= (14 downto 0  => OTMB(14 downto 0),    -- tmb_data[14:0]      // fifo data
+  --             29 downto 15 => OTMB(32 downto 18),   -- alct_data[14:0]     // alct data	
+  --             30           => OTMB(15),             -- tmb_ddu_special     // DDU special
+  --             31           => OTMB(16),             -- tmb_last_frame      // DMB last
+  --             32           => OTMB_DAV,             -- tmb_first_frame     // DMB data available
+  --             33           => OTMB(17),             -- tmb_/wr_enable      // DMB /wr
+  --             34           => RAWLCT(0),            -- tmb_active_feb_flag // DMB active cfeb flag
+  --             39 downto 35 => RAWLCT(5 downto 1),   -- tmb_active_feb[4:0] // DMB active cfeb list
+  --             40           => OTMB(35),             -- alct_/wr_enable     // ALCT _wr_fifo
+  --             41           => OTMB(33),             -- alct_ddu_special    // ALCT ddu_special (alct_data[15])
+  --             42           => OTMB(34),             -- alct_last_frame     // ALCT last frame  (alct_data[16])
+  --             43           => RSVTD_IN(7),          -- alct_first_frame    // ALCT first frame (ALCT_DAV)
+  --             45 downto 44 => RSVTD_IN(5 downto 4), -- res_to_dmb[2:1]     // DMB active cfeb list
+  --             46           => RSVTD_IN(6),          -- res_to_dmb[3]       // Not used, ='1' in PRBS test
+  --             47           => RAWLCT(6),            -- res_to_dmb[4]       // Not used, ='0' in PRBS test
+  --             48           => RSVTD_IN(3));         -- res_to_dmb[5]       // Not used, ='1' in PRBS test
+
+  alct <= otmb(35 downto 18);
+  otmb_tx <= RSVTD_IN(3) & RAWLCT(6) & RSVTD_IN(6) & RSVTD_IN(5) & RSVTD_IN(4) & RSVTD_IN(7) &
+             alct(16 downto 15) & alct(17) & RAWLCT(5 downto 0) & otmb(17) & otmb(17) &
+             otmb(16 downto 15) & alct(14 downto 0) & otmb(14 downto 0);
+
   ----------------------------------
   -- misc
   ----------------------------------
@@ -487,8 +577,8 @@ begin
       TEST_PED        => TEST_PED,
       TEST_BC0        => TEST_BC0,
       TEST_LCT        => TEST_LCT,
-      OTMB_LCT_RQST   => open,
-      OTMB_EXT_TRIG   => open,
+      OTMB_LCT_RQST   => otmb_lct_rqst,
+      OTMB_EXT_TRIG   => otmb_ext_trig,
 
       MASK_PLS      => MASK_PLS,
       MASK_L1A      => MASK_L1A,
@@ -505,21 +595,6 @@ begin
       LOOPBACK      => open       -- For internal loopback tests, bbb for W 3100 bbb
       );
       
---  DEV4_DUMMY : CONFREGS_DUMMY
---    port map (
---      SLOWCLK => clk2p5,
---      DEVICE  => device(4),
---      STROBE  => strobe,
---      COMMAND => cmd,
---      OUTDATA => outdata_dev(4),
---      DTACK => dtack_dev(4),
---      LCT_L1A_DLY => LCT_L1A_DLY,
---      INJ_DLY => INJ_DLY, 
---      EXT_DLY => EXT_DLY, 
---      CALLCT_DLY => CALLCT_DLY,
---      CABLE_DLY => CABLE_DLY
---    );
-  
   DEV4_VMECONFREGS : VMECONFREGS
       port map (
         SLOWCLK => CLK2P5,
@@ -561,10 +636,55 @@ begin
         QSPI_CFG_REGS    => cfg_regs_inner
       );      
 
+  DEV9_SYSTEST : SYSTEM_TEST
+    port map (
+      --CSP_FREE_AGENT_PORT_LA_CTRL => CSP_FREE_AGENT_PORT_LA_CTRL,
+
+      DEVICE  => device(9),
+      COMMAND => cmd,
+      INDATA  => VME_DATA_IN,
+      STROBE  => strobe,
+      WRITER  => VME_WRITE_B,
+      SLOWCLK => CLK2P5,
+      CLK     => CLK40,
+      CLK160  => CLK1P25,
+      RST     => RST,
+
+      OUTDATA => outdata_dev(9),
+      DTACK   => dtack_dev(9),
+
+      -- DDU/PC/DCFEB COMMON PRBS
+      MGT_PRBS_TYPE => MGT_PRBS_TYPE,
+
+      -- TODO: DDU PRBS signals
+      DDU_PRBS_TX_EN   => DDU_PRBS_TX_EN(0), -- temporary
+      DDU_PRBS_RX_EN   => DDU_PRBS_RX_EN(0), -- temporary
+      DDU_PRBS_TST_CNT => DDU_PRBS_TST_CNT,
+      DDU_PRBS_ERR_CNT => DDU_PRBS_ERR_CNT,
+
+      -- TODO: PC PRBS signals
+      PC_PRBS_TX_EN   => SPY_PRBS_TX_EN,
+      PC_PRBS_RX_EN   => SPY_PRBS_RX_EN,
+      PC_PRBS_TST_CNT => SPY_PRBS_TST_CNT,
+      PC_PRBS_ERR_CNT => SPY_PRBS_ERR_CNT,
+
+      -- TODO: DCFEB PRBS signals
+      DCFEB_PRBS_FIBER_SEL => DCFEB_PRBS_FIBER_SEL,
+      DCFEB_PRBS_EN        => DCFEB_PRBS_EN,
+      DCFEB_PRBS_RST       => DCFEB_PRBS_RST,
+      DCFEB_PRBS_RD_EN     => DCFEB_PRBS_RD_EN,
+      DCFEB_RXPRBSERR      => DCFEB_RXPRBSERR,
+      DCFEB_PRBS_ERR_CNT   => DCFEB_PRBS_ERR_CNT,
+
+      --OTMB_PRBS signals
+      OTMB_TX => otmb_tx,
+      OTMB_RX => otmb_rx
+      );
+
   COMMAND_PM : COMMAND_MODULE
     port map (
-      FASTCLK => clk40,
-      SLOWCLK => clk2p5,
+      FASTCLK => CLK40,
+      SLOWCLK => CLK2P5,
       GAP     => VME_GAP_B,
       GA      => VME_GA_B,
       ADR     => VME_ADDR,             -- input cmd = ADR(11 downto 2)
