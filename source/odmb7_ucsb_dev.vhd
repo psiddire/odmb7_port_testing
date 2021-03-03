@@ -429,6 +429,22 @@ architecture Behavioral of ODMB7_UCSB_DEV is
   signal odmbctrl_l1a_match : std_logic_vector(NCFEB downto 1) := (others => '0');
   signal ccb_bx0            : std_logic := '0';
   signal ccb_bx0_q          : std_logic := '0';
+  attribute clock_buffer_type of CCB_CMD        : signal is "NONE";
+  attribute clock_buffer_type of CCB_CMD_S      : signal is "NONE";
+  attribute clock_buffer_type of CCB_DATA       : signal is "NONE";
+  attribute clock_buffer_type of CCB_DATA_S     : signal is "NONE";
+  attribute clock_buffer_type of CCB_CAL        : signal is "NONE";
+  attribute clock_buffer_type of CCB_CRSV       : signal is "NONE";
+  attribute clock_buffer_type of CCB_DRSV       : signal is "NONE";
+  attribute clock_buffer_type of CCB_RSVO       : signal is "NONE";
+  attribute clock_buffer_type of CCB_RSVI       : signal is "NONE";
+  attribute clock_buffer_type of CCB_BX0_B      : signal is "NONE";
+  attribute clock_buffer_type of CCB_BX_RST_B   : signal is "NONE";
+  attribute clock_buffer_type of CCB_L1A_RST_B  : signal is "NONE";
+  attribute clock_buffer_type of CCB_L1A_B      : signal is "NONE";
+  attribute clock_buffer_type of CCB_L1A_RLS    : signal is "NONE";
+  attribute clock_buffer_type of CCB_CLKEN      : signal is "NONE";
+  attribute clock_buffer_type of CCB_EVCNTRES_B : signal is "NONE";
 
   -- signals to generate dcfeb_initjtag when DCFEBs are done programming
   type done_cnt_type is array (NCFEB downto 1) of integer range 0 to 3;
@@ -817,7 +833,7 @@ begin
   -- Debug
   -------------------------------------------------------------------------------------------
 
-  DIAGOUT <= diagout_inner;
+  DIAGOUT <= diagout_inner; --meta:comment_for_odmb
 
   -------------------------------------------------------------------------------------------
   -- Handle data readout
