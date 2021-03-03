@@ -44,7 +44,7 @@ entity ODMB7_UCSB_DEV is
     VME_CLK_B       : in std_logic;                        -- Bank 48, not used
     KUS_VME_OE_B    : out std_logic;                       -- Bank 44
     KUS_VME_DIR_B   : out std_logic;                       -- Bank 44
-    VME_DTACK_KUS_B : inout std_logic;                     -- Bank 44
+    VME_DTACK_KUS_B : out std_logic;                       -- Bank 44
 
     DCFEB_TCK_P    : out std_logic_vector(NCFEB downto 1); -- Bank 68
     DCFEB_TCK_N    : out std_logic_vector(NCFEB downto 1); -- Bank 68
@@ -134,7 +134,7 @@ architecture Behavioral of ODMB7_UCSB_DEV is
       VME_IACK_B    : in std_logic;
       VME_BERR_B    : in std_logic;
       VME_SYSFAIL_B : in std_logic;
-      VME_DTACK_B   : inout std_logic;
+      VME_DTACK_B   : out std_logic;
       VME_OE_B      : out std_logic;
       VME_DIR_B     : out std_logic;
 
