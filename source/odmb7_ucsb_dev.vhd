@@ -429,6 +429,7 @@ architecture Behavioral of ODMB7_UCSB_DEV is
   signal odmbctrl_l1a_match : std_logic_vector(NCFEB downto 1) := (others => '0');
   signal ccb_bx0            : std_logic := '0';
   signal ccb_bx0_q          : std_logic := '0';
+  attribute clock_buffer_type : string;
   attribute clock_buffer_type of CCB_CMD        : signal is "NONE";
   attribute clock_buffer_type of CCB_CMD_S      : signal is "NONE";
   attribute clock_buffer_type of CCB_DATA       : signal is "NONE";
@@ -592,7 +593,7 @@ begin
   BUFG_clk1p25 : BUFG port map(I => clk1p25_unbuf, O => clk1p25);
   BUFG_clk625k : BUFG port map(I => clk625k_unbuf, O => clk625k);
 
-  SYSCLK <= clk40; --meta:comment_in_odmb
+  SYSCLK <= clk40; --meta:comment_for_odmb
 
   -------------------------------------------------------------------------------------------
   -- Handle VME signals
