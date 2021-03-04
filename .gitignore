@@ -1,12 +1,15 @@
 vivado*
 testbench/vivado*
 .Xil
+*webtalk*
 testbench/tb_project/tb_project.cache
 testbench/tb_project/tb_project.hw
 testbench/tb_project/tb_project.ip_user_files
 testbench/tb_project/tb_project.runs
 testbench/tb_project/tb_project.sim
 testbench/ip
+odmb7_project/ip
+odmb7_project/odmb_project
 TestBench_odmb7
 
 testbench/ip/xcku040-ffva1156-2-e/lut_input1/

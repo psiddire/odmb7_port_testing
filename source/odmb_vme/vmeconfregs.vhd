@@ -52,15 +52,15 @@ entity VMECONFREGS is
     CHANGE_REG_INDEX : in integer range 0 to NREGS;
 
 -- To/From QSPI Interface
-    QSPI_CFG_UL_PULSE   : in std_logic;
-    QSPI_CONST_UL_PULSE : in std_logic;
-    QSPI_REG_IN : in std_logic_vector(15 downto 0);
-    QSPI_CFG_BUSY    : in  std_logic;
-    QSPI_CONST_BUSY  : in  std_logic;
-    QSPI_CFG_REG_WE   : in  integer range 0 to NREGS;
-    QSPI_CONST_REG_WE : in  integer range 0 to NREGS;
-    QSPI_CFG_REGS    : out cfg_regs_array;
-    QSPI_CONST_REGS  : out cfg_regs_array
+    SPI_CFG_UL_PULSE   : in std_logic;
+    SPI_CONST_UL_PULSE : in std_logic;
+    SPI_REG_IN : in std_logic_vector(15 downto 0);
+    SPI_CFG_BUSY    : in  std_logic;
+    SPI_CONST_BUSY  : in  std_logic;
+    SPI_CFG_REG_WE   : in  integer range 0 to NREGS;
+    SPI_CONST_REG_WE : in  integer range 0 to NREGS;
+    SPI_CFG_REGS    : out cfg_regs_array;
+    SPI_CONST_REGS  : out cfg_regs_array
     );
 end VMECONFREGS;
 
@@ -69,23 +69,28 @@ architecture VMECONFREGS_Arch of VMECONFREGS is
 
   constant FW_VERSION       : std_logic_vector(15 downto 0) := x"D3B7";
   constant FW_ID            : std_logic_vector(15 downto 0) := x"D3B7";
-  constant FW_MONTH_DAY     : std_logic_vector(15 downto 0) := x"1007";
+  constant FW_MONTH_DAY     : std_logic_vector(15 downto 0) := x"1109";
   constant FW_YEAR          : std_logic_vector(15 downto 0) := x"2020";
   constant able_write_const : std_logic                     := '0';
 
   constant cfg_reg_mask_we   : std_logic_vector(15 downto 0) := x"FDFF";
   constant const_reg_mask_we : std_logic_vector(15 downto 0) := x"FFE1";
-  constant cfg_reg_init : cfg_regs_array := (x"FFF0", x"FFF1", x"FFF2", x"FFF3",
-                                             x"FFF4", x"FFF5", x"FFF6", x"FFF7",
-                                             x"FFF8", FW_VERSION, x"FFFA", x"FFFB",
-                                             x"FFFC", x"FFFD", x"FFFE", x"FFFF");
-  constant const_reg_init : cfg_regs_array := (x"FFF0", FW_VERSION, FW_ID, FW_MONTH_DAY,
+--  constant cfg_reg_init : cfg_regs_array := (x"FFF0", x"FFF1", x"FFF2", x"FFF3",
+--                                             x"FFF4", x"FFF5", x"FFF6", x"FFF7",
+--                                             x"FFF8", FW_VERSION, x"FFFA", x"FFFB",
+--                                             x"FFFC", x"FFFD", x"FFFE", x"FFFF");
+                                               constant cfg_reg_init : cfg_regs_array := (x"5468", x"6973", x"2069", x"7320",
+                                                                                          x"6120", x"7465", x"7374", x"2066",
+                                                                                          x"6F72", x"2077", x"7269", x"7469",
+                                                                                          x"6E67", x"2050", x"524F", x"4D21");
+  constant const_reg_init : cfg_regs_array := (x"0D3B", FW_VERSION, FW_ID, FW_MONTH_DAY,
                                                FW_YEAR, x"FFF5", x"FFF6", x"FFF7",
                                                x"FFF8", x"FFF9", x"FFFA", x"FFFB",
                                                x"FFFC", x"FFFD", x"FFFE", x"FFFF");
-  constant cfg_reg_mask : cfg_regs_array := (x"003f", x"003f", x"0001", x"003f", x"001f",
-                                             x"001f", x"000f", x"01ff", x"00ff", x"ffff",
-                                             x"ffff", x"0fff", x"ffff", x"ffff", x"ffff", x"ffff");
+  constant cfg_reg_mask : cfg_regs_array := (x"003f", x"003f", x"0001", x"003f", 
+                                             x"001f", x"001f", x"000f", x"01ff", 
+                                             x"00ff", x"ffff", x"ffff", x"0fff", 
+                                             x"ffff", x"ffff", x"ffff", x"ffff");
   signal do_cfg, do_const                                   : std_logic := '0';
   signal do_cfg_we, do_const_we, do_cfg_we_q, do_const_we_q : std_logic := '0';
   signal bit_const                                          : std_logic := '0';
@@ -142,10 +147,10 @@ begin
   -- Output for read commands (R 0x40YZ and R 0x4Y00) and output data to top level
   OUTDATA <= mask_vme(15 downto 0) when r_mask_vme = '1' else
              const_regs(const_reg_index) when do_const = '1' else
-             cfg_regs(cfg_reg_index) and cfg_reg_mask(cfg_reg_index);
+             cfg_regs(cfg_reg_index); -- and cfg_reg_mask(cfg_reg_index);
 
-  QSPI_CFG_REGS   <= cfg_regs;
-  QSPI_CONST_REGS <= const_regs;
+  SPI_CFG_REGS   <= cfg_regs;
+  SPI_CONST_REGS <= const_regs;
 
   LCT_L1A_DLY   <= cfg_regs(0)(5 downto 0);                          -- 0x4000
   OTMB_PUSH_DLY <= to_integer(unsigned(cfg_regs(1)(5 downto 0)));    -- 0x4004
@@ -166,15 +171,15 @@ begin
 
 
   -- Write configuration registers (W 0x40YZ or top level signal) when vme_cfg_reg_we or CC_CFG_REG_WE are not NREGS
-  do_cfg_we      <= do_cfg and not WRITER and STROBE and not QSPI_CFG_BUSY;
+  do_cfg_we      <= do_cfg and not WRITER and STROBE and not SPI_CFG_BUSY;
   PULSE_CFGWE : PULSE2FAST port map(DOUT => do_cfg_we_q, CLK_DOUT => CLK, RST => RST, DIN => do_cfg_we);
   vme_cfg_reg_we <= cfg_reg_index when do_cfg_we_q = '1' else NREGS;
 
   cfg_reg_we <= CHANGE_REG_INDEX when CHANGE_REG_INDEX < NREGS else
-                QSPI_CFG_REG_WE when QSPI_CFG_UL_PULSE = '1' else
+                SPI_CFG_REG_WE when SPI_CFG_UL_PULSE = '1' else
                 vme_cfg_reg_we;
   cfg_reg_in <= CHANGE_REG_DATA when CHANGE_REG_INDEX < NREGS else
-                QSPI_REG_IN when QSPI_CFG_UL_PULSE = '1' else
+                SPI_REG_IN when SPI_CFG_UL_PULSE = '1' else
                 INDATA;
 
   cfg_reg_proc : process (RST, CLK, cfg_reg_we, cfg_reg_in, cfg_regs)
@@ -208,12 +213,12 @@ begin
 
 
   -- Writing protected registers (W 0x4Y00)
-  do_const_we      <= do_const and not WRITER and STROBE and not QSPI_CONST_BUSY and mask_vme(const_reg_index);
+  do_const_we      <= do_const and not WRITER and STROBE and not SPI_CONST_BUSY and mask_vme(const_reg_index);
   PULSE_CONSTWE : PULSE2FAST port map(DOUT => do_const_we_q, CLK_DOUT => CLK, RST => RST, DIN => do_const_we);
   vme_const_reg_we <= const_reg_index when do_const_we_q = '1' else NCONST;
 
-  const_reg_we <= vme_const_reg_we when (QSPI_CONST_UL_PULSE = '0') else QSPI_CONST_REG_WE;
-  const_reg_in <= INDATA           when (QSPI_CONST_UL_PULSE = '0') else QSPI_REG_IN;
+  const_reg_we <= vme_const_reg_we when (SPI_CONST_UL_PULSE = '0') else SPI_CONST_REG_WE;
+  const_reg_in <= INDATA           when (SPI_CONST_UL_PULSE = '0') else SPI_REG_IN;
 
   const_reg_proc : process (RST, CLK, const_reg_we, const_reg_in, const_regs)
   begin
