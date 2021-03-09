@@ -78,11 +78,10 @@ entity ODMB_VME is
     LVMB_CSB     : out std_logic_vector(6 downto 0);
     LVMB_SCLK    : out std_logic;
     LVMB_SDIN    : out std_logic;
-    LVMB_SDOUT_P : in  std_logic;
-    LVMB_SDOUT_N : in  std_logic;
+    LVMB_SDOUT   : in  std_logic;
 
     --------------------
-    -- OTMB signals
+    -- OTMB connections through backplane
     --------------------
     OTMB        : in  std_logic_vector(35 downto 0);      -- "TMB[35:0]" in Bank 44-45
     RAWLCT      : in  std_logic_vector(NCFEB-1 downto 0); -- Bank 45
@@ -401,11 +400,8 @@ architecture Behavioral of ODMB_VME is
   signal tovme_b, doe_b : std_logic := '0';
   signal vme_data_out_buf : std_logic_vector(15 downto 0) := (others => '0'); --comment for real ODMB, needed for KCU
 
-  -- lvmb signals
-  signal lvmb_sdout : std_logic;
-
-  type dev_array is array(0 to num_dev) of std_logic_vector(15 downto 0);
-  signal outdata_dev : dev_array;
+  type dev_data_array is array(0 to num_dev) of std_logic_vector(15 downto 0);
+  signal outdata_dev : dev_data_array;
   signal dtack_dev   : std_logic_vector(num_dev downto 0) := (others => '0');
   signal idx_dev     : integer range 0 to num_dev;
 
@@ -463,7 +459,7 @@ begin
   VME_DIR_B <= tovme_b;
 
   -- This will not be needed when all devs are ready --devtmp
-  GEN_OUTDATA_DEV : for dev in 5 to num_dev generate --devtmp
+  GEN_OUTDATA_DEV : for dev in 5 to 8 generate --devtmp
     outdata_dev(dev) <= (others => '0');             --devtmp
   end generate GEN_OUTDATA_DEV;                      --devtmp
   idx_dev <= to_integer(unsigned(cmd_adrs_inner(15 downto 12)));
@@ -471,8 +467,6 @@ begin
 
   VME_DTACK_B <= not or_reduce(dtack_dev);
   
-  u_lvmb_sdout : IBUFDS port map (I => LVMB_SDOUT_P, IB => LVMB_SDOUT_N, O => lvmb_sdout);
-
   ----------------------------------
   -- OTMB backplane pins
   ----------------------------------
@@ -487,27 +481,22 @@ begin
   --                      eof_alct_data_valid_b & lct(5 downto 0) & eof_otmb_data_valid_b & otmb_dav &
   --                      eof_otmb_data(16 downto 15) & eof_alct_data(14 downto 0) & eof_otmb_data(14 downto 0);
 
-  -- otmb_tx <= (14 downto 0  => OTMB(14 downto 0),    -- tmb_data[14:0]      // fifo data
-  --             29 downto 15 => OTMB(32 downto 18),   -- alct_data[14:0]     // alct data	
-  --             30           => OTMB(15),             -- tmb_ddu_special     // DDU special
-  --             31           => OTMB(16),             -- tmb_last_frame      // DMB last
-  --             32           => OTMB_DAV,             -- tmb_first_frame     // DMB data available
-  --             33           => OTMB(17),             -- tmb_/wr_enable      // DMB /wr
-  --             34           => RAWLCT(0),            -- tmb_active_feb_flag // DMB active cfeb flag
-  --             39 downto 35 => RAWLCT(5 downto 1),   -- tmb_active_feb[4:0] // DMB active cfeb list
-  --             40           => OTMB(35),             -- alct_/wr_enable     // ALCT _wr_fifo
-  --             41           => OTMB(33),             -- alct_ddu_special    // ALCT ddu_special (alct_data[15])
-  --             42           => OTMB(34),             -- alct_last_frame     // ALCT last frame  (alct_data[16])
-  --             43           => RSVTD_IN(7),          -- alct_first_frame    // ALCT first frame (ALCT_DAV)
-  --             45 downto 44 => RSVTD_IN(5 downto 4), -- res_to_dmb[2:1]     // DMB active cfeb list
-  --             46           => RSVTD_IN(6),          -- res_to_dmb[3]       // Not used, ='1' in PRBS test
-  --             47           => RAWLCT(6),            -- res_to_dmb[4]       // Not used, ='0' in PRBS test
-  --             48           => RSVTD_IN(3));         -- res_to_dmb[5]       // Not used, ='1' in PRBS test
-
-  alct <= otmb(35 downto 18);
-  otmb_tx <= RSVTD_IN(3) & RAWLCT(6) & RSVTD_IN(6) & RSVTD_IN(5) & RSVTD_IN(4) & RSVTD_IN(7) &
-             alct(16 downto 15) & alct(17) & RAWLCT(5 downto 0) & otmb(17) & otmb(17) &
-             otmb(16 downto 15) & alct(14 downto 0) & otmb(14 downto 0);
+  otmb_tx(14 downto 0)  <= OTMB(14 downto 0);    -- tmb_data[14:0]      // fifo data
+  otmb_tx(29 downto 15) <= OTMB(32 downto 18);   -- alct_data[14:0]     // alct data	
+  otmb_tx(30)           <= OTMB(15);             -- tmb_ddu_special     // DDU special
+  otmb_tx(31)           <= OTMB(16);             -- tmb_last_frame      // DMB last
+  otmb_tx(32)           <= OTMB_DAV;             -- tmb_first_frame     // DMB data available
+  otmb_tx(33)           <= OTMB(17);             -- tmb_/wr_enable      // DMB /wr
+  otmb_tx(34)           <= RAWLCT(0);            -- tmb_active_feb_flag // DMB active cfeb flag
+  otmb_tx(39 downto 35) <= RAWLCT(5 downto 1);   -- tmb_active_feb[4:0] // DMB active cfeb list
+  otmb_tx(40)           <= OTMB(35);             -- alct_/wr_enable     // ALCT _wr_fifo
+  otmb_tx(41)           <= OTMB(33);             -- alct_ddu_special    // ALCT ddu_special (alct_data[15])
+  otmb_tx(42)           <= OTMB(34);             -- alct_last_frame     // ALCT last frame  (alct_data[16])
+  otmb_tx(43)           <= RSVTD_IN(7);          -- alct_first_frame    // ALCT first frame (ALCT_DAV)
+  otmb_tx(45 downto 44) <= RSVTD_IN(5 downto 4); -- res_to_dmb[2:1]     // DMB active cfeb list
+  otmb_tx(46)           <= RSVTD_IN(6);          -- res_to_dmb[3]       // Not used, ='1' in PRBS test
+  otmb_tx(47)           <= RAWLCT(6);            -- res_to_dmb[4]       // Not used, ='0' in PRBS test
+  otmb_tx(48)           <= RSVTD_IN(3);          -- res_to_dmb[5]       // Not used, ='1' in PRBS test
 
   ----------------------------------
   -- misc
@@ -647,7 +636,7 @@ begin
       WRITER  => VME_WRITE_B,
       SLOWCLK => CLK2P5,
       CLK     => CLK40,
-      CLK160  => CLK1P25,
+      CLK160  => CLK160,  -- previously using CLK1P25, why?
       RST     => RST,
 
       OUTDATA => outdata_dev(9),
@@ -655,19 +644,16 @@ begin
 
       -- DDU/PC/DCFEB COMMON PRBS
       MGT_PRBS_TYPE => MGT_PRBS_TYPE,
-
       -- TODO: DDU PRBS signals
       DDU_PRBS_TX_EN   => DDU_PRBS_TX_EN(0), -- temporary
       DDU_PRBS_RX_EN   => DDU_PRBS_RX_EN(0), -- temporary
       DDU_PRBS_TST_CNT => DDU_PRBS_TST_CNT,
       DDU_PRBS_ERR_CNT => DDU_PRBS_ERR_CNT,
-
       -- TODO: PC PRBS signals
       PC_PRBS_TX_EN   => SPY_PRBS_TX_EN,
       PC_PRBS_RX_EN   => SPY_PRBS_RX_EN,
       PC_PRBS_TST_CNT => SPY_PRBS_TST_CNT,
       PC_PRBS_ERR_CNT => SPY_PRBS_ERR_CNT,
-
       -- TODO: DCFEB PRBS signals
       DCFEB_PRBS_FIBER_SEL => DCFEB_PRBS_FIBER_SEL,
       DCFEB_PRBS_EN        => DCFEB_PRBS_EN,

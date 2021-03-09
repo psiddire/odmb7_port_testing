@@ -68,7 +68,7 @@ entity odmb7_ucsb_dev is
     DCFEB_TDI_N    : out std_logic;                        -- Bank 68
     DCFEB_TDO_P    : in  std_logic_vector(NCFEB downto 1); -- "C_TDO" in Bank 67-68
     DCFEB_TDO_N    : in  std_logic_vector(NCFEB downto 1); -- "C_TDO" in Bank 67-68
-    DCFEB_DONE     : in  std_logic_vector(NCFEB downto 1); -- "DONE_?" in Bank 68
+    DCFEB_DONE     : in  std_logic_vector(NCFEB downto 1); -- "DONE_*" in Bank 68
     RESYNC_P       : out std_logic;                        -- Bank 66
     RESYNC_N       : out std_logic;                        -- Bank 66
     BC0_P          : out std_logic;                        -- Bank 68
@@ -303,8 +303,7 @@ architecture Behavioral of odmb7_ucsb_dev is
       LVMB_CSB     : out std_logic_vector(6 downto 0);
       LVMB_SCLK    : out std_logic;
       LVMB_SDIN    : out std_logic;
-      LVMB_SDOUT_P : in  std_logic;
-      LVMB_SDOUT_N : in  std_logic;
+      LVMB_SDOUT   : in  std_logic;
 
       --------------------
       -- OTMB signals
@@ -524,9 +523,8 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal dcfeb_initjtag_d : std_logic := '0';
   signal dcfeb_initjtag_dd : std_logic := '0';
 
-  -- OTMB backplane communication
-  signal otmb_rx : std_logic_vector(5 downto 0);
-  signal otmb_tx : std_logic_vector(48 downto 0);
+  -- lvmb signals
+  signal lvmb_sdout : std_logic;
 
   -- CAFIFO related signals place holder
   signal cafifo_l1a          : std_logic;
@@ -833,6 +831,11 @@ begin
   PULSE_DCFEB_INITJTAG : NPULSE2FAST port map(DOUT => dcfeb_initjtag, CLK_DOUT => clk_sysclk2p5, RST => '0', NPULSE => 5, DIN => dcfeb_initjtag_d);
 
   -------------------------------------------------------------------------------------------
+  -- Handle LVMB signal
+  -------------------------------------------------------------------------------------------
+  u_lvmb_sdout : IBUFDS port map (I => LVMB_SDOUT_P, IB => LVMB_SDOUT_N, O => lvmb_sdout);
+
+  -------------------------------------------------------------------------------------------
   -- Handle Triggers
   -------------------------------------------------------------------------------------------
 
@@ -952,8 +955,7 @@ begin
       LVMB_CSB     => LVMB_CSB,
       LVMB_SCLK    => LVMB_SCLK,
       LVMB_SDIN    => LVMB_SDIN,
-      LVMB_SDOUT_P => LVMB_SDOUT_P,
-      LVMB_SDOUT_N => LVMB_SDOUT_N,
+      LVMB_SDOUT   => lvmb_sdout,
 
       OTMB        => OTMB,
       RAWLCT      => RAWLCT,

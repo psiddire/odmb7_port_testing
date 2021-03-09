@@ -38,4 +38,5 @@ other devices in the future. LUTs are used to provide VME commands to the ODMB, 
   - [ ] Device 7: SYSTEM_MON
   - [ ] Device 8: LVDBMON
   - [ ] Device 9: SYSTEM_TEST
-
+    - [ ] Optical PRBS tests
+    - [ ] OTMB PRBS test
