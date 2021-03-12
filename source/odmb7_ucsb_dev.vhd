@@ -16,24 +16,14 @@ entity ODMB7_UCSB_DEV is
     NREGS       : integer := 16;
     NCFEB       : integer range 1 to 7 := 7  -- Number of DCFEBS, 7 for ME1/1, 5
   );
-  PORT (
+  port (
     --------------------
-    -- Clocks from testbench
+    -- Input clocks
     --------------------
-    --CLK160      : in std_logic;  -- For dcfeb prbs (160MHz)
-    --CLK80       : in std_logic;
-    --clk40       : in std_logic;  -- NEW (fastclk -> 40MHz)
-    --CLK10       : in std_logic;  -- NEW (midclk -> fastclk/4 -> 10MHz)
-
-    --------------------
-    -- Clocks
-    --------------------
-
-    CMS_CLK_FPGA_P : in std_logic;                         -- Bank 45
-    CMS_CLK_FPGA_N : in std_logic;                         -- Bank 45
-
-    GP_CLK_6_P     : in std_logic;                         -- Bank 44
-    GP_CLK_6_N     : in std_logic;                         -- Bank 44
+    CMS_CLK_FPGA_P : in std_logic;      -- system clock: 40.07897 MHz
+    CMS_CLK_FPGA_N : in std_logic;      -- system clock: 40.07897 MHz
+    GP_CLK_6_P : in std_logic;          -- clock synthesizer ODIV6: 80 MHz
+    GP_CLK_6_N : in std_logic;          -- clock synthesizer ODIV6: 80 MHz
 
     --------------------
     -- Signals controlled by ODMB_VME
@@ -62,9 +52,9 @@ entity ODMB7_UCSB_DEV is
     DCFEB_TMS_N    : out std_logic;                        -- Bank 68
     DCFEB_TDI_P    : out std_logic;                        -- Bank 68
     DCFEB_TDI_N    : out std_logic;                        -- Bank 68
-    DCFEB_TDO_P    : in  std_logic_vector(NCFEB downto 1); -- Bank 67-68
-    DCFEB_TDO_N    : in  std_logic_vector(NCFEB downto 1); -- Bank 67-68
-    DCFEB_DONE     : in  std_logic_vector(NCFEB downto 1); -- Bank 68
+    DCFEB_TDO_P    : in  std_logic_vector(NCFEB downto 1); -- "C_TDO" in Bank 67-68
+    DCFEB_TDO_N    : in  std_logic_vector(NCFEB downto 1); -- "C_TDO" in Bank 67-68
+    DCFEB_DONE     : in  std_logic_vector(NCFEB downto 1); -- "DONE_*" in Bank 68
     RESYNC_P       : out std_logic;                        -- Bank 66
     RESYNC_N       : out std_logic;                        -- Bank 66
     BC0_P          : out std_logic;                        -- Bank 68
@@ -80,18 +70,8 @@ entity ODMB7_UCSB_DEV is
     PPIB_OUT_EN_B  : out std_logic;                        -- Bank 68
 
     --------------------
-    -- Signals to Avoid Resetting Stuff
-    --------------------
-
-    KUS_DL_SEL_B   : out std_logic;                        -- Bank 47: Don't brick JTAG
-    DONE           : in  std_logic;                        -- Bank 66: Allow done light on
-    FPGA_SEL_18    : out std_logic;                        -- Bank 47: Allow USB clock synth program
-    RST_CLKS_18_B  : out std_logic;                        -- Bank 47: Allow clock board to program
-
-    --------------------
     -- CCB Signals
     --------------------
-      
     CCB_CMD        : in  std_logic_vector(5 downto 0);     -- Bank 44
     CCB_CMD_S      : in  std_logic;                        -- Bank 46
     CCB_DATA       : in  std_logic_vector(7 downto 0);     -- Bank 44
@@ -108,13 +88,12 @@ entity ODMB7_UCSB_DEV is
     CCB_L1A_RLS    : out std_logic;                        -- Bank 45
     CCB_CLKEN      : in  std_logic;                        -- Bank 46
     CCB_EVCNTRES_B : in  std_logic;                        -- Bank 46
-    CCB_HARDRST    : in  std_logic;                        -- Bank 45
-    CCB_SOFT_RST_B : in  std_logic;                        -- Bank 45
+    CCB_HARDRST_B  : in  std_logic;                        -- Bank 45
+    CCB_SOFT_RST   : in  std_logic;                        -- Bank 45
 
     --------------------
     -- LVMB Signals
     --------------------
-
     LVMB_PON     : out std_logic_vector(7 downto 0);       -- Bank 67
     PON_LOAD     : out std_logic;                          -- Bank 67
     PON_OE       : out std_logic;                          -- Bank 67
@@ -126,15 +105,35 @@ entity ODMB7_UCSB_DEV is
     LVMB_SDOUT_N : in std_logic;                           -- Bank 67 --meta:comment_for_odmb
     --LVMB_SDOUT_N : in std_logic                           -- Bank 67 --meta:uncomment_for_odmb
 
-    --DCFEB_PRBS_FIBER_SEL : out std_logic_vector(3 downto 0);
-    --DCFEB_PRBS_EN        : out std_logic;
-    --DCFEB_PRBS_RST       : out std_logic;
-    --DCFEB_PRBS_RD_EN     : out std_logic;
-    --DCFEB_RXPRBSERR      : in  std_logic;
-    --DCFEB_PRBS_ERR_CNT   : in  std_logic_vector(15 downto 0);
+    --------------------------------
+    -- OTMB communication signals
+    --------------------------------
+    OTMB        : in  std_logic_vector(35 downto 0);      -- "TMB[35:0]" in Bank 44-45
+    RAWLCT      : in  std_logic_vector(NCFEB-1 downto 0); -- Bank 45
+    OTMB_DAV    : in  std_logic;                          -- "TMB_DAV" in Bank 45
+    OTMB_FF_CLK : in  std_logic;                          -- "TMB_FF_CLK" in Bank 45
+    RSVTD_IN    : in  std_logic_vector(7 downto 3);       -- "RSVTD[7:3]" in Bank 44-45
+    RSVTD_OUT   : out std_logic_vector(2 downto 0);       -- "RSVTD[2:0]" in Bank 44-45
+    LCT_RQST    : out std_logic_vector(2 downto 1);       -- Bank 45
 
-    --OTMB_TX : in  std_logic_vector(48 downto 0);
-    --OTMB_RX : out std_logic_vector(5 downto 0);
+    --------------------------------
+    -- Essential selector/reset signals not classified yet
+    --------------------------------
+    KUS_DL_SEL    : out std_logic;                         -- Bank 47, ODMB JTAG path select
+    FPGA_SEL      : out std_logic;                         -- Bank 47, clock synthesizaer control input select
+    RST_CLKS_B    : out std_logic;                         -- Bank 47, clock synthesizaer reset
+    ODMB_DONE     : in std_logic;                          -- "DONE" in bank 66 (pin L9), monitor DONE_0 from Bank 0 (pin N7) 
+
+    --------------------------------
+    -- SYSMON ports
+    --------------------------------
+    SYSMON_P      : in std_logic_vector(15 downto 0);
+    SYSMON_N      : in std_logic_vector(15 downto 0);
+
+    --------------------------------
+    -- Others
+    --------------------------------
+    LEDS_CFV      : out std_logic_vector(11 downto 0)
 
     --------------------------------
     -- KCU signals (not in real ODMB)
@@ -163,7 +162,7 @@ architecture Behavioral of ODMB7_UCSB_DEV is
       CLK40       : in std_logic;  -- NEW (fastclk -> 40MHz)
       CLK10       : in std_logic;  -- NEW (midclk -> fastclk/4 -> 10MHz)
       CLK2P5      : in std_logic;  -- 2.5 MHz clock
-      CLK1P25     : in std_logic;
+      CLK1P25     : in std_logic;  -- 1.25 MHz clock
 
       --------------------
       -- VME signals  <-- relevant ones only
@@ -209,20 +208,15 @@ architecture Behavioral of ODMB7_UCSB_DEV is
       LVMB_SDOUT   : in  std_logic;
 
       --------------------
-      -- TODO: DCFEB PRBS signals
+      -- OTMB signals
       --------------------
-      --DCFEB_PRBS_FIBER_SEL : out std_logic_vector(3 downto 0);
-      --DCFEB_PRBS_EN        : out std_logic;
-      --DCFEB_PRBS_RST       : out std_logic;
-      --DCFEB_PRBS_RD_EN     : out std_logic;
-      --DCFEB_RXPRBSERR      : in  std_logic;
-      --DCFEB_PRBS_ERR_CNT   : in  std_logic_vector(15 downto 0);
-
-      --------------------
-      -- TODO: OTMB PRBS signals
-      --------------------
-      --OTMB_TX : in  std_logic_vector(48 downto 0);
-      --OTMB_RX : out std_logic_vector(5 downto 0);
+      OTMB        : in  std_logic_vector(35 downto 0);      -- "TMB[35:0]" in Bank 44-45
+      RAWLCT      : in  std_logic_vector(NCFEB-1 downto 0); -- Bank 45
+      OTMB_DAV    : in  std_logic;                          -- "TMB_DAV" in Bank 45
+      OTMB_FF_CLK : in  std_logic;                          -- "TMB_FF_CLK" in Bank 45
+      RSVTD_IN    : in  std_logic_vector(7 downto 3);       -- "RSVTD[7:3]" in Bank 44-45
+      RSVTD_OUT   : out std_logic_vector(2 downto 0);       -- "RSVTD[2:0]" in Bank 44-45
+      LCT_RQST    : out std_logic_vector(2 downto 1);       -- Bank 45
       
       --------------------
       -- VMEMON Configuration signals for top level
@@ -261,6 +255,25 @@ architecture Behavioral of ODMB7_UCSB_DEV is
       CRATEID          : out std_logic_vector(7 downto 0);
       CHANGE_REG_DATA  : in std_logic_vector(15 downto 0);
       CHANGE_REG_INDEX : in integer range 0 to NREGS;
+
+      --------------------
+      -- DDU/SPY/DCFEB/ALCT Optical PRBS test signals
+      --------------------
+      MGT_PRBS_TYPE        : out std_logic_vector(3 downto 0); -- DDU/SPY/DCFEB/ALCT Common PRBS type
+      DDU_PRBS_TX_EN       : out std_logic_vector(3 downto 0);
+      DDU_PRBS_RX_EN       : out std_logic_vector(3 downto 0);
+      DDU_PRBS_TST_CNT     : out std_logic_vector(15 downto 0);
+      DDU_PRBS_ERR_CNT     : in  std_logic_vector(15 downto 0);
+      SPY_PRBS_TX_EN       : out std_logic;
+      SPY_PRBS_RX_EN       : out std_logic;
+      SPY_PRBS_TST_CNT     : out std_logic_vector(15 downto 0);
+      SPY_PRBS_ERR_CNT     : in  std_logic_vector(15 downto 0);
+      DCFEB_PRBS_FIBER_SEL : out std_logic_vector(3 downto 0);
+      DCFEB_PRBS_EN        : out std_logic;
+      DCFEB_PRBS_RST       : out std_logic;
+      DCFEB_PRBS_RD_EN     : out std_logic;
+      DCFEB_RXPRBSERR      : in  std_logic;
+      DCFEB_PRBS_ERR_CNT   : in  std_logic_vector(15 downto 0);
 
       --------------------
       -- Other
@@ -323,7 +336,6 @@ architecture Behavioral of ODMB7_UCSB_DEV is
       RST         : in std_logic
       );
   end component;
-
 
   component LCTDLY is  -- Aligns RAW_LCT with L1A by 2.4 us to 4.8 us
     port (
@@ -517,14 +529,47 @@ architecture Behavioral of ODMB7_UCSB_DEV is
   --------------------------------------
   signal fw_reset        : std_logic := '0';
   signal fw_reset_q      : std_logic := '0';
-  signal ccb_softrst_b_q : std_logic := '1';
+  signal ccb_softrst_q   : std_logic := '1';
   signal fw_rst_reg      : std_logic_vector(31 downto 0) := (others => '0');
   signal reset           : std_logic := '0';
 
   --------------------------------------
+  -- MGT PRBS signals as place holder
+  --------------------------------------
+  signal mgt_prbs_type : std_logic_vector(3 downto 0);
+
+  signal spy_prbs_tx_en : std_logic;
+  signal spy_prbs_rx_en : std_logic;
+  signal spy_prbs_tst_cnt : std_logic_vector(15 downto 0);
+  signal spy_prbs_err_cnt : std_logic_vector(15 downto 0) := (others => '0');
+
+  signal ddu_prbs_tx_en : std_logic_vector(3 downto 0);
+  signal ddu_prbs_rx_en : std_logic_vector(3 downto 0);
+  signal ddu_prbs_tst_cnt : std_logic_vector(15 downto 0);
+  signal ddu_prbs_err_cnt : std_logic_vector(15 downto 0) := (others => '0');
+
+  signal dcfeb_prbs_rx_en : std_logic_vector(7 downto 1);
+  signal dcfeb_prbs_tst_cnt : std_logic_vector(15 downto 0);
+
+  signal dcfeb_prbs_fiber_sel : std_logic_vector(3 downto 0);
+  signal dcfeb_prbs_en : std_logic;
+  signal dcfeb_prbs_rst : std_logic;
+  signal dcfeb_prbs_rd_en : std_logic;
+  signal dcfeb_rxprbserr :  std_logic;
+  signal dcfeb_prbs_err_cnt :  std_logic_vector(15 downto 0) := (others => '0');
+
+  signal alct_prbs_rx_en : std_logic_vector(4 downto 1);
+  signal alct_prbs_tst_cnt : std_logic_vector(15 downto 0);
+  signal alct_prbs_err_cnt : std_logic_vector(15 downto 0) := (others => '0');
+
+  --------------------------------------
+  -- Miscellaneous
+  --------------------------------------
+  signal nwords_dummy  : std_logic_vector(15 downto 0);
+
+  --------------------------------------
   -- Debug signals
   --------------------------------------
-
   signal diagout_inner : std_logic_vector(17 downto 0) := (others => '0');
 
   --------------------------------------
@@ -536,12 +581,11 @@ architecture Behavioral of ODMB7_UCSB_DEV is
 begin
 
   -------------------------------------------------------------------------------------------
-  -- Important: don't kill JTAG or clocks
+  -- Constant driver for selector/reset pins for board to work
   -------------------------------------------------------------------------------------------
-
-  KUS_DL_SEL_B <= '1';
-  FPGA_SEL_18 <= '0';
-  RST_CLKS_18_B <= '1';
+  KUS_DL_SEL <= '1';
+  FPGA_SEL <= '0';
+  RST_CLKS_B <= '1';
 
   -------------------------------------------------------------------------------------------
   -- Handle clock synthesizer signals and generate clocks
@@ -817,10 +861,10 @@ begin
   -- Handle reset signals
   -------------------------------------------------------------------------------------------
 
-  FD_CCB_SOFTRST : FD generic map(INIT => '1') port map (Q => ccb_softrst_b_q, C => clk40, D => CCB_SOFT_RST_B);
+  FD_CCB_SOFTRST : FD generic map(INIT => '1') port map (Q => ccb_softrst_q, C => clk40, D => CCB_SOFT_RST);
 
   FD_FW_RESET : FD port map (Q => fw_reset_q, C => clk40, D => fw_reset);
-  fw_rst_reg <= x"3FFFF000" when ((fw_reset_q = '0' and fw_reset = '1') or ccb_softrst_b_q = '0') else
+  fw_rst_reg <= x"3FFFF000" when ((fw_reset_q = '0' and fw_reset = '1') or ccb_softrst_q = '0') else
                   fw_rst_reg(30 downto 0) & '0' when rising_edge(clk40) else
                   fw_rst_reg;
   reset <= fw_rst_reg(31) or pon_rst_reg(31) or RST;
@@ -907,15 +951,13 @@ begin
       LVMB_SDIN   => LVMB_SDIN,
       LVMB_SDOUT  => lvmb_sdout,
 
-      --DCFEB_PRBS_FIBER_SEL  => DCFEB_PRBS_FIBER_SEL,
-      --DCFEB_PRBS_EN         => DCFEB_PRBS_EN,
-      --DCFEB_PRBS_RST        => DCFEB_PRBS_RST,
-      --DCFEB_PRBS_RD_EN      => DCFEB_PRBS_RD_EN,
-      --DCFEB_RXPRBSERR       => DCFEB_RXPRBSERR,
-      --DCFEB_PRBS_ERR_CNT    => DCFEB_PRBS_ERR_CNT,
-
-      --OTMB_TX  => OTMB_TX,
-      --OTMB_RX  => OTMB_RX,
+      OTMB        => OTMB,
+      RAWLCT      => RAWLCT,
+      OTMB_DAV    => OTMB_DAV,
+      OTMB_FF_CLK => OTMB_FF_CLK,
+      RSVTD_IN    => RSVTD_IN,
+      RSVTD_OUT   => RSVTD_OUT,
+      LCT_RQST    => LCT_RQST,
       
       FW_RESET => fw_reset,
       L1A_RESET_PULSE => l1a_reset_pulse,
@@ -943,11 +985,27 @@ begin
       EXT_DLY          => ext_dly, 
       CALLCT_DLY       => callct_dly,
       ODMB_ID          => open,
-      NWORDS_DUMMY     => open,
+      NWORDS_DUMMY     => nwords_dummy,
       KILL             => kill,
       CRATEID          => open,
       CHANGE_REG_DATA  => change_reg_data,
       CHANGE_REG_INDEX => change_reg_index,
+
+      MGT_PRBS_TYPE        => mgt_prbs_type,
+      DDU_PRBS_TX_EN       => ddu_prbs_tx_en,
+      DDU_PRBS_RX_EN       => ddu_prbs_rx_en,
+      DDU_PRBS_TST_CNT     => ddu_prbs_tst_cnt,
+      DDU_PRBS_ERR_CNT     => ddu_prbs_err_cnt,
+      SPY_PRBS_TX_EN       => spy_prbs_tx_en,
+      SPY_PRBS_RX_EN       => spy_prbs_rx_en,
+      SPY_PRBS_TST_CNT     => spy_prbs_tst_cnt,
+      SPY_PRBS_ERR_CNT     => spy_prbs_err_cnt,
+      DCFEB_PRBS_FIBER_SEL => dcfeb_prbs_fiber_sel,
+      DCFEB_PRBS_EN        => dcfeb_prbs_en,
+      DCFEB_PRBS_RST       => dcfeb_prbs_rst,
+      DCFEB_PRBS_RD_EN     => dcfeb_prbs_rd_en,
+      DCFEB_RXPRBSERR      => dcfeb_rxprbserr,
+      DCFEB_PRBS_ERR_CNT   => dcfeb_prbs_err_cnt,
 
       DIAGOUT   => diagout_inner,
       RST       => reset,
