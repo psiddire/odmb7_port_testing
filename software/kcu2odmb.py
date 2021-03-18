@@ -61,7 +61,7 @@ if __name__=='__main__':
   if not os.path.isdir('../odmb_source'):
     os.mkdir('../odmb_source')
 
-  os.system('cp ../source/constraints_odmb7_ucsb_dev.xdc ../odmb_source/odmb7_ucsb_dev.xdc')
+  os.system('cp ../constraints/odmb7_ucsb_dev.xdc ../odmb_source/odmb7_ucsb_dev.xdc')
   os.system('cp -r ../source/odmb_vme ../odmb_source/odmb_vme')
   os.system('cp -r ../source/odmb_ctrl ../odmb_source/odmb_ctrl')
   os.system('cp -r ../source/spi ../odmb_source/spi')

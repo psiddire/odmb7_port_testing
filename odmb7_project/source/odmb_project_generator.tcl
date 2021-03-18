@@ -19,7 +19,7 @@ add_files -norecurse "Firmware_pkg.vhd ../ip/$FPGA_TYPE/spi_readback_fifo/spi_re
 #add_files "vme/"
 #add_files "dcfeb/"
 add_files "odmb/"
-add_files -fileset constrs_1 -norecurse "odmb/constraints_odmb7_ucsb_dev.xdc"
+add_files -fileset constrs_1 -norecurse "odmb/odmb7_ucsb_dev.xdc"
 
 # Add tcl for simulation
 set_property -name {xsim.simulate.custom_tcl} -value {Firmware_tb.tcl} -objects [get_filesets sim_1]

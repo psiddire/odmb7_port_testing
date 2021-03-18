@@ -42,8 +42,10 @@ other devices in the future. LUTs are used to provide VME commands to the ODMB, 
     - [ ] Read SPI status/timer
   - [ ] Device 7: SYSTEM_MON
   - [ ] Device 8: LVDBMON
-    - [x] Import LVDB module
+    - [X] Import LVDB module
   - [ ] Device 9: SYSTEM_TEST
+    - [X] Import OTMB PRBS test
+    - [ ] Import the Optical PRBS tests
   - [ ] SPI_CTRL
     - [X] Read/write/erase PROM commands
     - [ ] Other PROM commands (status/lock/unlock/check)
