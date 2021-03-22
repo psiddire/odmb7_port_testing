@@ -22,13 +22,7 @@ library unisim;
 use unisim.vcomponents.all;
 use work.ucsb_types.all;
 
-use work.Firmware_pkg.all;     -- for switch between sim and synthesis
-
 entity ODMB_VME is
-  generic (
-    NCFEB       : integer range 1 to 7 := 7;  -- Number of DCFEBS, 7 for ME1/1, 5
-    NREGS       : integer := 16
-  );
   port (
     --------------------
     -- Clock
@@ -74,7 +68,7 @@ entity ODMB_VME is
     -- From/To LVMB: ODMB & ODMB7 design, ODMB5 to be seen
     --------------------
     LVMB_PON   : out std_logic_vector(7 downto 0);
-    PON_LOAD   : out std_logic;
+    PON_LOAD_B : out std_logic;
     PON_OE     : out std_logic;
     R_LVMB_PON : in  std_logic_vector(7 downto 0);
     LVMB_CSB   : out std_logic_vector(6 downto 0);
@@ -165,62 +159,54 @@ architecture Behavioral of ODMB_VME is
   constant num_dev  : integer := 9;  -- number of devices (exclude dev0)
   
   component VMECONFREGS is
-      generic (
-        NREGS  : integer := 16;             -- Number of Configuration registers
-        NCONST : integer := 16;             -- Number of Protected registers
-        NFEB   : integer := 7               -- Number of DCFEBs
-        );
-      port (
-        SLOWCLK : in std_logic;
-          CLK     : in std_logic;
-          RST     : in std_logic;
+    port (
+      SLOWCLK : in std_logic;
+      CLK     : in std_logic;
+      RST     : in std_logic;
       
-          DEVICE   : in  std_logic;
-          STROBE   : in  std_logic;
-          COMMAND  : in  std_logic_vector(9 downto 0);
-          WRITER   : in  std_logic;
-          DTACK    : out std_logic;
+      DEVICE   : in  std_logic;
+      STROBE   : in  std_logic;
+      COMMAND  : in  std_logic_vector(9 downto 0);
+      WRITER   : in  std_logic;
+      DTACK    : out std_logic;
       
-          INDATA  : in  std_logic_vector(15 downto 0);
-          OUTDATA : out std_logic_vector(15 downto 0);
+      INDATA  : in  std_logic_vector(15 downto 0);
+      OUTDATA : out std_logic_vector(15 downto 0);
       
       -- Configuration registers    
-          LCT_L1A_DLY   : out std_logic_vector(5 downto 0);
-          CABLE_DLY     : out integer range 0 to 1;
-          OTMB_PUSH_DLY : out integer range 0 to 63;
-          ALCT_PUSH_DLY : out integer range 0 to 63;
-          BX_DLY        : out integer range 0 to 4095;
+      LCT_L1A_DLY   : out std_logic_vector(5 downto 0);
+      CABLE_DLY     : out integer range 0 to 1;
+      OTMB_PUSH_DLY : out integer range 0 to 63;
+      ALCT_PUSH_DLY : out integer range 0 to 63;
+      BX_DLY        : out integer range 0 to 4095;
       
-          INJ_DLY    : out std_logic_vector(4 downto 0);
-          EXT_DLY    : out std_logic_vector(4 downto 0);
-          CALLCT_DLY : out std_logic_vector(3 downto 0);
+      INJ_DLY    : out std_logic_vector(4 downto 0);
+      EXT_DLY    : out std_logic_vector(4 downto 0);
+      CALLCT_DLY : out std_logic_vector(3 downto 0);
       
-          ODMB_ID      : out std_logic_vector(15 downto 0);
-          NWORDS_DUMMY : out std_logic_vector(15 downto 0);
-          KILL         : out std_logic_vector(NFEB+2 downto 1);
-          CRATEID      : out std_logic_vector(7 downto 0);
+      ODMB_ID      : out std_logic_vector(15 downto 0);
+      NWORDS_DUMMY : out std_logic_vector(15 downto 0);
+      KILL         : out std_logic_vector(NCFEB+2 downto 1);
+      CRATEID      : out std_logic_vector(7 downto 0);
       
       -- From ODMB_UCSB_V2 to change registers
-          CHANGE_REG_DATA  : in std_logic_vector(15 downto 0);
-          CHANGE_REG_INDEX : in integer range 0 to NREGS;
+      CHANGE_REG_DATA  : in std_logic_vector(15 downto 0);
+      CHANGE_REG_INDEX : in integer range 0 to NREGS;
       
       -- To/From SPI Interface
-          SPI_CFG_UL_PULSE   : in std_logic;
-          SPI_CONST_UL_PULSE : in std_logic;
-          SPI_REG_IN : in std_logic_vector(15 downto 0);
-          SPI_CFG_BUSY    : in  std_logic;
-          SPI_CONST_BUSY  : in  std_logic;
-          SPI_CFG_REG_WE   : in  integer range 0 to NREGS;
-          SPI_CONST_REG_WE : in  integer range 0 to NREGS;
-          SPI_CFG_REGS    : out cfg_regs_array;
-          SPI_CONST_REGS  : out cfg_regs_array
+      SPI_CFG_UL_PULSE   : in std_logic;
+      SPI_CONST_UL_PULSE : in std_logic;
+      SPI_REG_IN : in std_logic_vector(15 downto 0);
+      SPI_CFG_BUSY    : in  std_logic;
+      SPI_CONST_BUSY  : in  std_logic;
+      SPI_CFG_REG_WE   : in  integer range 0 to NREGS;
+      SPI_CONST_REG_WE : in  integer range 0 to NREGS;
+      SPI_CFG_REGS    : out cfg_regs_array;
+      SPI_CONST_REGS  : out cfg_regs_array
       );
-    end component;
+  end component;
 
   component CFEBJTAG is
-    generic (
-      NCFEB   : integer range 1 to 7 := NCFEB
-    );
     port (
       -- CSP_LVMB_LA_CTRL : inout std_logic_vector(35 downto 0);
 
@@ -245,64 +231,58 @@ architecture Behavioral of ODMB_VME is
   end component;
 
   component VMEMON is
-    generic (
-      NCFEB   : integer range 1 to 7 := NCFEB
-      );    
     port (
       SLOWCLK : in std_logic;
-        CLK40   : in std_logic;
-        RST     : in std_logic;
-    
-        DEVICE  : in std_logic;
-        STROBE  : in std_logic;
-        COMMAND : in std_logic_vector(9 downto 0);
-        WRITER  : in std_logic;
-    
-        INDATA  : in  std_logic_vector(15 downto 0);
-        OUTDATA : out std_logic_vector(15 downto 0);
-    
-        DTACK : out std_logic;
-    
-        DCFEB_DONE  : in std_logic_vector(NCFEB downto 1);
-    
-        --reset signals
-        OPT_RESET_PULSE : out std_logic;
-        L1A_RESET_PULSE : out std_logic;
-        FW_RESET        : out std_logic;
-        REPROG_B        : out std_logic;
-        
-        --pulses
-        TEST_INJ        : out std_logic;
-        TEST_PLS        : out std_logic;
-        TEST_LCT        : out std_logic;
-        TEST_BC0        : out std_logic;
-        OTMB_LCT_RQST   : out std_logic;
-        OTMB_EXT_TRIG   : out std_logic;
-        
-        --internal register outputs
-        ODMB_CAL      : out std_logic;
-        TP_SEL        : out std_logic_vector(15 downto 0);
-        MAX_WORDS_DCFEB : out std_logic_vector(15 downto 0);
-        LOOPBACK      : out std_logic_vector(2 downto 0);  -- For internal loopback tests
-        TXDIFFCTRL    : out std_logic_vector(3 downto 0);  -- Controls the TX voltage swing
-        MUX_DATA_PATH   : out std_logic;
-        MUX_TRIGGER     : out std_Logic;
-        MUX_LVMB        : out std_logic;
-        ODMB_PED        : out std_logic_vector(1 downto 0);
-        TEST_PED        : out std_logic;
-        MASK_L1A      : out std_logic_vector(NCFEB downto 0);
-        MASK_PLS      : out std_logic;
-        
-        --exernal registers
-        ODMB_DATA_SEL : out std_logic_vector(7 downto 0);
-        ODMB_DATA     : in  std_logic_vector(15 downto 0)      
+      CLK40   : in std_logic;
+      RST     : in std_logic;
+      
+      DEVICE  : in std_logic;
+      STROBE  : in std_logic;
+      COMMAND : in std_logic_vector(9 downto 0);
+      WRITER  : in std_logic;
+      
+      INDATA  : in  std_logic_vector(15 downto 0);
+      OUTDATA : out std_logic_vector(15 downto 0);
+      
+      DTACK : out std_logic;
+      
+      DCFEB_DONE  : in std_logic_vector(NCFEB downto 1);
+      
+      --reset signals
+      OPT_RESET_PULSE : out std_logic;
+      L1A_RESET_PULSE : out std_logic;
+      FW_RESET        : out std_logic;
+      REPROG_B        : out std_logic;
+      
+      --pulses
+      TEST_INJ        : out std_logic;
+      TEST_PLS        : out std_logic;
+      TEST_LCT        : out std_logic;
+      TEST_BC0        : out std_logic;
+      OTMB_LCT_RQST   : out std_logic;
+      OTMB_EXT_TRIG   : out std_logic;
+      
+      --internal register outputs
+      ODMB_CAL      : out std_logic;
+      TP_SEL        : out std_logic_vector(15 downto 0);
+      MAX_WORDS_DCFEB : out std_logic_vector(15 downto 0);
+      LOOPBACK      : out std_logic_vector(2 downto 0);  -- For internal loopback tests
+      TXDIFFCTRL    : out std_logic_vector(3 downto 0);  -- Controls the TX voltage swing
+      MUX_DATA_PATH   : out std_logic;
+      MUX_TRIGGER     : out std_Logic;
+      MUX_LVMB        : out std_logic;
+      ODMB_PED        : out std_logic_vector(1 downto 0);
+      TEST_PED        : out std_logic;
+      MASK_L1A      : out std_logic_vector(NCFEB downto 0);
+      MASK_PLS      : out std_logic;
+      
+      --exernal registers
+      ODMB_DATA_SEL : out std_logic_vector(7 downto 0);
+      ODMB_DATA     : in  std_logic_vector(15 downto 0)      
       );
   end component;
   
   component SPI_PORT is
-    generic (
-      NREGS  : integer := 16
-      );
     port (
       SLOWCLK              : in std_logic;
       CLK                  : in std_logic;
@@ -439,22 +419,22 @@ architecture Behavioral of ODMB_VME is
   end component;
   
   component SPI_CTRL is
-  port (
+    port (
       
-    CLK40   : in std_logic;
-    CLK2P5  : in std_logic;
-    RST     : in std_logic;
-    
-    CMD_FIFO_IN : in std_logic_vector(15 downto 0);
-    CMD_FIFO_WRITE_EN : in std_logic;
-    READBACK_FIFO_OUT : out std_logic_vector(15 downto 0);
-    READBACK_FIFO_READ_EN : in std_logic;
-    READ_BUSY : out std_logic;
+      CLK40   : in std_logic;
+      CLK2P5  : in std_logic;
+      RST     : in std_logic;
       
-    NCMDS_SPICTRL : out unsigned(15 downto 0);
-    NCMDS_SPIINTR : out unsigned(15 downto 0);
-    DIAGOUT : out std_logic_vector(17 downto 0)
-    );
+      CMD_FIFO_IN : in std_logic_vector(15 downto 0);
+      CMD_FIFO_WRITE_EN : in std_logic;
+      READBACK_FIFO_OUT : out std_logic_vector(15 downto 0);
+      READBACK_FIFO_READ_EN : in std_logic;
+      READ_BUSY : out std_logic;
+      
+      NCMDS_SPICTRL : out unsigned(15 downto 0);
+      NCMDS_SPIINTR : out unsigned(15 downto 0);
+      DIAGOUT : out std_logic_vector(17 downto 0)
+      );
   end component;
 
   signal device    : std_logic_vector(num_dev downto 0) := (others => '0');
@@ -589,7 +569,6 @@ begin
   ----------------------------------
 
   DEV1_CFEBJTAG : CFEBJTAG
-    generic map (NCFEB => NCFEB)
     port map (
       -- CSP_LVMB_LA_CTRL => CSP_LVMB_LA_CTRL,
       FASTCLK => clk40,
@@ -616,7 +595,6 @@ begin
       );
 
   DEV3_VMEMON : VMEMON
-    generic map (NCFEB => NCFEB)
     port map (
       SLOWCLK => clk2p5,
       CLK40   => clk40,
@@ -701,7 +679,6 @@ begin
       );      
       
   DEV6_SPI_PORT_I : SPI_PORT
-    generic map (NREGS => NREGS)
     port map (
         SLOWCLK => CLK2P5,
         CLK => CLK40,
@@ -751,7 +728,7 @@ begin
       ADCIN => LVMB_SDOUT,
       LVTURNON => LVMB_PON,
       R_LVTURNON => R_LVMB_PON,
-      LOADON => PON_LOAD,
+      LOADON => PON_LOAD_B,
       DIAGOUT => open
     );
 

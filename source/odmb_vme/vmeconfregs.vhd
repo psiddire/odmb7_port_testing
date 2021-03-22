@@ -12,11 +12,6 @@ use ieee.std_logic_misc.all;
 use work.ucsb_types.all;
 
 entity VMECONFREGS is
-  generic (
-    NREGS  : integer := 16;             -- Number of Configuration registers
-    NCONST : integer := 16;             -- Number of Protected registers
-    NFEB   : integer := 7               -- Number of DCFEBs
-    );
   port (
     SLOWCLK : in std_logic;
     CLK     : in std_logic;
@@ -44,7 +39,7 @@ entity VMECONFREGS is
 
     ODMB_ID      : out std_logic_vector(15 downto 0);
     NWORDS_DUMMY : out std_logic_vector(15 downto 0);
-    KILL         : out std_logic_vector(NFEB+2 downto 1);
+    KILL         : out std_logic_vector(NCFEB+2 downto 1);
     CRATEID      : out std_logic_vector(7 downto 0);
 
 -- From ODMB_UCSB_V2 to change registers
@@ -159,7 +154,7 @@ begin
   INJ_DLY       <= cfg_regs(4)(4 downto 0);                          -- 0x4010
   EXT_DLY       <= cfg_regs(5)(4 downto 0);                          -- 0x4014
   CALLCT_DLY    <= cfg_regs(6)(3 downto 0);                          -- 0x4018
-  KILL          <= cfg_regs(7)(NFEB+1 downto 0);                     -- 0x401C
+  KILL          <= cfg_regs(7)(NCFEB+1 downto 0);                     -- 0x401C
   CRATEID       <= cfg_regs(8)(7 downto 0);                          -- 0x4020
   -- 0x4024 reserved for FW version
   NWORDS_DUMMY  <= cfg_regs(10)(15 downto 0);                        -- 0x4028

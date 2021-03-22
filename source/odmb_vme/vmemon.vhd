@@ -9,9 +9,6 @@ use work.ucsb_types.all;
 use unisim.vcomponents.all;
 
 entity VMEMON is
-  generic (
-    NCFEB : integer range 1 to 7 := 7  -- Number of DCFEBS, 7 in the final design
-    );    
   port (
 
     SLOWCLK : in std_logic;

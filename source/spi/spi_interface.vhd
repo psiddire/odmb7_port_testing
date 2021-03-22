@@ -12,8 +12,7 @@ use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 use ieee.numeric_std.all;
 use UNISIM.vcomponents.all;
-
-use work.Firmware_pkg.all;     -- for switch between sim and synthesis
+use work.ucsb_types.all;
 
 entity spi_interface is
   port
