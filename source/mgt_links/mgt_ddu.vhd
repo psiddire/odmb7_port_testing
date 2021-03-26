@@ -7,14 +7,13 @@ library IEEE;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use ieee.std_logic_unsigned.all;
-
-library work;
-use work.ucsb_types.all;
+use ieee.std_logic_misc.all;
 
 library UNISIM;
 use UNISIM.VComponents.all;
 
-use ieee.std_logic_misc.all;
+-- library work;
+-- use work.ucsb_types.all;
 
 entity mgt_ddu is
   generic (
@@ -136,22 +135,8 @@ architecture Behavioral of mgt_ddu is
       );
   end component;
 
-  component gtwiz_example_init is
-    port (
-      clk_freerun_in : in std_logic := '0';
-      reset_all_in : in std_logic := '0';
-      tx_init_done_in : in std_logic := '0';
-      rx_init_done_in : in std_logic := '0';
-      rx_data_good_in : in std_logic := '0';
-      reset_all_out : out std_logic := '0';
-      reset_rx_out : out std_logic := '0';
-      init_done_out : out std_logic := '0';
-      retry_ctr_out : out std_logic_vector(3 downto 0) := (others=> '0')
-      );
-  end component;
-
   constant IDLE16 : std_logic_vector(15 downto 0) := x"50BC"; -- TODO: what is the IDLE word from DCFEBs?
-  constant IDLE32 : std_logic_vector(31 downto 0) := x"503C50BC"; -- TODO: what is the IDLE word from DCFEBs?
+  constant IDLE32 : std_logic_vector(31 downto 0) := x"503C50BC";
 
   -- Synchronize the latched link down reset input and the VIO-driven signal into the free-running clock domain
   -- signals passed to wizard
@@ -235,7 +220,7 @@ architecture Behavioral of mgt_ddu is
   signal txprbssel_int : std_logic_vector(4*NCHANNL-1 downto 0) := (others => '0');
 
   -- debug signals
-  signal ila_data_rx: std_logic_vector(191 downto 0) := (others=> '0');
+  signal ila_data_rx: std_logic_vector(127 downto 0) := (others=> '0');
   signal gtpowergood_vio_sync : std_logic_vector(1 downto 0) := (others=> '0');
   signal txpmaresetdone_vio_sync: std_logic_vector(1 downto 0) := (others=> '0');
   signal rxpmaresetdone_vio_sync: std_logic_vector(1 downto 0) := (others=> '0');
@@ -246,16 +231,6 @@ architecture Behavioral of mgt_ddu is
   signal hb_gtwiz_reset_rx_datapath_vio_int: std_logic;
   signal hb_gtwiz_reset_rx_pll_and_datapath_vio_int: std_logic;
   signal rxdata_errctr_reset_vio_int : std_logic;
-
-  -- attribute dont_touch : string;
-  -- attribute dont_touch of bit_synchronizer_vio_gtpowergood_0_inst : label is "true";
-  -- attribute dont_touch of bit_synchronizer_vio_gtpowergood_1_inst : label is "true";
-  -- attribute dont_touch of bit_synchronizer_vio_txpmaresetdone_0_inst : label is "true";
-  -- attribute dont_touch of bit_synchronizer_vio_txpmaresetdone_1_inst: label is "true";
-  -- attribute dont_touch of bit_synchronizer_vio_rxpmaresetdone_0_inst: label is "true";
-  -- attribute dont_touch of bit_synchronizer_vio_rxpmaresetdone_1_inst: label is "true";
-  -- attribute dont_touch of bit_synchronizer_vio_gtwiz_reset_rx_done_0_inst: label is "true";
-  -- attribute dont_touch of bit_synchronizer_vio_gtwiz_reset_tx_done_0_inst: label is "true";
 
 begin
 
@@ -274,6 +249,10 @@ begin
   gtwiz_userdata_tx_int(2*TXDATAWIDTH-1 downto 1*TXDATAWIDTH) <= TXDATA_CH1 when TXD_VALID(1) = '1' else IDLE16 when TXDATAWIDTH = 16 else IDLE32;
   gtwiz_userdata_tx_int(3*TXDATAWIDTH-1 downto 2*TXDATAWIDTH) <= TXDATA_CH2 when TXD_VALID(2) = '1' else IDLE16 when TXDATAWIDTH = 16 else IDLE32;
   gtwiz_userdata_tx_int(4*TXDATAWIDTH-1 downto 3*TXDATAWIDTH) <= TXDATA_CH3 when TXD_VALID(3) = '1' else IDLE16 when TXDATAWIDTH = 16 else IDLE32;
+  txctrl2_int( 7 downto  0) <= x"00" when TXD_VALID(0) = '1' else x"01";
+  txctrl2_int(15 downto  8) <= x"00" when TXD_VALID(1) = '1' else x"01";
+  txctrl2_int(23 downto 16) <= x"00" when TXD_VALID(2) = '1' else x"01";
+  txctrl2_int(31 downto 24) <= x"00" when TXD_VALID(3) = '1' else x"01";
 
   RXDATA_CH0 <= gtwiz_userdata_rx_int(1*RXDATAWIDTH-1 downto 0*RXDATAWIDTH);
   u_mgt_port_assign_2 : if NRXLINK >= 2 generate
@@ -332,14 +311,6 @@ begin
   -- TODO: leave the individual reset for now, only use one big reset
   gtwiz_reset_all_int <= RESET;
   rxprbscntreset_int <= (others => RESET);
-
-  -- Potential useful signals
-  -- hb_gtwiz_reset_rx_datapath_int <= hb_gtwiz_reset_rx_datapath_init_int;
-  -- gtwiz_reset_tx_datapath_int <= hb0_gtwiz_reset_tx_datapath_int;
-  -- hb0_gtwiz_userclk_tx_active_int  <= gtwiz_userclk_tx_active_int;
-  -- hb0_gtwiz_userclk_rx_active_int  <= gtwiz_userclk_rx_active_int;
-  -- gtwiz_reset_tx_pll_and_datapath_int <= hb0_gtwiz_reset_tx_pll_and_datapath_int;
-  -- gtwiz_reset_rx_datapath_int <= hb_gtwiz_reset_rx_datapath_init_int or hb_gtwiz_reset_rx_datapath_vio_int;
 
   ---------------------------------------------------------------------------------------------------------------------
   -- EXAMPLE WRAPPER INSTANCE
@@ -408,20 +379,5 @@ begin
   ---------------------------------------------------------------------------------------------------------------------
   -- Debug session
   ---------------------------------------------------------------------------------------------------------------------
-
-  -- ila_data_rx(63 downto 0) <= gtwiz_userdata_rx_int;
-  -- ila_data_rx(67 downto 64) <= ch0_codevalid;
-  -- ila_data_rx(75 downto 72) <= ch0_rxchariscomma;
-  -- ila_data_rx(99 downto 98) <= bad_rx_int;
-  -- ila_data_rx(103 downto 96)  <= rxctrl2_int(7 downto 0);
-  -- ila_data_rx(113 downto 112) <= rxbyteisaligned_int;
-  -- ila_data_rx(115 downto 114) <= rxbyterealign_int;
-  -- ila_data_rx(117 downto 116) <= rxcommadet_int;
-
-  -- mgt_sfp_ila_inst : ila
-  --   port map(
-  --     clk => gtwiz_userclk_rx_usrclk2_int,
-  --     probe0 => ila_data_rx
-  --     );
 
 end Behavioral;
