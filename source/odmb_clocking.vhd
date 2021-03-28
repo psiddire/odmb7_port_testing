@@ -6,7 +6,7 @@ use ieee.std_logic_misc.all;
 library unisim;
 use unisim.vcomponents.all;
 
-entity odmb7_clocking is
+entity odmb_clocking is
   port (
     --------------------
     -- Input ports
@@ -63,9 +63,9 @@ entity odmb7_clocking is
     clk_mgtclk125 : out std_logic
 
     );
-end odmb7_clocking;
+end odmb_clocking;
 
-architecture Behavioral of odmb7_clocking is
+architecture Clocking_Arch of odmb_clocking is
 
   component clockManager is
     port (
@@ -283,4 +283,4 @@ begin
   BUFG_clk1p25 : BUFG port map(I => clk1p25_unbuf, O => clk_sysclk1p25);
   BUFG_clk625k : BUFG port map(I => clk625k_unbuf, O => clk_sysclk625k);
 
-end Behavioral;
+end Clocking_Arch;

@@ -121,6 +121,13 @@ architecture Behavioral of mgt_spy is
       );
   end component;
 
+  component ila_1 is
+    port (
+      clk : in std_logic := '0';
+      probe0 : in std_logic_vector(127 downto 0) := (others=> '0')
+      );
+  end component;
+
   constant IDLE : std_logic_vector(DATAWIDTH-1 downto 0) := x"50BC"; -- IDLE word for 16 bit width
 
   -- Synchronize the latched link down reset input and the VIO-driven signal into the free-running clock domain
@@ -169,7 +176,6 @@ architecture Behavioral of mgt_spy is
   signal rxctrl3_int : std_logic_vector(8*NLINK-1 downto 0) := (others => '0');
   signal rxpmaresetdone_int : std_logic_vector(NLINK-1 downto 0) := (others => '0');
   signal txpmaresetdone_int : std_logic_vector(NLINK-1 downto 0) := (others => '0');
-
   -- signal txdiffctrl_int : std_logic_vector(7 downto 0) := (others=> '0');
 
   -- reset related
@@ -251,7 +257,10 @@ begin
 
   -- RXDATA is valid only when it's been deemed aligned, recognized 8B/10B pattern and does not contain a K-character.
   -- The RXVALID port is not explained in UG576, so it's not used.
-  RXD_VALID(0) <= '1' when (rxready_int = '1' and bad_rx_int(0) = '0' and and_reduce(ch0_codevalid) = '1' and or_reduce(ch0_rxchariscomma) = '0') else '0';
+  -- RXD_VALID(0) <= '1' when (rxready_int = '1' and bad_rx_int(0) = '0' and and_reduce(ch0_codevalid) = '1' and or_reduce(ch0_rxchariscomma) = '0') else '0';
+  rxd_valid_int(0) <= '1' when (rxready_int = '1' and bad_rx_int(0) = '0' and and_reduce(ch0_codevalid) = '1' and or_reduce(ch0_rxchariscomma) = '0') else '0';
+
+  RXD_VALID <= rxd_valid_int;
 
   -- MGT reference clk
   gtrefclk0_int <= MGTREFCLK;
@@ -366,21 +375,22 @@ begin
   -- Debug session
   ---------------------------------------------------------------------------------------------------------------------
 
-  -- ila_data_rx(15 downto 0)    <= gtwiz_userdata_rx_int;
-  -- ila_data_rx(17 downto 16)   <= ch0_codevalid;
-  -- ila_data_rx(20)             <= bad_rx_int(0);
-  -- ila_data_rx(21)             <= rxd_valid_int(0);
-  -- ila_data_rx(25 downto 24)   <= ch0_rxcharisk;
-  -- ila_data_rx(29 downto 28)   <= ch0_rxdisperr;
-  -- ila_data_rx(33 downto 32)   <= ch0_rxchariscomma;
-  -- ila_data_rx(37 downto 36)   <= ch0_rxnotintable;
+  ila_data_rx(15 downto 0)    <= gtwiz_userdata_rx_int;
+  ila_data_rx(17 downto 16)   <= ch0_codevalid;
+  ila_data_rx(20)             <= bad_rx_int(0);
+  ila_data_rx(21)             <= rxd_valid_int(0);
+  ila_data_rx(22)             <= rxbyteisaligned_int(0);
+  ila_data_rx(23)             <= rxbyterealign_int(0);
+  ila_data_rx(25 downto 24)   <= ch0_rxcharisk;
+  ila_data_rx(29 downto 28)   <= ch0_rxdisperr;
+  ila_data_rx(33 downto 32)   <= ch0_rxchariscomma;
+  ila_data_rx(37 downto 36)   <= ch0_rxnotintable;
 
-  -- mgt_sfp_ila_inst : ila_1
-  --   port map(
-  --     clk => gtwiz_userclk_rx_usrclk2_int,
-  --     probe0 => ila_data_rx
-  --     );
-
+  mgt_spy_ila_inst : ila_1
+    port map(
+      clk => gtwiz_userclk_rx_usrclk2_int,
+      probe0 => ila_data_rx
+      );
 
 
 end Behavioral;

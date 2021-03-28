@@ -154,7 +154,7 @@ begin
   INJ_DLY       <= cfg_regs(4)(4 downto 0);                          -- 0x4010
   EXT_DLY       <= cfg_regs(5)(4 downto 0);                          -- 0x4014
   CALLCT_DLY    <= cfg_regs(6)(3 downto 0);                          -- 0x4018
-  KILL          <= cfg_regs(7)(NCFEB+1 downto 0);                     -- 0x401C
+  KILL          <= cfg_regs(7)(NCFEB+1 downto 0);                    -- 0x401C
   CRATEID       <= cfg_regs(8)(7 downto 0);                          -- 0x4020
   -- 0x4024 reserved for FW version
   NWORDS_DUMMY  <= cfg_regs(10)(15 downto 0);                        -- 0x4028

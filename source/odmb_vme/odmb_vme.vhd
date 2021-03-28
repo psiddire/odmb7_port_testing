@@ -92,6 +92,7 @@ entity ODMB_VME is
     --------------------
     FW_RESET             : out std_logic;
     L1A_RESET_PULSE      : out std_logic;
+    OPT_RESET_PULSE      : out std_logic;
     TEST_INJ             : out std_logic;
     TEST_PLS             : out std_logic;
     TEST_BC0             : out std_logic;
@@ -263,17 +264,17 @@ architecture Behavioral of ODMB_VME is
       OTMB_EXT_TRIG   : out std_logic;
       
       --internal register outputs
-      ODMB_CAL      : out std_logic;
-      TP_SEL        : out std_logic_vector(15 downto 0);
+      ODMB_CAL        : out std_logic;
+      TP_SEL          : out std_logic_vector(15 downto 0);
       MAX_WORDS_DCFEB : out std_logic_vector(15 downto 0);
-      LOOPBACK      : out std_logic_vector(2 downto 0);  -- For internal loopback tests
-      TXDIFFCTRL    : out std_logic_vector(3 downto 0);  -- Controls the TX voltage swing
+      LOOPBACK        : out std_logic_vector(2 downto 0);  -- For internal loopback tests
+      TXDIFFCTRL      : out std_logic_vector(3 downto 0);  -- Controls the TX voltage swing
       MUX_DATA_PATH   : out std_logic;
       MUX_TRIGGER     : out std_Logic;
       MUX_LVMB        : out std_logic;
       ODMB_PED        : out std_logic_vector(1 downto 0);
       TEST_PED        : out std_logic;
-      MASK_L1A      : out std_logic_vector(NCFEB downto 0);
+      MASK_L1A        : out std_logic_vector(NCFEB downto 0);
       MASK_PLS      : out std_logic;
       
       --exernal registers
@@ -611,7 +612,7 @@ begin
 
       DCFEB_DONE  => dcfeb_done,
 
-      OPT_RESET_PULSE => open,
+      OPT_RESET_PULSE => OPT_RESET_PULSE,
       L1A_RESET_PULSE => L1A_RESET_PULSE,
       FW_RESET        => FW_RESET,
       REPROG_B        => open,
@@ -623,19 +624,19 @@ begin
       OTMB_LCT_RQST   => otmb_lct_rqst,
       OTMB_EXT_TRIG   => otmb_ext_trig,
 
-      MASK_PLS      => MASK_PLS,
-      MASK_L1A      => MASK_L1A,
-      TP_SEL        => open,
+      MASK_PLS        => MASK_PLS,
+      MASK_L1A        => MASK_L1A,
+      TP_SEL          => open,
       MAX_WORDS_DCFEB => open,
-      ODMB_CAL      => ODMB_CAL,
-      MUX_DATA_PATH => MUX_DATA_PATH,
-      MUX_TRIGGER   => MUX_TRIGGER,
-      MUX_LVMB      => MUX_LVMB,
-      ODMB_PED      => ODMB_PED,
-      ODMB_DATA_SEL => ODMB_DATA_SEL,   -- output: <= COMMAND[9:2] directly
-      ODMB_DATA     => ODMB_DATA,       -- input depend on ODMB_DATA_SEL
-      TXDIFFCTRL    => open,      -- TX voltage swing, W 3110 is disabled: constant output x"8"
-      LOOPBACK      => open       -- For internal loopback tests, bbb for W 3100 bbb
+      ODMB_CAL        => ODMB_CAL,
+      MUX_DATA_PATH   => MUX_DATA_PATH,
+      MUX_TRIGGER     => MUX_TRIGGER,
+      MUX_LVMB        => MUX_LVMB,
+      ODMB_PED        => ODMB_PED,
+      ODMB_DATA_SEL   => ODMB_DATA_SEL,   -- output XY under command R 3XYC, when XY /= 40
+      ODMB_DATA       => ODMB_DATA,       -- input depend on ODMB_DATA_SEL
+      TXDIFFCTRL      => open,      -- TX voltage swing, W 3110 is disabled: constant output x"8"
+      LOOPBACK        => open       -- For internal loopback tests, bbb for W 3100 bbb
       );
   
   DEV4_VMECONFREGS : VMECONFREGS

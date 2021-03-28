@@ -439,8 +439,8 @@ set_property PACKAGE_PIN     AN33       [get_ports CCB_EVCNTRES_B]
 set_property IOSTANDARD      LVCMOS18   [get_ports CCB_EVCNTRES_B]
 set_property PACKAGE_PIN     AN14       [get_ports CCB_HARDRST_B]
 set_property IOSTANDARD      LVCMOS18   [get_ports CCB_HARDRST_B]
-set_property PACKAGE_PIN     AP14       [get_ports CCB_SOFT_RST]
-set_property IOSTANDARD      LVCMOS18   [get_ports CCB_SOFT_RST]
+set_property PACKAGE_PIN     AP14       [get_ports CCB_SOFT_RST_B]
+set_property IOSTANDARD      LVCMOS18   [get_ports CCB_SOFT_RST_B]
 
 # ----------------------------------------------------------------------------------------------------------------------
 # LVMB control/monitor pins

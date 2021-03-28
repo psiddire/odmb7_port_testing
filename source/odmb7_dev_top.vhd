@@ -91,15 +91,15 @@ entity odmb7_ucsb_dev is
     CCB_DRSV       : in  std_logic_vector(1 downto 0);     -- Bank 45
     CCB_RSVO       : in  std_logic_vector(4 downto 0);     -- Bank 45
     CCB_RSVI       : out std_logic_vector(2 downto 0);     -- Bank 45
-    CCB_BX0_B      : in  std_logic;                        -- Bank 46
-    CCB_BX_RST_B   : in  std_logic;                        -- Bank 46
-    CCB_L1A_RST_B  : in  std_logic;                        -- Bank 46
-    CCB_L1A_B      : in  std_logic;                        -- Bank 46
+    CCB_BX0_B      : in  std_logic;                        -- "CCB_BX0" in Bank 46
+    CCB_BX_RST_B   : in  std_logic;                        -- "CCB_BX_RST" in Bank 46
+    CCB_L1A_RST_B  : in  std_logic;                        -- "CCB_L1A_RST" in Bank 46
+    CCB_L1A_B      : in  std_logic;                        -- "CCB_L1A" in Bank 46
     CCB_L1A_RLS    : out std_logic;                        -- Bank 45
     CCB_CLKEN      : in  std_logic;                        -- Bank 46
-    CCB_EVCNTRES_B : in  std_logic;                        -- Bank 46
-    CCB_HARDRST_B  : in  std_logic;                        -- Bank 45
-    CCB_SOFT_RST   : in  std_logic;                        -- Bank 45
+    CCB_EVCNTRES_B : in  std_logic;                        -- "CCB_EVCNTRES" in Bank 46
+    CCB_HARDRST_B  : in  std_logic;                        -- Bank 45 <-- should not be connected
+    CCB_SOFT_RST_B : in  std_logic;                        -- "CCB_SOFT_RST" in Bank 45
 
     --------------------
     -- LVMB Signals
@@ -201,7 +201,7 @@ end odmb7_ucsb_dev;
 
 architecture Behavioral of odmb7_ucsb_dev is
 
-  component odmb7_clocking is
+  component odmb_clocking is
     port (
       -- Input ports
       CMS_CLK_FPGA_P : in std_logic;    -- system clock: 40.07897 MHz
@@ -326,6 +326,7 @@ architecture Behavioral of odmb7_ucsb_dev is
       --------------------
       FW_RESET             : out std_logic;
       L1A_RESET_PULSE      : out std_logic;
+      OPT_RESET_PULSE      : out std_logic;
       TEST_INJ             : out std_logic;
       TEST_PLS             : out std_logic;
       TEST_BC0             : out std_logic;
@@ -511,18 +512,21 @@ architecture Behavioral of odmb7_ucsb_dev is
       sysclk       : in  std_logic; -- clock for the helper block, 80 MHz
       daq_rx_n     : in  std_logic_vector(NLINK-1 downto 0);
       daq_rx_p     : in  std_logic_vector(NLINK-1 downto 0);
-      rxdata_ch1   : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
-      rxdata_ch2   : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
-      rxdata_ch3   : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
-      rxdata_ch4   : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
-      rxdata_ch5   : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
-      rxdata_ch6   : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
-      rxdata_ch7   : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
-      rxd_valid    : out std_logic_vector(NLINK-1 downto 0);   -- Flag for valid data;
-      bad_rx       : out std_logic_vector(NLINK-1 downto 0);   -- Flag for fiber errors;
-      rxready      : out std_logic; -- Flag for rx reset done
+      rxdata_feb1  : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
+      rxdata_feb2  : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
+      rxdata_feb3  : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
+      rxdata_feb4  : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
+      rxdata_feb5  : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
+      rxdata_feb6  : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
+      rxdata_feb7  : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
+      rxd_valid    : out std_logic_vector(NLINK downto 1);   -- Flag for valid data
+      crc_valid    : out std_logic_vector(NLINK downto 1);   -- Flag for valid CRC
+      bad_rx       : out std_logic_vector(NLINK downto 1);   -- Flag for fiber errors
+      rxready      : out std_logic;                          -- Flag for rx reset done
+      fifo_full    : in  std_logic_vector(NLINK downto 1);   -- Flag for FIFO full
+      fifo_afull   : in  std_logic_vector(NLINK downto 1);   -- Flag for FIFO almost full
       prbs_type    : in  std_logic_vector(3 downto 0);
-      prbs_rx_en   : in  std_logic_vector(NLINK-1 downto 0);
+      prbs_rx_en   : in  std_logic_vector(NLINK downto 1);
       prbs_tst_cnt : in  std_logic_vector(15 downto 0);
       prbs_err_cnt : out std_logic_vector(15 downto 0);
       reset        : in  std_logic
@@ -575,7 +579,9 @@ architecture Behavioral of odmb7_ucsb_dev is
       SPYDATAWIDTH : integer := 16;
       FEBDATAWIDTH : integer := 16;
       DDUTXDWIDTH  : integer := 32;
-      DDURXDWIDTH  : integer := 16
+      DDURXDWIDTH  : integer := 16;
+      SPY_PATTERN  : integer := 0;        -- 0 for PRBS, 1 for counter
+      DDU_PATTERN  : integer := 0         -- 0 for PRBS, 1 for counter
       );
     port (
       sysclk         : in std_logic; -- sysclk
@@ -685,6 +691,8 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal l1acnt_rst_sync    : std_logic := '0';
   signal l1a_reset_pulse    : std_logic := '0';
   signal l1a_reset_pulse_q  : std_logic := '0';
+  signal opt_reset_pulse    : std_logic := '0';
+  signal opt_reset_pulse_q  : std_logic := '0';
   signal premask_injpls     : std_logic := '0';
   signal premask_extpls     : std_logic := '0';
   signal dcfeb_injpls       : std_logic := '0';
@@ -786,8 +794,11 @@ architecture Behavioral of odmb7_ucsb_dev is
   --------------------------------------
   signal fw_reset        : std_logic := '0';
   signal fw_reset_q      : std_logic := '0';
-  signal ccb_softrst_q   : std_logic := '1';
+  signal opt_reset       : std_logic := '0';
+  signal opt_reset_q     : std_logic := '0';
+  signal ccb_softrst_b_q : std_logic := '1';
   signal fw_rst_reg      : std_logic_vector(31 downto 0) := (others => '0');
+  signal opt_rst_reg     : std_logic_vector(31 downto 0) := (others => '0');
   signal reset           : std_logic := '0';
 
   --------------------------------------
@@ -830,7 +841,7 @@ architecture Behavioral of odmb7_ucsb_dev is
   -- MGT signals for DDU channels
   --------------------------------------
   constant DDU_NTXLINK : integer := 4;
-  constant DDU_NRXLINK : integer := 1;
+  constant DDU_NRXLINK : integer := 4;
   constant DDUTXDWIDTH : integer := 32;
   constant DDURXDWIDTH : integer := 16;
 
@@ -867,14 +878,19 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal dcfeb5_data : std_logic_vector(15 downto 0);  -- Data received
   signal dcfeb6_data : std_logic_vector(15 downto 0);  -- Data received
   signal dcfeb7_data : std_logic_vector(15 downto 0);  -- Data received
-  signal mgtc_data_valid : std_logic_vector(7 downto 1);   -- Flag for valid data;
-  signal mgtc_bad_rx : std_logic_vector(7 downto 1);   -- Flag for fiber errors;
+  signal mgtc_rxd_valid : std_logic_vector(NCFEB downto 1);   -- Flag for valid data;
+  signal mgtc_crc_valid : std_logic_vector(NCFEB downto 1);   -- Flag for valid data;
+  signal mgtc_bad_rx : std_logic_vector(NCFEB downto 1);   -- Flag for fiber errors;
   signal mgtc_rxready : std_logic; -- Flag for rx reset done
   signal mgtc_reset : std_logic;
 
-  signal dcfeb_prbs_rx_en : std_logic_vector(7 downto 1);
+  signal dcfeb_prbs_rx_en : std_logic_vector(NCFEB downto 1);
   signal dcfeb_prbs_tst_cnt : std_logic_vector(15 downto 0);
   signal dcfeb_prbs_err_cnt :  std_logic_vector(15 downto 0) := (others => '0');
+
+  -- Place holder signals for dcfeb data FIFOs
+  signal dcfeb_datafifo_full : std_logic_vector(NCFEB downto 1) := (others => '0');
+  signal dcfeb_datafifo_afull : std_logic_vector(NCFEB downto 1) := (others => '0');
 
   --------------------------------------
   -- MGT signals for ALCT RX channels
@@ -888,7 +904,7 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal mgta_bad_rx : std_logic_vector(4 downto 1);   -- Flag for fiber errors;
   signal mgta_rxready : std_logic; -- Flag for rx reset done
   signal mgta_reset : std_logic;
-  signal mgt_reset : std_logic;
+  signal mgt_reset : std_logic := '0';
 
   signal alct_prbs_rx_en : std_logic_vector(4 downto 1);
   signal alct_prbs_tst_cnt : std_logic_vector(15 downto 0);
@@ -926,7 +942,7 @@ begin
   -------------------------------------------------------------------------------------------
   -- Handle clock synthesizer signals and generate clocks
   -------------------------------------------------------------------------------------------
-  u_clocking : odmb7_clocking
+  u_clocking : odmb_clocking
     port map (
       CMS_CLK_FPGA_P => CMS_CLK_FPGA_P,
       CMS_CLK_FPGA_N => CMS_CLK_FPGA_N,
@@ -1125,7 +1141,7 @@ begin
   -------------------------------------------------------------------------------------------
 
   test_pb_lct <= test_lct;
-  LCTDLY_GTRG : LCTDLY port map(DIN => test_pb_lct, CLK => cmsclk, DELAY => lct_l1a_dly, DOUT => test_l1a);
+  LCTDLY_GTRG : LCTDLY port map(DOUT => test_l1a, CLK => cmsclk, DELAY => lct_l1a_dly, DIN => test_lct);
   raw_l1a <= test_l1a;
 
   -------------------------------------------------------------------------------------------
@@ -1161,19 +1177,27 @@ begin
   -- Handle reset signals
   -------------------------------------------------------------------------------------------
 
-  FD_CCB_SOFTRST : FD generic map(INIT => '1') port map (Q => ccb_softrst_q, C => cmsclk, D => CCB_SOFT_RST);
+  FD_CCB_SOFTRST : FD generic map(INIT => '1') port map (Q => ccb_softrst_b_q, C => cmsclk, D => CCB_SOFT_RST_B);
 
   FD_FW_RESET : FD port map (Q => fw_reset_q, C => cmsclk, D => fw_reset);
-  fw_rst_reg <= x"3FFFF000" when ((fw_reset_q = '0' and fw_reset = '1') or ccb_softrst_q = '0') else
-                  fw_rst_reg(30 downto 0) & '0' when rising_edge(cmsclk) else
-                  fw_rst_reg;
-  reset <= fw_rst_reg(31) or pon_rst_reg(31) or RST;
+  fw_rst_reg <= x"3FFFF000" when ((fw_reset_q = '0' and fw_reset = '1') or ccb_softrst_b_q = '0') else
+                fw_rst_reg(30 downto 0) & '0' when rising_edge(cmsclk) else
+                fw_rst_reg;
+
   -- original: reset <= fw_rst_reg(31) or pon_rst_reg(31) or not pb0_q;
   -- pon_rst_reg used to be reset from pll lock
-  pon_rst_reg    <= pon_rst_reg(30 downto 0) & '0' when rising_edge(cmsclk) else
-                    pon_rst_reg;
+  pon_rst_reg <= pon_rst_reg(30 downto 0) & '0' when rising_edge(cmsclk) else
+                 pon_rst_reg;
   pon_reset <= pon_rst_reg(31);
-  
+
+  reset <= fw_rst_reg(31) or pon_rst_reg(31);   -- Firmware reset
+
+  FD_OPT_RESET : FD port map(Q => opt_reset_pulse_q, C => cmsclk, D => opt_reset_pulse);
+  opt_rst_reg <= x"3FFFF000" when (opt_reset_pulse_q = '0' and opt_reset_pulse = '1') else
+                 opt_rst_reg(30 downto 0) & '0' when rising_edge(cmsclk) else
+                 opt_rst_reg;
+  opt_reset <= opt_rst_reg(31) or pon_reset or mgt_reset;  -- Optical reset
+
   -------------------------------------------------------------------------------------------
   -- Debug
   -------------------------------------------------------------------------------------------
@@ -1260,6 +1284,7 @@ begin
       
       FW_RESET => fw_reset,
       L1A_RESET_PULSE => l1a_reset_pulse,
+      OPT_RESET_PULSE => opt_reset_pulse,
       TEST_INJ => test_inj,
       TEST_PLS => test_pls,
       TEST_BC0 => test_bc0,
@@ -1387,7 +1412,7 @@ begin
       prbs_rx_en      => spy_prbs_rx_en,
       prbs_tst_cnt    => spy_prbs_tst_cnt,
       prbs_err_cnt    => spy_prbs_err_cnt,
-      reset           => mgt_reset
+      reset           => opt_reset
       );
 
 
@@ -1402,21 +1427,24 @@ begin
       sysclk       => sysclk80,
       daq_rx_n     => DAQ_RX_N(6 downto 0),
       daq_rx_p     => DAQ_RX_P(6 downto 0),
-      rxdata_ch1   => dcfeb1_data,
-      rxdata_ch2   => dcfeb2_data,
-      rxdata_ch3   => dcfeb3_data,
-      rxdata_ch4   => dcfeb4_data,
-      rxdata_ch5   => dcfeb5_data,
-      rxdata_ch6   => dcfeb6_data,
-      rxdata_ch7   => dcfeb7_data,
-      rxd_valid    => mgtc_data_valid,
+      rxdata_feb1  => dcfeb1_data,
+      rxdata_feb2  => dcfeb2_data,
+      rxdata_feb3  => dcfeb3_data,
+      rxdata_feb4  => dcfeb4_data,
+      rxdata_feb5  => dcfeb5_data,
+      rxdata_feb6  => dcfeb6_data,
+      rxdata_feb7  => dcfeb7_data,
+      rxd_valid    => mgtc_rxd_valid,
+      crc_valid    => mgtc_crc_valid,
       bad_rx       => mgtc_bad_rx,
       rxready      => mgtc_rxready,
+      fifo_full    => dcfeb_datafifo_full,
+      fifo_afull   => dcfeb_datafifo_afull,
       prbs_type    => mgt_prbs_type,
       prbs_rx_en   => dcfeb_prbs_rx_en,
       prbs_tst_cnt => dcfeb_prbs_tst_cnt,
       prbs_err_cnt => dcfeb_prbs_err_cnt,
-      reset        => mgt_reset
+      reset        => opt_reset
       );
 
   u_alct_gth : mgt_alct
@@ -1434,7 +1462,7 @@ begin
       prbs_rx_en      => alct_prbs_rx_en(1),
       prbs_tst_cnt    => alct_prbs_tst_cnt,
       prbs_err_cnt    => alct_prbs_err_cnt,
-      reset           => mgt_reset
+      reset           => opt_reset
       );
 
   u_ddu_gth : mgt_ddu
@@ -1473,9 +1501,8 @@ begin
       prbs_rx_en   => ddu_prbs_rx_en(DDU_NRXLINK downto 1),
       prbs_tst_cnt => ddu_prbs_tst_cnt,
       prbs_err_cnt => ddu_prbs_err_cnt,
-      reset        => mgt_reset
+      reset        => opt_reset
       );
-
 
   -------------------------------------------------------------------------------------------
   -- Tester
@@ -1486,7 +1513,9 @@ begin
       SPYDATAWIDTH  => 16,
       FEBDATAWIDTH  => 16,
       DDUTXDWIDTH   => DDUTXDWIDTH,
-      DDURXDWIDTH   => DDURXDWIDTH
+      DDURXDWIDTH   => DDURXDWIDTH,
+      SPY_PATTERN   => 0,
+      DDU_PATTERN   => 0
       )
     port map (
       sysclk         => cmsclk,
@@ -1518,7 +1547,7 @@ begin
       rxdata_cfeb5   => dcfeb5_data,
       rxdata_cfeb6   => dcfeb6_data,
       rxdata_cfeb7   => dcfeb7_data,
-      rxd_valid_mgtc => mgtc_data_valid,
+      rxd_valid_mgtc => mgtc_rxd_valid,
       rxready_mgtc   => mgtc_rxready,
       usrclk_mgta    => usrclk_mgta,
       rxdata_alct    => alct_rxdata,

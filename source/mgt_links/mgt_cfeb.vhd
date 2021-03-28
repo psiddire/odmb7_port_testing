@@ -18,7 +18,6 @@ use ieee.std_logic_misc.all;
 
 entity mgt_cfeb is
   generic (
-    FEBTYPE   : integer range 1 to 2  := 1;  -- 1: DCFEB, 2: ALCT
     NLINK     : integer range 1 to 20 := 7;  -- number of links
     DATAWIDTH : integer := 16                -- user data width
     );
@@ -33,16 +32,21 @@ entity mgt_cfeb is
     daq_rx_p    : in  std_logic_vector(NLINK-1 downto 0);
 
     -- Receiver signals
-    rxdata_ch1  : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
-    rxdata_ch2  : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
-    rxdata_ch3  : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
-    rxdata_ch4  : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
-    rxdata_ch5  : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
-    rxdata_ch6  : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
-    rxdata_ch7  : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
-    rxd_valid   : out std_logic_vector(NLINK downto 1);   -- Flag for valid data;
-    bad_rx      : out std_logic_vector(NLINK downto 1);   -- Flag for fiber errors;
+    rxdata_feb1 : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
+    rxdata_feb2 : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
+    rxdata_feb3 : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
+    rxdata_feb4 : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
+    rxdata_feb5 : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
+    rxdata_feb6 : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
+    rxdata_feb7 : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
+    rxd_valid   : out std_logic_vector(NLINK downto 1);   -- Flag for valid data
+    crc_valid   : out std_logic_vector(NLINK downto 1);   -- Flag for valid CRC check
+    bad_rx      : out std_logic_vector(NLINK downto 1);   -- Flag for fiber errors
     rxready     : out std_logic; -- Flag for rx reset done
+
+    -- CFEB data FIFO full signals
+    fifo_full   : in std_logic_vector(NLINK downto 1);   -- Flag for FIFO full
+    fifo_afull  : in std_logic_vector(NLINK downto 1);   -- Flag for FIFO almost full
 
     -- PRBS signals
     prbs_type    : in  std_logic_vector(3 downto 0);
@@ -117,21 +121,25 @@ architecture Behavioral of mgt_cfeb is
       );
   end component;
 
-  component gtwiz_example_init is
+  component rx_frame_proc
     port (
-      clk_freerun_in : in std_logic := '0';
-      reset_all_in : in std_logic := '0';
-      tx_init_done_in : in std_logic := '0';
-      rx_init_done_in : in std_logic := '0';
-      rx_data_good_in : in std_logic := '0';
-      reset_all_out : out std_logic := '0';
-      reset_rx_out : out std_logic := '0';
-      init_done_out : out std_logic := '0';
-      retry_ctr_out : out std_logic_vector(3 downto 0) := (others=> '0')
+      -- Inputs
+      CLK : in std_logic;
+      RST : in std_logic;                        -- reset signal from VMEMON
+      RXDATA : in std_logic_vector(15 downto 0); -- direct rxdata out from gt wrapper
+      RX_IS_K : in std_logic_vector(1 downto 0);
+      RXDISPERR : in std_logic_vector(1 downto 0);
+      RXNOTINTABLE : in std_logic_vector(1 downto 0);
+      -- FIFO (almost) full inputs, triggers error state
+      FF_FULL : in std_logic;
+      FF_AF : in std_logic;
+      -- Client outputs
+      FRM_DATA : out std_logic_vector(15 downto 0);
+      FRM_DATA_VALID : out std_logic;
+      GOOD_CRC : out std_logic;
+      CRC_CHK_VLD : out std_logic
       );
   end component;
-
-  constant IDLE : std_logic_vector(DATAWIDTH-1 downto 0) := x"50BC"; -- TODO: what is the IDLE word from DCFEBs?
 
   -- Synchronize the latched link down reset input and the VIO-driven signal into the free-running clock domain
   -- signals passed to wizard
@@ -180,16 +188,24 @@ architecture Behavioral of mgt_cfeb is
   signal qpll0outclk_int : std_logic_vector(1 downto 0);
   signal qpll0outrefclk_int : std_logic_vector(1 downto 0);
 
-  -- rx helper signals
-  type rxd_nbyte_array_nlink is array (1 to NLINK) of std_logic_vector(DATAWIDTH/8-1 downto 0);
-  signal rxcharisk_ch : rxd_nbyte_array_nlink;
-  signal rxdisperr_ch : rxd_nbyte_array_nlink;
-  signal rxnotintable_ch : rxd_nbyte_array_nlink;
-  signal rxchariscomma_ch : rxd_nbyte_array_nlink;
-  signal codevalid_ch : rxd_nbyte_array_nlink;
+  -- RX helper signals in channel number: ch(I) = feb(I-1)
+  type t_rxd_nbyte_arr is array (integer range <>) of std_logic_vector(DATAWIDTH/8-1 downto 0);
+  signal rxcharisk_ch : t_rxd_nbyte_arr(NLINK-1 downto 0);
+  signal rxdisperr_ch : t_rxd_nbyte_arr(NLINK-1 downto 0);
+  signal rxnotintable_ch : t_rxd_nbyte_arr(NLINK-1 downto 0);
+  signal rxchariscomma_ch : t_rxd_nbyte_arr(NLINK-1 downto 0);
+  signal codevalid_ch : t_rxd_nbyte_arr(NLINK-1 downto 0);
 
-  signal bad_rx_int : std_logic_vector(NLINK downto 1);
+  -- internal signals based on channel number
+  signal rxd_valid_ch : std_logic_vector(NLINK-1 downto 0);
+  signal bad_rx_ch : std_logic_vector(NLINK-1 downto 0);
+  signal good_crc_ch : std_logic_vector(NLINK-1 downto 0);
+  signal crc_valid_ch : std_logic_vector(NLINK-1 downto 0);
   signal rxready_int : std_logic;
+
+  -- delayed signal from rx_frame_proc
+  type t_rxd_arr is array (integer range <>) of std_logic_vector(DATAWIDTH-1 downto 0);
+  signal rxdata_checked_ch  : t_rxd_arr(NLINK-1 downto 0);
 
   -- Preset constants
   signal rx8b10ben_int : std_logic_vector(NLINK-1 downto 0) := (others => '1');
@@ -213,62 +229,54 @@ architecture Behavioral of mgt_cfeb is
 
   -- debug signals
   signal ila_data_rx: std_logic_vector(191 downto 0) := (others=> '0');
-  signal gtpowergood_vio_sync : std_logic_vector(1 downto 0) := (others=> '0');
-  signal txpmaresetdone_vio_sync: std_logic_vector(1 downto 0) := (others=> '0');
-  signal rxpmaresetdone_vio_sync: std_logic_vector(1 downto 0) := (others=> '0');
-  signal gtwiz_reset_rx_done_vio_sync: std_logic;
-  signal gtwiz_reset_tx_done_vio_sync: std_logic;
-  signal link_down_latched_reset_vio_int: std_logic;
-  signal link_down_latched_reset_sync: std_logic;
-  signal hb_gtwiz_reset_rx_datapath_vio_int: std_logic;
-  signal hb_gtwiz_reset_rx_pll_and_datapath_vio_int: std_logic;
-  signal rxdata_errctr_reset_vio_int : std_logic;
-
-  -- attribute dont_touch : string;
-  -- attribute dont_touch of bit_synchronizer_vio_gtpowergood_0_inst : label is "true";
-  -- attribute dont_touch of bit_synchronizer_vio_gtpowergood_1_inst : label is "true";
-  -- attribute dont_touch of bit_synchronizer_vio_txpmaresetdone_0_inst : label is "true";
-  -- attribute dont_touch of bit_synchronizer_vio_txpmaresetdone_1_inst: label is "true";
-  -- attribute dont_touch of bit_synchronizer_vio_rxpmaresetdone_0_inst: label is "true";
-  -- attribute dont_touch of bit_synchronizer_vio_rxpmaresetdone_1_inst: label is "true";
-  -- attribute dont_touch of bit_synchronizer_vio_gtwiz_reset_rx_done_0_inst: label is "true";
-  -- attribute dont_touch of bit_synchronizer_vio_gtwiz_reset_tx_done_0_inst: label is "true";
 
 begin
 
   ---------------------------------------------------------------------------------------------------------------------
-  -- User data ports
+  -- User data ports, note change between channel number and cfeb number
   ---------------------------------------------------------------------------------------------------------------------
-  RXDATA_CH1 <= gtwiz_userdata_rx_int(1*DATAWIDTH-1 downto 0*DATAWIDTH);
-  RXDATA_CH2 <= gtwiz_userdata_rx_int(2*DATAWIDTH-1 downto 1*DATAWIDTH);
-  RXDATA_CH3 <= gtwiz_userdata_rx_int(3*DATAWIDTH-1 downto 2*DATAWIDTH);
-  RXDATA_CH4 <= gtwiz_userdata_rx_int(4*DATAWIDTH-1 downto 3*DATAWIDTH);
-  u_mgt_port_assign_5 : if NLINK >= 5 generate
-    RXDATA_CH5 <= gtwiz_userdata_rx_int(5*DATAWIDTH-1 downto 4*DATAWIDTH);
-  end generate;
-  u_mgt_port_assign_6 : if NLINK >= 6 generate
-    RXDATA_CH6 <= gtwiz_userdata_rx_int(6*DATAWIDTH-1 downto 5*DATAWIDTH);
-  end generate;
+  RXDATA_FEB1 <= rxdata_checked_ch(0);
+  RXDATA_FEB2 <= rxdata_checked_ch(1);
+  RXDATA_FEB3 <= rxdata_checked_ch(2);
+  RXDATA_FEB4 <= rxdata_checked_ch(3);
+  RXDATA_FEB5 <= rxdata_checked_ch(4);
   u_mgt_port_assign_7 : if NLINK >= 7 generate
-    RXDATA_CH7 <= gtwiz_userdata_rx_int(7*DATAWIDTH-1 downto 6*DATAWIDTH);
+    RXDATA_FEB6 <= rxdata_checked_ch(5);
+    RXDATA_FEB7 <= rxdata_checked_ch(6);
   end generate;
 
-  gen_rx_quality : for I in 1 to NLINK generate
+  RXD_VALID <= rxd_valid_ch;
+  CRC_VALID <= crc_valid_ch;
+  BAD_RX <= bad_rx_ch;
+
+  gen_rx_quality : for I in 0 to NLINK-1 generate
   begin
-    rxcharisk_ch(I)     <= rxctrl0_int(16*(I-1)+DATAWIDTH/8-1 downto 16*(I-1));
-    rxdisperr_ch(I)     <= rxctrl1_int(16*(I-1)+DATAWIDTH/8-1 downto 16*(I-1));
-    rxchariscomma_ch(I) <= rxctrl2_int(8*(I-1)+DATAWIDTH/8-1 downto 8*(I-1));
-    rxnotintable_ch(I)  <= rxctrl3_int(8*(I-1)+DATAWIDTH/8-1 downto 8*(I-1));
+    rxcharisk_ch(I)     <= rxctrl0_int(16*I+DATAWIDTH/8-1 downto 16*I);
+    rxdisperr_ch(I)     <= rxctrl1_int(16*I+DATAWIDTH/8-1 downto 16*I);
+    rxchariscomma_ch(I) <= rxctrl2_int(8*I+DATAWIDTH/8-1 downto 8*I);
+    rxnotintable_ch(I)  <= rxctrl3_int(8*I+DATAWIDTH/8-1 downto 8*I);
 
-    codevalid_ch(I) <= not (rxnotintable_ch(I) or rxdisperr_ch(I));
-    bad_rx_int(I) <= not (rxbyteisaligned_int(I-1) and (not rxbyterealign_int(I-1)));
+    bad_rx_ch(I) <= '1' when (rxbyteisaligned_int(I) = '0') or (rxbyterealign_int(I) = '1') or (or_reduce(rxdisperr_ch(I)) = '1') else '0';
 
-    -- RXDATA is valid only when it's been deemed aligned, recognized 8B/10B pattern and does not contain a K-character.
-    -- The RXVALID port is not explained in UG576, so it's not used.
-    RXD_VALID(I) <= '1' when (rxready_int = '1' and bad_rx_int(I) = '0' and and_reduce(codevalid_ch(I)) = '1' and or_reduce(rxchariscomma_ch(I)) = '0') else '0';
+    -- Module for RXDATA validity checks, working for 16 bit datawidth only
+    rx_data_check_i : rx_frame_proc
+      port map (
+        CLK => gtwiz_userclk_rx_usrclk2_int,
+        RST => reset,
+        RXDATA => gtwiz_userdata_rx_int((I+1)*DATAWIDTH-1 downto I*DATAWIDTH),
+        RX_IS_K => rxcharisk_ch(I),
+        RXDISPERR => rxdisperr_ch(I),
+        RXNOTINTABLE => rxnotintable_ch(I),
+        FF_FULL => FIFO_FULL(I+1),
+        FF_AF => FIFO_AFULL(I+1),
+        FRM_DATA => rxdata_checked_ch(I),
+        FRM_DATA_VALID => rxd_valid_ch(I),
+        GOOD_CRC => good_crc_ch(I),    -- CRC is checked, but signal is not used
+        CRC_CHK_VLD => crc_valid_ch(I) -- used for CRC counting 
+        );
 
     -- Duplicating GT control inputs for all channels
-    rxprbssel_int(4*I-1 downto 4*I-4) <= PRBS_TYPE when PRBS_RX_EN(I) = '1' else x"0";
+    rxprbssel_int(4*I+3 downto 4*I) <= PRBS_TYPE when PRBS_RX_EN(I+1) = '1' else x"0";
   end generate gen_rx_quality;
 
   RXREADY <= rxready_int;
@@ -293,11 +301,8 @@ begin
   gtwiz_reset_all_int <= RESET;
   rxprbscntreset_int <= (others => RESET);
 
-  -- Potential useful signals
-  -- hb_gtwiz_reset_rx_datapath_int <= hb_gtwiz_reset_rx_datapath_init_int;
+  -- Potential useful individual reset signals
   -- gtwiz_reset_tx_datapath_int <= hb0_gtwiz_reset_tx_datapath_int;
-  -- hb0_gtwiz_userclk_tx_active_int  <= gtwiz_userclk_tx_active_int;
-  -- hb0_gtwiz_userclk_rx_active_int  <= gtwiz_userclk_rx_active_int;
   -- gtwiz_reset_tx_pll_and_datapath_int <= hb0_gtwiz_reset_tx_pll_and_datapath_int;
   -- gtwiz_reset_rx_datapath_int <= hb_gtwiz_reset_rx_datapath_init_int or hb_gtwiz_reset_rx_datapath_vio_int;
 
