@@ -234,7 +234,7 @@ begin
   out_txdiffctrl    <= x"000" & txdiffctrl_inner;
 
   --0x3120 read DCFEB done (NOT local register)
-  out_dcfeb_done <= x"00"  & '0'   & dcfeb_done;
+  out_dcfeb_done <= x"00" & '0' & dcfeb_done;
 
   --0x3300 write/read data path MUX selector
   FD_MUXDATAPATHSEL : FDCE port map(Q => mux_data_path_inner, C => SLOWCLK, CE => w_mux_data_path, CLR => RST, D => INDATA(0));

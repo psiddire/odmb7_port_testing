@@ -43,6 +43,7 @@ entity mgt_cfeb is
     crc_valid   : out std_logic_vector(NLINK downto 1);   -- Flag for valid CRC check
     bad_rx      : out std_logic_vector(NLINK downto 1);   -- Flag for fiber errors
     rxready     : out std_logic; -- Flag for rx reset done
+    kill_rx     : in  std_logic_vector(NLINK downto 1);   -- Kill bad DCFEB 
 
     -- CFEB data FIFO full signals
     fifo_full   : in std_logic_vector(NLINK downto 1);   -- Flag for FIFO full
@@ -203,9 +204,9 @@ architecture Behavioral of mgt_cfeb is
   signal crc_valid_ch : std_logic_vector(NLINK-1 downto 0);
   signal rxready_int : std_logic;
 
-  -- delayed signal from rx_frame_proc
   type t_rxd_arr is array (integer range <>) of std_logic_vector(DATAWIDTH-1 downto 0);
-  signal rxdata_checked_ch  : t_rxd_arr(NLINK-1 downto 0);
+  signal rxdata_i_ch  : t_rxd_arr(NLINK-1 downto 0); -- rx userdata out of mgt wrapper
+  signal rxdata_o_ch  : t_rxd_arr(NLINK-1 downto 0); -- delayed signal from rx_frame_proc
 
   -- Preset constants
   signal rx8b10ben_int : std_logic_vector(NLINK-1 downto 0) := (others => '1');
@@ -235,22 +236,23 @@ begin
   ---------------------------------------------------------------------------------------------------------------------
   -- User data ports, note change between channel number and cfeb number
   ---------------------------------------------------------------------------------------------------------------------
-  RXDATA_FEB1 <= rxdata_checked_ch(0);
-  RXDATA_FEB2 <= rxdata_checked_ch(1);
-  RXDATA_FEB3 <= rxdata_checked_ch(2);
-  RXDATA_FEB4 <= rxdata_checked_ch(3);
-  RXDATA_FEB5 <= rxdata_checked_ch(4);
+  RXDATA_FEB1 <= rxdata_o_ch(0);
+  RXDATA_FEB2 <= rxdata_o_ch(1);
+  RXDATA_FEB3 <= rxdata_o_ch(2);
+  RXDATA_FEB4 <= rxdata_o_ch(3);
+  RXDATA_FEB5 <= rxdata_o_ch(4);
   u_mgt_port_assign_7 : if NLINK >= 7 generate
-    RXDATA_FEB6 <= rxdata_checked_ch(5);
-    RXDATA_FEB7 <= rxdata_checked_ch(6);
+    RXDATA_FEB6 <= rxdata_o_ch(5);
+    RXDATA_FEB7 <= rxdata_o_ch(6);
   end generate;
 
-  RXD_VALID <= rxd_valid_ch;
-  CRC_VALID <= crc_valid_ch;
+  RXD_VALID <= rxd_valid_ch and (not KILL_RX);
+  CRC_VALID <= crc_valid_ch and (not KILL_RX);
   BAD_RX <= bad_rx_ch;
 
   gen_rx_quality : for I in 0 to NLINK-1 generate
   begin
+    rxdata_i_ch(I)      <= gtwiz_userdata_rx_int((I+1)*DATAWIDTH-1 downto I*DATAWIDTH);
     rxcharisk_ch(I)     <= rxctrl0_int(16*I+DATAWIDTH/8-1 downto 16*I);
     rxdisperr_ch(I)     <= rxctrl1_int(16*I+DATAWIDTH/8-1 downto 16*I);
     rxchariscomma_ch(I) <= rxctrl2_int(8*I+DATAWIDTH/8-1 downto 8*I);
@@ -258,18 +260,21 @@ begin
 
     bad_rx_ch(I) <= '1' when (rxbyteisaligned_int(I) = '0') or (rxbyterealign_int(I) = '1') or (or_reduce(rxdisperr_ch(I)) = '1') else '0';
 
+    -- Power down the RX for killed DCFEB
+    rxpd_int(2*I+1 downto 2*I) <= "11" when KILL_RX(I+1) = '1' else "00";
+
     -- Module for RXDATA validity checks, working for 16 bit datawidth only
     rx_data_check_i : rx_frame_proc
       port map (
         CLK => gtwiz_userclk_rx_usrclk2_int,
-        RST => reset,
-        RXDATA => gtwiz_userdata_rx_int((I+1)*DATAWIDTH-1 downto I*DATAWIDTH),
+        RST => reset or KILL_RX(I+1),
+        RXDATA => rxdata_i_ch(I),
         RX_IS_K => rxcharisk_ch(I),
         RXDISPERR => rxdisperr_ch(I),
         RXNOTINTABLE => rxnotintable_ch(I),
         FF_FULL => FIFO_FULL(I+1),
         FF_AF => FIFO_AFULL(I+1),
-        FRM_DATA => rxdata_checked_ch(I),
+        FRM_DATA => rxdata_o_ch(I),
         FRM_DATA_VALID => rxd_valid_ch(I),
         GOOD_CRC => good_crc_ch(I),    -- CRC is checked, but signal is not used
         CRC_CHK_VLD => crc_valid_ch(I) -- used for CRC counting 

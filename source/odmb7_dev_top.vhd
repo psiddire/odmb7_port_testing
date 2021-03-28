@@ -184,7 +184,7 @@ entity odmb7_ucsb_dev is
     KUS_DL_SEL    : out std_logic;                         -- Bank 47, ODMB JTAG path select
     FPGA_SEL      : out std_logic;                         -- Bank 47, clock synthesizaer control input select
     RST_CLKS_B    : out std_logic;                         -- Bank 47, clock synthesizaer reset
-    ODMB_DONE     : in std_logic;                          -- "DONE" in bank 66 (pin L9), monitor DONE_0 from Bank 0 (pin N7) 
+    ODMB_DONE     : in std_logic;                          -- "DONE" in bank 66 (pin L9), monitor DONE_0 from Bank 0 (pin N7)
 
     --------------------------------
     -- SYSMON ports
@@ -320,7 +320,7 @@ architecture Behavioral of odmb7_ucsb_dev is
       RSVTD_IN    : in  std_logic_vector(7 downto 3);       -- "RSVTD[7:3]" in Bank 44-45
       RSVTD_OUT   : out std_logic_vector(2 downto 0);       -- "RSVTD[2:0]" in Bank 44-45
       LCT_RQST    : out std_logic_vector(2 downto 1);       -- Bank 45
-      
+
       --------------------
       -- VMEMON Configuration signals for top level
       --------------------
@@ -424,7 +424,7 @@ architecture Behavioral of odmb7_ucsb_dev is
       -- Triggers
       --------------------
       RAW_L1A       : in std_logic;
-      
+
       --------------------
       -- To/From DCFEBs (FF-EMU-MOD)
       --------------------
@@ -521,8 +521,9 @@ architecture Behavioral of odmb7_ucsb_dev is
       rxdata_feb7  : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
       rxd_valid    : out std_logic_vector(NLINK downto 1);   -- Flag for valid data
       crc_valid    : out std_logic_vector(NLINK downto 1);   -- Flag for valid CRC
-      bad_rx       : out std_logic_vector(NLINK downto 1);   -- Flag for fiber errors
       rxready      : out std_logic;                          -- Flag for rx reset done
+      bad_rx       : out std_logic_vector(NLINK downto 1);   -- Flag for fiber errors
+      kill_rx      : in  std_logic_vector(NLINK downto 1);   -- Power down channel of killed DCFEB
       fifo_full    : in  std_logic_vector(NLINK downto 1);   -- Flag for FIFO full
       fifo_afull   : in  std_logic_vector(NLINK downto 1);   -- Flag for FIFO almost full
       prbs_type    : in  std_logic_vector(3 downto 0);
@@ -587,18 +588,18 @@ architecture Behavioral of odmb7_ucsb_dev is
       sysclk         : in std_logic; -- sysclk
       -- Pattern generation and checking for SPY channel
       usrclk_spy_tx  : in std_logic; -- USRCLK for SPY TX data generation
-      txdata_spy     : out std_logic_vector(SPYDATAWIDTH-1 downto 0); -- PRBS data out 
+      txdata_spy     : out std_logic_vector(SPYDATAWIDTH-1 downto 0); -- PRBS data out
       txd_valid_spy  : out std_logic;
       usrclk_spy_rx  : in std_logic;  -- USRCLK for SPY RX data readout
-      rxdata_spy     : in std_logic_vector(SPYDATAWIDTH-1 downto 0); -- PRBS data out 
+      rxdata_spy     : in std_logic_vector(SPYDATAWIDTH-1 downto 0); -- PRBS data out
       rxd_valid_spy  : in std_logic;
       rxready_spy    : in std_logic; -- Flag for rx reset done
       -- Pattern generation for mgt_ddu
       usrclk_ddu_tx  : in std_logic; -- USRCLK for SPY TX data generation
-      txdata_ddu1    : out std_logic_vector(DDUTXDWIDTH-1 downto 0); -- PRBS data out 
-      txdata_ddu2    : out std_logic_vector(DDUTXDWIDTH-1 downto 0); -- PRBS data out 
-      txdata_ddu3    : out std_logic_vector(DDUTXDWIDTH-1 downto 0); -- PRBS data out 
-      txdata_ddu4    : out std_logic_vector(DDUTXDWIDTH-1 downto 0); -- PRBS data out 
+      txdata_ddu1    : out std_logic_vector(DDUTXDWIDTH-1 downto 0); -- PRBS data out
+      txdata_ddu2    : out std_logic_vector(DDUTXDWIDTH-1 downto 0); -- PRBS data out
+      txdata_ddu3    : out std_logic_vector(DDUTXDWIDTH-1 downto 0); -- PRBS data out
+      txdata_ddu4    : out std_logic_vector(DDUTXDWIDTH-1 downto 0); -- PRBS data out
       txd_valid_ddu  : out std_logic_vector(4 downto 1);
       -- Pattern checking for mgt_ddu
       usrclk_ddu_rx  : in std_logic;  -- USRCLK for DDU RX data readout
@@ -763,10 +764,10 @@ architecture Behavioral of odmb7_ucsb_dev is
   -- Triggers
   --------------------------------------
   signal test_lct    : std_logic := '0';
-  signal test_pb_lct : std_logic := '0';
   signal test_l1a    : std_logic := '0';
   signal raw_l1a     : std_logic := '0';
-  
+  signal raw_lct     : std_logic_vector(NCFEB downto 0);
+
   --------------------------------------
   -- Internal configuration signals
   --------------------------------------
@@ -783,11 +784,22 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal change_reg_index : integer range 0 to NREGS := NREGS;
 
   --------------------------------------
-  -- ODMB VME<->ODMB CTRL signals
+  -- ODMB VME <=> ODMB CTRL signals
   --------------------------------------
   signal test_inj : std_logic := '0';
   signal test_pls : std_logic := '0';
   signal test_ped : std_logic := '0';
+
+  --------------------------------------
+  -- ODMB status signals
+  --------------------------------------
+  -- Counter arrays
+  signal goodcrc_cnt         : t_twobyte_arr(NCFEB downto 1);
+  signal dcfeb_bad_rx_cnt    : t_twobyte_arr(NCFEB downto 1);
+  signal dcfeb_dvalid_cnt    : t_twobyte_arr(NCFEB downto 1); -- replacement for cafifo dav count
+
+  signal into_cafifo_dav_cnt : t_twobyte_arr(NCFEB+2 downto 1);
+  signal l1a_match_cnt       : t_twobyte_arr(NCFEB+2 downto 1);
 
   --------------------------------------
   -- Reset signals
@@ -878,10 +890,10 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal dcfeb5_data : std_logic_vector(15 downto 0);  -- Data received
   signal dcfeb6_data : std_logic_vector(15 downto 0);  -- Data received
   signal dcfeb7_data : std_logic_vector(15 downto 0);  -- Data received
-  signal mgtc_rxd_valid : std_logic_vector(NCFEB downto 1);   -- Flag for valid data;
-  signal mgtc_crc_valid : std_logic_vector(NCFEB downto 1);   -- Flag for valid data;
-  signal mgtc_bad_rx : std_logic_vector(NCFEB downto 1);   -- Flag for fiber errors;
-  signal mgtc_rxready : std_logic; -- Flag for rx reset done
+  signal dcfeb_rxd_valid : std_logic_vector(NCFEB downto 1);   -- Flag for valid data;
+  signal dcfeb_crc_valid : std_logic_vector(NCFEB downto 1);   -- Flag for valid data;
+  signal dcfeb_bad_rx : std_logic_vector(NCFEB downto 1);   -- Flag for fiber errors;
+  signal dcfeb_rxready : std_logic; -- Flag for rx reset done
   signal mgtc_reset : std_logic;
 
   signal dcfeb_prbs_rx_en : std_logic_vector(NCFEB downto 1);
@@ -1001,9 +1013,9 @@ begin
 
   GEN_VMEOUT_16 : for I in 0 to 15 generate
   begin
-    VME_BUF : IOBUF port map(O => vme_data_in_buf(I), IO => VME_DATA(I), I => vme_data_out_buf(I), T => vme_dir_b); 
+    VME_BUF : IOBUF port map(O => vme_data_in_buf(I), IO => VME_DATA(I), I => vme_data_out_buf(I), T => vme_dir_b);
   end generate GEN_VMEOUT_16;
-  
+
   -------------------------------------------------------------------------------------------
   -- Handle PPIB/DCFEB signals
   -------------------------------------------------------------------------------------------
@@ -1027,7 +1039,7 @@ begin
   --generate pulses if not masked
   dcfeb_injpls <= '0' when mask_pls = '1' else premask_injpls;
   dcfeb_extpls <= '0' when mask_pls = '1' else premask_extpls;
-  
+
   --generate RESYNC, BC0, L1A, and L1A match signals to DCFEBs
   ccb_bx0   <= not CCB_BX0_B;
   FD_CCBBX0 : FD port map(Q => ccb_bx0_q, C => cmsclk, D => ccb_bx0);
@@ -1041,15 +1053,15 @@ begin
   --l1acnt_rst <= clk20 and (l1a_reset_pulse or l1a_reset_pulse_q or reset_pulse or reset_pulse_q);
   proc_sync_l1acnt : process (cmsclk)
   begin
-  if rising_edge(cmsclk) then
-    l1acnt_rst <= (l1a_reset_pulse or l1a_reset_pulse_q or reset_pulse or reset_pulse_q);
-    l1acnt_rst_meta <= l1acnt_rst;
-    l1acnt_rst_sync <= l1acnt_rst_meta;
-  end if;
+    if rising_edge(cmsclk) then
+      l1acnt_rst <= (l1a_reset_pulse or l1a_reset_pulse_q or reset_pulse or reset_pulse_q);
+      l1acnt_rst_meta <= l1acnt_rst;
+      l1acnt_rst_sync <= l1acnt_rst_meta;
+    end if;
   end process;
 
   pre_bc0    <= test_bc0 or ccb_bx0_q;
-  masked_l1a <= '0' when mask_l1a(0)='1' else odmbctrl_l1a;
+  masked_l1a <= '0' when mask_l1a(0) = '1' else odmbctrl_l1a;
 
   DS_RESYNC : DELAY_SIGNAL generic map (NCYCLES_MAX => 1) port map (DOUT => dcfeb_resync, CLK => cmsclk, NCYCLES => cable_dly, DIN => l1acnt_rst);
   DS_BC0    : DELAY_SIGNAL generic map (NCYCLES_MAX => 1) port map (DOUT => dcfeb_bc0,    CLK => cmsclk, NCYCLES => cable_dly, DIN => pre_bc0   );
@@ -1057,7 +1069,7 @@ begin
 
   GEN_DCFEB_L1A_MATCH : for I in 1 to NCFEB generate
   begin
-    masked_l1a_match(I) <= '0' when mask_l1a(I)='1' else odmbctrl_l1a_match(I);
+    masked_l1a_match(I) <= '0' when mask_l1a(I) = '1' else odmbctrl_l1a_match(I);
     DS_L1A_MATCH : DELAY_SIGNAL generic map (NCYCLES_MAX => 1) port map (DOUT => dcfeb_l1a_match(I), CLK => cmsclk, NCYCLES => cable_dly, DIN => masked_l1a_match(I));
   end generate GEN_DCFEB_L1A_MATCH;
 
@@ -1139,16 +1151,14 @@ begin
   -------------------------------------------------------------------------------------------
   -- Handle Triggers
   -------------------------------------------------------------------------------------------
-
-  test_pb_lct <= test_lct;
   LCTDLY_GTRG : LCTDLY port map(DOUT => test_l1a, CLK => cmsclk, DELAY => lct_l1a_dly, DIN => test_lct);
   raw_l1a <= test_l1a;
 
   -------------------------------------------------------------------------------------------
   -- Handle Internal configuration signals
   -------------------------------------------------------------------------------------------
-  
-  --FIXME should change with bad_dcfeb_pulse and good_dcfeb_pulse, currently, KILL must be updated manually via VME command
+
+  -- FIXME: should change with bad_dcfeb_pulse and good_dcfeb_pulse, currently, KILL must be updated manually via VME command
   change_reg_data <= x"0" & "000" & kill(9) & kill(8) & kill(7 downto 1);
   change_reg_index <= NREGS;
 
@@ -1198,6 +1208,19 @@ begin
                  opt_rst_reg;
   opt_reset <= opt_rst_reg(31) or pon_reset or mgt_reset;  -- Optical reset
 
+
+  -------------------------------------------------------------------------------------------
+  -- ODMB status signal generations
+  -------------------------------------------------------------------------------------------
+
+  -- TODO: unfinished counting to be filled
+  DCFEB_RXSTAT_CNT : for dev in 1 to NCFEB generate
+  begin
+    C_GODDCRC_CNT : COUNT_EDGES port map(COUNT => goodcrc_cnt(dev), CLK => usrclk_mgtc, RST => reset, DIN => dcfeb_crc_valid(dev));
+    C_DVALID_CNT  : COUNT_EDGES port map(COUNT => dcfeb_dvalid_cnt(dev), CLK => usrclk_mgtc, RST => reset, DIN => dcfeb_rxd_valid(dev));
+    C_BAD_RX_CNT  : COUNT_EDGES port map(COUNT => dcfeb_bad_rx_cnt(dev), CLK => usrclk_mgtc, RST => reset, DIN => dcfeb_bad_rx(dev));
+  end generate DCFEB_RXSTAT_CNT;
+
   -------------------------------------------------------------------------------------------
   -- Debug
   -------------------------------------------------------------------------------------------
@@ -1210,17 +1233,37 @@ begin
 
   odmb_status_pro : process (odmb_data_sel, VME_GAP_B, VME_GA_B)
   begin
-    
+
     case odmb_data_sel is
 
       --debug register
       when x"06" => odmb_data <= x"7E57";
 
       when x"20" => odmb_data <= "0000000000" & VME_GAP_B & VME_GA_B;
+
+      -- FIXME: Use dcfeb_dvalid_cnt in place of into_cafifo_dav_cnt for now
+      when x"41" => odmb_data <= dcfeb_dvalid_cnt(1);
+      when x"42" => odmb_data <= dcfeb_dvalid_cnt(2);
+      when x"43" => odmb_data <= dcfeb_dvalid_cnt(3);
+      when x"44" => odmb_data <= dcfeb_dvalid_cnt(4);
+      when x"45" => odmb_data <= dcfeb_dvalid_cnt(5);
+      when x"46" => odmb_data <= dcfeb_dvalid_cnt(6);
+      when x"47" => odmb_data <= dcfeb_dvalid_cnt(7);
+                    -- when x"48" => odmb_data <= into_cafifo_dav_cnt(8);
+                    -- when x"49" => odmb_data <= into_cafifo_dav_cnt(9);
+
       when x"5A" => odmb_data <= ccb_cmd_reg;
       when x"5B" => odmb_data <= ccb_data_reg;
       when x"5C" => odmb_data <= ccb_other_reg;
       when x"5D" => odmb_data <= ccb_rsv_reg;
+
+      when x"61" => odmb_data <= goodcrc_cnt(1);
+      when x"62" => odmb_data <= goodcrc_cnt(2);
+      when x"63" => odmb_data <= goodcrc_cnt(3);
+      when x"64" => odmb_data <= goodcrc_cnt(4);
+      when x"65" => odmb_data <= goodcrc_cnt(5);
+      when x"66" => odmb_data <= goodcrc_cnt(6);
+      when x"67" => odmb_data <= goodcrc_cnt(7);
 
       when others => odmb_data <= (others => '1');
     end case;
@@ -1229,7 +1272,7 @@ begin
   -------------------------------------------------------------------------------------------
   -- Sub-modules
   -------------------------------------------------------------------------------------------
-  
+
   MBV : ODMB_VME
     generic map (
       NCFEB => NCFEB
@@ -1238,8 +1281,8 @@ begin
       CLK160         => mgtclk1,
       CLK40          => cmsclk,
       CLK10          => sysclk10,
-      CLK2P5	     => sysclk2p5,
-      CLK1P25	     => sysclk1p25,
+      CLK2P5         => sysclk2p5,
+      CLK1P25        => sysclk1p25,
 
       VME_DATA_IN    => vme_data_in_buf,
       VME_DATA_OUT   => vme_data_out_buf,
@@ -1281,7 +1324,7 @@ begin
       RSVTD_IN    => RSVTD_IN,
       RSVTD_OUT   => RSVTD_OUT,
       LCT_RQST    => LCT_RQST,
-      
+
       FW_RESET => fw_reset,
       L1A_RESET_PULSE => l1a_reset_pulse,
       OPT_RESET_PULSE => opt_reset_pulse,
@@ -1305,8 +1348,8 @@ begin
       OTMB_PUSH_DLY    => open,
       ALCT_PUSH_DLY    => open,
       BX_DLY           => open,
-      INJ_DLY          => inj_dly, 
-      EXT_DLY          => ext_dly, 
+      INJ_DLY          => inj_dly,
+      EXT_DLY          => ext_dly,
       CALLCT_DLY       => callct_dly,
       ODMB_ID          => open,
       NWORDS_DUMMY     => nwords_dummy,
@@ -1336,7 +1379,7 @@ begin
       PON_RESET => pon_reset
       );
 
-  MBC : ODMB_CTRL 
+  MBC : ODMB_CTRL
     generic map (
       NCFEB => NCFEB
       )
@@ -1346,7 +1389,7 @@ begin
 
       TEST_CCBINJ => test_inj,
       TEST_CCBPLS => test_pls,
-      TEST_CCBPED => test_ped, 
+      TEST_CCBPED => test_ped,
 
       CAL_MODE => odmb_ctrl_reg(0),
       PEDESTAL => odmb_ctrl_reg(13),
@@ -1354,14 +1397,14 @@ begin
       RAW_L1A => raw_l1a,
 
       LCT_L1A_DLY => lct_l1a_dly,
-      INJ_DLY     => inj_dly, 
-      EXT_DLY     => ext_dly, 
-      CALLCT_DLY  => callct_dly, 
-      
+      INJ_DLY     => inj_dly,
+      EXT_DLY     => ext_dly,
+      CALLCT_DLY  => callct_dly,
+
       DCFEB_INJPULSE  => premask_injpls,
       DCFEB_EXTPULSE  => premask_extpls,
-      DCFEB_L1A       => odmbctrl_l1a,                    
-      DCFEB_L1A_MATCH => odmbctrl_l1a_match,        
+      DCFEB_L1A       => odmbctrl_l1a,
+      DCFEB_L1A_MATCH => odmbctrl_l1a_match,
 
       DIAGOUT => open,
       RST     => reset
@@ -1388,7 +1431,7 @@ begin
   spy_rx_n <= DAQ_SPY_RX_N when SPY_SEL = '1' else '0';
   spy_rx_p <= DAQ_SPY_RX_P when SPY_SEL = '1' else '0';
 
-  u_spy_gth : mgt_spy
+  GTH_SPY : mgt_spy
     port map (
       mgtrefclk       => mgtrefclk1_226,
       txusrclk        => usrclk_spy_tx,
@@ -1416,7 +1459,7 @@ begin
       );
 
 
-  u_dcfeb_gth : mgt_cfeb
+  GTH_DCFEB : mgt_cfeb
     generic map (
       NLINK     => 7,  -- number of links
       DATAWIDTH => 16  -- user data width
@@ -1434,10 +1477,11 @@ begin
       rxdata_feb5  => dcfeb5_data,
       rxdata_feb6  => dcfeb6_data,
       rxdata_feb7  => dcfeb7_data,
-      rxd_valid    => mgtc_rxd_valid,
-      crc_valid    => mgtc_crc_valid,
-      bad_rx       => mgtc_bad_rx,
-      rxready      => mgtc_rxready,
+      rxd_valid    => dcfeb_rxd_valid,
+      crc_valid    => dcfeb_crc_valid,
+      rxready      => dcfeb_rxready,
+      bad_rx       => dcfeb_bad_rx,
+      kill_rx      => kill(7 downto 1),
       fifo_full    => dcfeb_datafifo_full,
       fifo_afull   => dcfeb_datafifo_afull,
       prbs_type    => mgt_prbs_type,
@@ -1447,7 +1491,7 @@ begin
       reset        => opt_reset
       );
 
-  u_alct_gth : mgt_alct
+  GTH_ALCT : mgt_alct
     port map (
       mgtrefclk       => mgtrefclk0_225,
       rxusrclk        => usrclk_mgta,
@@ -1465,7 +1509,7 @@ begin
       reset           => opt_reset
       );
 
-  u_ddu_gth : mgt_ddu
+  GTH_DDU : mgt_ddu
     generic map (
       NCHANNL     => 4,            -- number of (firmware) channels (max of TX/RX links)
       NRXLINK     => DDU_NRXLINK,  -- number of (physical) RX links
@@ -1507,7 +1551,7 @@ begin
   -------------------------------------------------------------------------------------------
   -- Tester
   -------------------------------------------------------------------------------------------
-  u_mgt_tester : prbs_tester 
+  u_mgt_tester : prbs_tester
     generic map (
       DDU_NRXLINK   => DDU_NRXLINK,
       SPYDATAWIDTH  => 16,
@@ -1547,8 +1591,8 @@ begin
       rxdata_cfeb5   => dcfeb5_data,
       rxdata_cfeb6   => dcfeb6_data,
       rxdata_cfeb7   => dcfeb7_data,
-      rxd_valid_mgtc => mgtc_rxd_valid,
-      rxready_mgtc   => mgtc_rxready,
+      rxd_valid_mgtc => dcfeb_rxd_valid,
+      rxready_mgtc   => dcfeb_rxready,
       usrclk_mgta    => usrclk_mgta,
       rxdata_alct    => alct_rxdata,
       rxd_valid_alct => alct_rxd_valid,
@@ -1595,4 +1639,3 @@ begin
       );
 
 end Behavioral;
-

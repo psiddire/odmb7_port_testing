@@ -17,9 +17,9 @@ package ucsb_types is
   type done_state_type is (DONE_IDLE, DONE_LOW, DONE_COUNTING);
   type done_state_array_type is array (NCFEB downto 1) of done_state_type;
 
-  -- For MGT data quality control
-  type fourbit_array_ncfeb is array (1 to NCFEB) of std_logic_vector(3 downto 0);
-  type twobyte_array_ndev is array (1 to NDEVICE) of std_logic_vector(15 downto 0);
+  -- For various counter
+  type t_twobyte_arr is array (integer range <>) of std_logic_vector(15 downto 0);
+  type t_fourbyte_arr is array (integer range <>) of std_logic_vector(31 downto 0);
 
   ---- Flag for synthesis/simulation
   -- For simulation
