@@ -135,7 +135,15 @@ architecture Behavioral of mgt_ddu is
       );
   end component;
 
-  constant IDLE16 : std_logic_vector(15 downto 0) := x"50BC"; -- TODO: what is the IDLE word from DCFEBs?
+  -- Temporary debugging
+  component ila_1 is
+    port (
+      clk : in std_logic := '0';
+      probe0 : in std_logic_vector(127 downto 0) := (others=> '0')
+      );
+  end component;
+
+  constant IDLE16 : std_logic_vector(15 downto 0) := x"50BC";
   constant IDLE32 : std_logic_vector(31 downto 0) := x"503C50BC";
 
   -- Synchronize the latched link down reset input and the VIO-driven signal into the free-running clock domain
@@ -379,5 +387,27 @@ begin
   ---------------------------------------------------------------------------------------------------------------------
   -- Debug session
   ---------------------------------------------------------------------------------------------------------------------
+
+
+  ila_data_rx(63 downto 0)  <= gtwiz_userdata_rx_int;
+  ila_data_rx(65 downto 64) <= codevalid_ch(1);
+  ila_data_rx(69 downto 68) <= codevalid_ch(3);
+  ila_data_rx(73 downto 70) <= rxbyteisaligned_int;
+  ila_data_rx(77 downto 74) <= rxbyterealign_int;
+  ila_data_rx(79 downto 78) <= rxnotintable_ch(1);
+  ila_data_rx(81 downto 80) <= rxnotintable_ch(3);
+  ila_data_rx(83 downto 82) <= rxdisperr_ch(1);
+  ila_data_rx(85 downto 84) <= rxdisperr_ch(3);
+  ila_data_rx(87 downto 86) <= rxcharisk_ch(1);
+  ila_data_rx(89 downto 88) <= rxcharisk_ch(3);
+  ila_data_rx(91 downto 90) <= rxchariscomma_ch(1);
+  ila_data_rx(93 downto 92) <= rxchariscomma_ch(3);
+  ila_data_rx(97 downto 94) <= bad_rx_int;
+
+  mgt_ddu_ila_inst : ila_1
+    port map(
+      clk => gtwiz_userclk_rx_usrclk2_int,
+      probe0 => ila_data_rx
+      );
 
 end Behavioral;

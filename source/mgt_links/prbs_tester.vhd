@@ -533,12 +533,12 @@ begin
       probe0 => ila_ddu_tx
       );
 
-  -- -- ila_ddu_tx(31 downto 0)   <= txdata_ddu_int;
-  -- ila_ddu_tx(15 downto 0)   <= txdata_ddu_prbs_int;
-  -- ila_ddu_tx(31 downto 16)  <= txdata_ddu_cntr_int;
-  -- ila_ddu_tx(32)            <= txd_valid_ddu_int(1);
-  -- ila_ddu_tx(48 downto 33)  <= std_logic_vector(txd_ddu_init_ctr);
-  -- ila_ddu_tx(64 downto 49)  <= txdata_spy_int;
+  -- ila_ddu_tx(31 downto 0)   <= txdata_ddu_int;
+  ila_ddu_tx(15 downto 0)   <= txdata_ddu_prbs_int;
+  ila_ddu_tx(31 downto 16)  <= txdata_ddu_cntr_int;
+  ila_ddu_tx(32)            <= txd_valid_ddu_int(1);
+  ila_ddu_tx(48 downto 33)  <= std_logic_vector(txd_ddu_init_ctr);
+  ila_ddu_tx(64 downto 49)  <= txdata_spy_int;
 
   ddu_rx_ila_inst : ila_1
     port map (

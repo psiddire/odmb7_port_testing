@@ -43,7 +43,8 @@ entity mgt_cfeb is
     crc_valid   : out std_logic_vector(NLINK downto 1);   -- Flag for valid CRC check
     bad_rx      : out std_logic_vector(NLINK downto 1);   -- Flag for fiber errors
     rxready     : out std_logic; -- Flag for rx reset done
-    kill_rx     : in  std_logic_vector(NLINK downto 1);   -- Kill bad DCFEB 
+    kill_rxout  : in  std_logic_vector(NLINK downto 1);   -- Kill DCFEB by no output
+    kill_rxpd   : in  std_logic_vector(NLINK downto 1);   -- Kill bad DCFEB with power down RX
 
     -- CFEB data FIFO full signals
     fifo_full   : in std_logic_vector(NLINK downto 1);   -- Flag for FIFO full
@@ -142,6 +143,14 @@ architecture Behavioral of mgt_cfeb is
       );
   end component;
 
+  -- Temporary debugging
+  component ila_1 is
+    port (
+      clk : in std_logic := '0';
+      probe0 : in std_logic_vector(127 downto 0) := (others=> '0')
+      );
+  end component;
+
   -- Synchronize the latched link down reset input and the VIO-driven signal into the free-running clock domain
   -- signals passed to wizard
   signal gthrxn_int : std_logic_vector(NLINK-1 downto 0) := (others => '0');
@@ -229,7 +238,7 @@ architecture Behavioral of mgt_cfeb is
   signal rxpd_int : std_logic_vector(2*NLINK-1 downto 0) := (others => '0');
 
   -- debug signals
-  signal ila_data_rx: std_logic_vector(191 downto 0) := (others=> '0');
+  signal ila_data_rx: std_logic_vector(127 downto 0) := (others=> '0');
 
 begin
 
@@ -246,8 +255,8 @@ begin
     RXDATA_FEB7 <= rxdata_o_ch(6);
   end generate;
 
-  RXD_VALID <= rxd_valid_ch and (not KILL_RX);
-  CRC_VALID <= crc_valid_ch and (not KILL_RX);
+  RXD_VALID <= rxd_valid_ch and (not KILL_RXOUT) when rxready_int = '1' else (others => '0');
+  CRC_VALID <= crc_valid_ch and (not KILL_RXOUT) when rxready_int = '1' else (others => '0');
   BAD_RX <= bad_rx_ch;
 
   gen_rx_quality : for I in 0 to NLINK-1 generate
@@ -261,13 +270,13 @@ begin
     bad_rx_ch(I) <= '1' when (rxbyteisaligned_int(I) = '0') or (rxbyterealign_int(I) = '1') or (or_reduce(rxdisperr_ch(I)) = '1') else '0';
 
     -- Power down the RX for killed DCFEB
-    rxpd_int(2*I+1 downto 2*I) <= "11" when KILL_RX(I+1) = '1' else "00";
+    rxpd_int(2*I+1 downto 2*I) <= "11" when KILL_RXPD(I+1) = '1' else "00";
 
     -- Module for RXDATA validity checks, working for 16 bit datawidth only
     rx_data_check_i : rx_frame_proc
       port map (
         CLK => gtwiz_userclk_rx_usrclk2_int,
-        RST => reset or KILL_RX(I+1),
+        RST => reset or KILL_RXOUT(I+1),
         RXDATA => rxdata_i_ch(I),
         RX_IS_K => rxcharisk_ch(I),
         RXDISPERR => rxdisperr_ch(I),
@@ -370,5 +379,50 @@ begin
       txpmaresetdone_out                 => txpmaresetdone_int
       );
 
+
+  ---------------------------------------------------------------------------------------------------------------------
+  -- Debugging
+  ---------------------------------------------------------------------------------------------------------------------
+  -- Monitor channel 1 (DCFEB2) only
+  ila_data_rx(15 downto 0)  <= rxdata_o_ch(1);
+  ila_data_rx(31 downto 16) <= rxdata_i_ch(1);
+  ila_data_rx(33 downto 32) <= codevalid_ch(1);
+  ila_data_rx(34)           <= rxd_valid_ch(1);
+  ila_data_rx(35)           <= crc_valid_ch(1);
+  ila_data_rx(36)           <= good_crc_ch(1);
+  ila_data_rx(37)           <= bad_rx_ch(1);
+  ila_data_rx(38)           <= rxbyteisaligned_int(1);
+  ila_data_rx(39)           <= rxbyterealign_int(1);
+  ila_data_rx(41 downto 40) <= rxcharisk_ch(1);
+  ila_data_rx(43 downto 42) <= rxdisperr_ch(1);
+  ila_data_rx(45 downto 44) <= rxchariscomma_ch(1);
+  ila_data_rx(47 downto 46) <= rxnotintable_ch(1);
+
+  -- Monitor channel 3 (DCFEB4) only
+  ila_data_rx(63 downto 48) <= rxdata_o_ch(3);
+  ila_data_rx(79 downto 64) <= rxdata_i_ch(3);
+  ila_data_rx(81 downto 80) <= codevalid_ch(3);
+  ila_data_rx(82)           <= rxd_valid_ch(3);
+  ila_data_rx(83)           <= crc_valid_ch(3);
+  ila_data_rx(84)           <= good_crc_ch(3);
+  ila_data_rx(85)           <= bad_rx_ch(3);
+  ila_data_rx(86)           <= rxbyteisaligned_int(3);
+  ila_data_rx(87)           <= rxbyterealign_int(3);
+  ila_data_rx(89 downto 88) <= rxcharisk_ch(3);
+  ila_data_rx(91 downto 90) <= rxdisperr_ch(3);
+  ila_data_rx(93 downto 92) <= rxchariscomma_ch(3);
+  ila_data_rx(95 downto 94) <= rxnotintable_ch(3);
+
+  -- Input control signals
+  ila_data_rx(102 downto 96)  <= kill_rxout;
+  ila_data_rx(109 downto 103) <= kill_rxpd;
+  ila_data_rx(110)            <= reset;
+
+
+  mgt_ddu_ila_inst : ila_1
+    port map(
+      clk => gtwiz_userclk_rx_usrclk2_int,
+      probe0 => ila_data_rx
+      );
 
 end Behavioral;

@@ -6,7 +6,6 @@ use ieee.std_logic_misc.all;
 library unisim;
 use unisim.vcomponents.all;
 
---library work;
 use work.ucsb_types.all;
 
 entity odmb7_ucsb_dev is
@@ -38,6 +37,7 @@ entity odmb7_ucsb_dev is
     --------------------
     -- Signals controlled by ODMB_VME
     --------------------
+    -- From/To VME controller to/from MBV
     VME_DATA        : inout std_logic_vector(15 downto 0); -- Bank 48
     VME_GAP_B       : in std_logic;                        -- Bank 48
     VME_GA_B        : in std_logic_vector(4 downto 0);     -- Bank 48
@@ -56,6 +56,7 @@ entity odmb7_ucsb_dev is
     KUS_VME_DIR     : out std_logic;                       -- Bank 44
     VME_DTACK_KUS_B : out std_logic;                       -- Bank 44
 
+    -- From/To PPIB (connectors J3 and J4)
     DCFEB_TCK_P    : out std_logic_vector(NCFEB downto 1); -- Bank 68
     DCFEB_TCK_N    : out std_logic_vector(NCFEB downto 1); -- Bank 68
     DCFEB_TMS_P    : out std_logic;                        -- Bank 68
@@ -523,7 +524,8 @@ architecture Behavioral of odmb7_ucsb_dev is
       crc_valid    : out std_logic_vector(NLINK downto 1);   -- Flag for valid CRC
       rxready      : out std_logic;                          -- Flag for rx reset done
       bad_rx       : out std_logic_vector(NLINK downto 1);   -- Flag for fiber errors
-      kill_rx      : in  std_logic_vector(NLINK downto 1);   -- Power down channel of killed DCFEB
+      kill_rxout   : in  std_logic_vector(NLINK downto 1);   -- Kill DCFEB by no output
+      kill_rxpd    : in  std_logic_vector(NLINK downto 1);   -- Kill bad DCFEB with power down RX
       fifo_full    : in  std_logic_vector(NLINK downto 1);   -- Flag for FIFO full
       fifo_afull   : in  std_logic_vector(NLINK downto 1);   -- Flag for FIFO almost full
       prbs_type    : in  std_logic_vector(3 downto 0);
@@ -854,7 +856,7 @@ architecture Behavioral of odmb7_ucsb_dev is
   --------------------------------------
   constant DDU_NTXLINK : integer := 4;
   constant DDU_NRXLINK : integer := 4;
-  constant DDUTXDWIDTH : integer := 32;
+  constant DDUTXDWIDTH : integer := 16;
   constant DDURXDWIDTH : integer := 16;
 
   signal usrclk_ddu_tx : std_logic; -- USRCLK for TX data preparation
@@ -1481,7 +1483,8 @@ begin
       crc_valid    => dcfeb_crc_valid,
       rxready      => dcfeb_rxready,
       bad_rx       => dcfeb_bad_rx,
-      kill_rx      => kill(7 downto 1),
+      kill_rxout   => kill(7 downto 1),
+      kill_rxpd    => (others => '0'),
       fifo_full    => dcfeb_datafifo_full,
       fifo_afull   => dcfeb_datafifo_afull,
       prbs_type    => mgt_prbs_type,
