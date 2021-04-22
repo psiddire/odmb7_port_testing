@@ -145,6 +145,19 @@ entity ODMB_VME is
     DCFEB_RXPRBSERR      : in  std_logic;
     DCFEB_PRBS_ERR_CNT   : in  std_logic_vector(15 downto 0);
 
+    -------------------
+    -- Voltage monitoring through MAX127 chips
+
+    ADC_CS0_18     : out std_logic;
+    ADC_CS1_18     : out std_logic;
+    ADC_CS2_18     : out std_logic;
+    ADC_CS3_18     : out std_logic;
+    ADC_CS4_18     : out std_logic;
+    ADC_DIN_18     : out std_logic;
+    ADC_SCK_18     : out std_logic; 
+    ADC_DOUT_18    : in  std_logic;
+    -------------------
+
     --------------------
     -- Other
     --------------------
@@ -316,6 +329,37 @@ architecture Behavioral of ODMB_VME is
       SPI_NCMDS_SPIINTR         : in unsigned(15 downto 0);
       --debug
       DIAGOUT                   : out std_logic_vector(17 downto 0)
+      );
+  end component;
+
+  component SYSTEM_MON is
+    port (
+      OUTDATA : out std_logic_vector(15 downto 0);
+      INDATA  : in  std_logic_vector(15 downto 0);
+      DTACK   : out std_logic;
+
+      ADC_CS0_18     : out std_logic;
+      ADC_CS1_18     : out std_logic;
+      ADC_CS2_18     : out std_logic;
+      ADC_CS3_18     : out std_logic;
+      ADC_CS4_18     : out std_logic;
+      ADC_DIN_18     : out std_logic;
+      ADC_SCK_18     : out std_logic; 
+      ADC_DOUT_18    : in  std_logic;
+
+      SLOWCLK : in std_logic;
+      FASTCLK : in std_logic;
+      RST     : in std_logic;
+
+      DEVICE  : in std_logic;
+      STROBE  : in std_logic;
+      COMMAND : in std_logic_vector(9 downto 0);
+      WRITER  : in std_logic
+
+      --VP    : in std_logic;
+      --VN    : in std_logic;
+      --VAUXP : in std_logic_vector(15 downto 0);
+      --VAUXN : in std_logic_vector(15 downto 0)
       );
   end component;
 
@@ -708,6 +752,36 @@ begin
         SPI_NCMDS_SPICTRL => spi_ncmds_spictrl,
         SPI_NCMDS_SPIINTR => spi_ncmds_spiintr,
         DIAGOUT => open
+      );
+
+  DEV7_SYSMON : SYSTEM_MON
+    port map(
+      OUTDATA => outdata_dev(7),
+      INDATA => VME_DATA_IN,
+      DTACK   => dtack_dev(7),
+
+      SLOWCLK => CLK1P25,
+      FASTCLK => CLK40,
+      RST     => rst,
+
+      DEVICE  => device(7),
+      STROBE  => strobe,
+      COMMAND => cmd,
+      WRITER  => vme_write_b,
+
+      ADC_CS0_18  =>  ADC_CS0_18,  
+      ADC_CS1_18  =>  ADC_CS1_18,  
+      ADC_CS2_18  =>  ADC_CS2_18,  
+      ADC_CS3_18  =>  ADC_CS3_18,  
+      ADC_CS4_18  =>  ADC_CS4_18,  
+      ADC_DIN_18  =>  ADC_DIN_18,  
+      ADC_SCK_18  =>  ADC_SCK_18,  
+      ADC_DOUT_18 =>  ADC_DOUT_18 
+
+      --VP    => VP,
+      --VN    => VN,
+      --VAUXP => VAUXP,
+      --VAUXN => VAUXN
       );
   
   DEV8_LVDBMON : LVDBMON

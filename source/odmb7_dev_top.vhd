@@ -194,6 +194,18 @@ entity odmb7_ucsb_dev is
     SYSMON_N      : in std_logic_vector(15 downto 0);
 
     --------------------------------
+    -- Voltage monitoring ports
+    --------------------------------
+    ADC_CS0_18    : out std_logic; -- Bank 46
+    ADC_CS1_18    : out std_logic; -- Bank 46 
+    ADC_CS2_18    : out std_logic; -- Bank 46 
+    ADC_CS3_18    : out std_logic; -- Bank 46 
+    ADC_CS4_18    : out std_logic; -- Bank 46 
+    ADC_DIN_18    : out std_logic; -- Bank 46 
+    ADC_SCK_18    : out std_logic; -- Bank 46 
+    ADC_DOUT_18   : in std_logic;   -- Bank 46
+
+    --------------------------------
     -- Others
     --------------------------------
     LEDS_CFV      : out std_logic_vector(11 downto 0)
