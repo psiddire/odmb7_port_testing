@@ -102,7 +102,7 @@ module rx_frame_proc
      begin
 	idle <= (RX_IS_K == 2'b01)  && ((RXDATA[15:0] == IDLE1) || (RXDATA[15:0] == IDLE2));
 	car_xtend <= (RX_IS_K[1] == 1'b1) && (RXDATA[15:8] == K23_7) || (RX_IS_K[0] == 1'b1) && (RXDATA[7:0] == K23_7);
-	err_prop <= (RX_IS_K[1] == 1'b1) && (RXDATA[15:8] == K30_7) || (RX_IS_K[0] == 1'b1) && (RXDATA[7:0] == K30_7);
+        ;	err_prop <= (RX_IS_K[1] == 1'b1) && (RXDATA[15:8] == K30_7) || (RX_IS_K[0] == 1'b1) && (RXDATA[7:0] == K30_7); // 
 	wrng_sop <= (RX_IS_K[1] == 1'b1) && (RXDATA[15:8] == K27_7);
 	sop <= (RX_IS_K[0] == 1'b1) && (RXDATA[7:0]  == K27_7);
 	eop_odd  <= (RX_IS_K[1] == 1'b1) && (RXDATA[15:8] == K29_7);
