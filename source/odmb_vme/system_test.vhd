@@ -70,11 +70,11 @@ architecture SYSTEM_TEST_Arch of SYSTEM_TEST is
   component ila_2 is
     port (
       clk : in std_logic := '0';
-      probe0 : in std_logic_vector(255 downto 0) := (others=> '0')
+      probe0 : in std_logic_vector(383 downto 0) := (others=> '0')
       );
   end component;
 
-  signal ila_data : std_logic_vector(255 downto 0) := (others => '0');
+  signal ila_data : std_logic_vector(383 downto 0) := (others => '0');
   signal outdata_inner : std_logic_vector(15 downto 0);
   signal dtack_inner : std_logic;
 
