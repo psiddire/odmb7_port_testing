@@ -21,6 +21,16 @@ set_clock_groups -group [get_clocks lf_clk -include_generated_clocks] -asynchron
 # set_property C_CLK_INPUT_FREQ_HZ 80000000 [get_debug_cores dbg_hub]
 # set_property C_ENABLE_CLK_DIVIDER true [get_debug_cores dbg_hub]
 
+# # ----------------------------------
+# # Set dedicated clock pin false
+# # ----------------------------------
+# set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets CCB_CMD_S]
+# set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets CCB_DATA_S]
+# set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets CCB_BX0_B]
+# set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets CCB_BX_RST_B]
+# set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets CCB_CLKEN]
+# set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets CCB_EVCNTRES]
+
 # ----------------------------------
 # Create the MGT reference clocks
 # ----------------------------------

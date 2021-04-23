@@ -386,11 +386,11 @@ begin
   ila_data_rx(33 downto 32)   <= ch0_rxchariscomma;
   ila_data_rx(37 downto 36)   <= ch0_rxnotintable;
 
-  mgt_spy_ila_inst : ila_1
-    port map(
-      clk => gtwiz_userclk_rx_usrclk2_int,
-      probe0 => ila_data_rx
-      );
+  -- mgt_spy_ila_inst : ila_1
+  --   port map(
+  --     clk => gtwiz_userclk_rx_usrclk2_int,
+  --     probe0 => ila_data_rx
+  --     );
 
 
 end Behavioral;

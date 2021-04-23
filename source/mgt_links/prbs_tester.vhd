@@ -505,21 +505,21 @@ begin
       probe_out3 => global_reset
       );
 
-  spy_tx_ila_inst : ila_1
-    port map (
-      clk => usrclk_spy_tx,
-      probe0 => ila_spy_tx
-      );
+  -- spy_tx_ila_inst : ila_1
+  --   port map (
+  --     clk => usrclk_spy_tx,
+  --     probe0 => ila_spy_tx
+  --     );
 
   ila_spy_tx(15 downto 0)   <= txdata_spy_int;
   ila_spy_tx(16)            <= txd_valid_spy_int;
   ila_spy_tx(34 downto 19)  <= std_logic_vector(txd_spy_init_ctr);
 
-  spy_rx_ila_inst : ila_1
-    port map (
-      clk => usrclk_spy_rx,
-      probe0 => ila_spy_rx
-      );
+  -- spy_rx_ila_inst : ila_1
+  --   port map (
+  --     clk => usrclk_spy_rx,
+  --     probe0 => ila_spy_rx
+  --     );
 
   ila_spy_rx(15 downto 0)   <= rxdata_spy;
   ila_spy_rx(16)            <= rxd_valid_spy;
@@ -527,11 +527,11 @@ begin
   ila_spy_rx(18)            <= rxready_spy;
   ila_spy_rx(34 downto 19)  <= prbs_anyerr_spy;
 
-  ddu_tx_ila_inst : ila_1
-    port map (
-      clk => usrclk_ddu_tx,
-      probe0 => ila_ddu_tx
-      );
+  -- ddu_tx_ila_inst : ila_1
+  --   port map (
+  --     clk => usrclk_ddu_tx,
+  --     probe0 => ila_ddu_tx
+  --     );
 
   -- ila_ddu_tx(31 downto 0)   <= txdata_ddu_int;
   ila_ddu_tx(15 downto 0)   <= txdata_ddu_prbs_int;
@@ -540,11 +540,11 @@ begin
   ila_ddu_tx(48 downto 33)  <= std_logic_vector(txd_ddu_init_ctr);
   ila_ddu_tx(64 downto 49)  <= txdata_spy_int;
 
-  ddu_rx_ila_inst : ila_1
-    port map (
-      clk => usrclk_ddu_rx,
-      probe0 => ila_ddu_rx
-      );
+  -- ddu_rx_ila_inst : ila_1
+  --   port map (
+  --     clk => usrclk_ddu_rx,
+  --     probe0 => ila_ddu_rx
+  --     );
 
   ila_ddu_rx(15 downto 0)   <= rxdata_ddu_ch(1);
   ila_ddu_rx(31 downto 16)  <= rxdata_ddu_ch(3);

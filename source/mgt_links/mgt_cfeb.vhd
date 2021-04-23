@@ -144,10 +144,10 @@ architecture Behavioral of mgt_cfeb is
   end component;
 
   -- Temporary debugging
-  component ila_1 is
+  component ila_2 is
     port (
       clk : in std_logic := '0';
-      probe0 : in std_logic_vector(127 downto 0) := (others=> '0')
+      probe0 : in std_logic_vector(383 downto 0) := (others=> '0')
       );
   end component;
 
@@ -238,7 +238,9 @@ architecture Behavioral of mgt_cfeb is
   signal rxpd_int : std_logic_vector(2*NLINK-1 downto 0) := (others => '0');
 
   -- debug signals
-  signal ila_data_rx: std_logic_vector(127 downto 0) := (others=> '0');
+  signal ila_data_rx : std_logic_vector(383 downto 0) := (others=> '0');
+  type t_ilad_arr is array (integer range <>) of std_logic_vector(47 downto 0);
+  signal ila_data_ch : t_ilad_arr(NLINK-1 downto 0);
 
 begin
 
@@ -384,42 +386,31 @@ begin
   -- Debugging
   ---------------------------------------------------------------------------------------------------------------------
   -- Monitor channel 1 (DCFEB2) only
-  ila_data_rx(15 downto 0)  <= rxdata_o_ch(1);
-  ila_data_rx(31 downto 16) <= rxdata_i_ch(1);
-  ila_data_rx(33 downto 32) <= codevalid_ch(1);
-  ila_data_rx(34)           <= rxd_valid_ch(1);
-  ila_data_rx(35)           <= crc_valid_ch(1);
-  ila_data_rx(36)           <= good_crc_ch(1);
-  ila_data_rx(37)           <= bad_rx_ch(1);
-  ila_data_rx(38)           <= rxbyteisaligned_int(1);
-  ila_data_rx(39)           <= rxbyterealign_int(1);
-  ila_data_rx(41 downto 40) <= rxcharisk_ch(1);
-  ila_data_rx(43 downto 42) <= rxdisperr_ch(1);
-  ila_data_rx(45 downto 44) <= rxchariscomma_ch(1);
-  ila_data_rx(47 downto 46) <= rxnotintable_ch(1);
+  ila_data_assign : for I in 0 to NLINK-1 generate
+  begin
+    ila_data_ch(I)(15 downto 0)  <= rxdata_o_ch(I);
+    ila_data_ch(I)(31 downto 16) <= rxdata_i_ch(I);
+    ila_data_ch(I)(33 downto 32) <= codevalid_ch(I);
+    ila_data_ch(I)(34)           <= rxd_valid_ch(I);
+    ila_data_ch(I)(35)           <= crc_valid_ch(I);
+    ila_data_ch(I)(36)           <= good_crc_ch(I);
+    ila_data_ch(I)(37)           <= bad_rx_ch(I);
+    ila_data_ch(I)(38)           <= rxbyteisaligned_int(I);
+    ila_data_ch(I)(39)           <= rxbyterealign_int(I);
+    ila_data_ch(I)(41 downto 40) <= rxcharisk_ch(I);
+    ila_data_ch(I)(43 downto 42) <= rxdisperr_ch(I);
+    ila_data_ch(I)(45 downto 44) <= rxchariscomma_ch(I);
+    ila_data_ch(I)(47 downto 46) <= rxnotintable_ch(I);
 
-  -- Monitor channel 3 (DCFEB4) only
-  ila_data_rx(63 downto 48) <= rxdata_o_ch(3);
-  ila_data_rx(79 downto 64) <= rxdata_i_ch(3);
-  ila_data_rx(81 downto 80) <= codevalid_ch(3);
-  ila_data_rx(82)           <= rxd_valid_ch(3);
-  ila_data_rx(83)           <= crc_valid_ch(3);
-  ila_data_rx(84)           <= good_crc_ch(3);
-  ila_data_rx(85)           <= bad_rx_ch(3);
-  ila_data_rx(86)           <= rxbyteisaligned_int(3);
-  ila_data_rx(87)           <= rxbyterealign_int(3);
-  ila_data_rx(89 downto 88) <= rxcharisk_ch(3);
-  ila_data_rx(91 downto 90) <= rxdisperr_ch(3);
-  ila_data_rx(93 downto 92) <= rxchariscomma_ch(3);
-  ila_data_rx(95 downto 94) <= rxnotintable_ch(3);
+    ila_data_rx(48*I+47 downto 48*I) <= ila_data_ch(I);
+  end generate ila_data_assign;
 
   -- Input control signals
-  ila_data_rx(102 downto 96)  <= kill_rxout;
-  ila_data_rx(109 downto 103) <= kill_rxpd;
-  ila_data_rx(110)            <= reset;
+  ila_data_rx(352 downto 346)  <= kill_rxout;
+  ila_data_rx(359 downto 353) <= kill_rxpd;
+  ila_data_rx(360)            <= reset;
 
-
-  mgt_ddu_ila_inst : ila_1
+  mgt_ddu_ila_inst : ila_2
     port map(
       clk => gtwiz_userclk_rx_usrclk2_int,
       probe0 => ila_data_rx
