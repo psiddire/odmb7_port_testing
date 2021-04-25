@@ -113,7 +113,7 @@ begin
   do_voltage_mon <= w_vol_mon or r_vol_mon;
   -- this signal is not actually used in reading dout_data_inner
   which_chip <= CMDDEV(2 downto 0) when (w_vol_mon = '1') else "000";
-  which_channel <= INDATA when (do_voltage_mon = '1') else x"0";
+  which_channel <= INDATA(3 downto 0) when (do_voltage_mon = '1') else x"0";
 
   -- when w_vol_mon has a rising edge, trigger a sequence sent to MAX1271
   u1_oneshot : oneshot port map (trigger => w_vol_mon, clk => SLOWCLK, pulse => startchannelvalid);
@@ -135,8 +135,8 @@ begin
               which_chip_inner <= which_chip;
               which_channel_inner <= which_channel;
 
-              if rising_edge(w_vol_mon) then
-                 csstate <= S_CS_SET;
+              if (startchannelvalid = '1') then
+                 csstate <= S_CS_SET;   
               end if;
 
           when S_CS_SET =>
@@ -147,6 +147,12 @@ begin
               when x"3" => ADC_CS2_18 <= '0'; 
               when x"4" => ADC_CS3_18 <= '0'; 
               when x"5" => ADC_CS4_18 <= '0'; 
+              when others =>
+                ADC_CS0_18 <= '1';
+                ADC_CS1_18 <= '1';
+                ADC_CS2_18 <= '1';
+                ADC_CS3_18 <= '1';
+                ADC_CS4_18 <= '1';
             end case;
 
             -- when starting read ADCs from MAX127, 8 readings will be returned consectively
