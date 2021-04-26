@@ -1660,34 +1660,34 @@ begin
   -------------------------------------------------------------------------------------------
   -- SYSMON module instantiation
   -------------------------------------------------------------------------------------------
-  sysmone1_inst : SYSMONE1
-    port map (
-      ALM => open,
-      OT => open,
-      DO => open,
-      DRDY => open,
-      BUSY => open,
-      CHANNEL => open,
-      EOC => open,
-      EOS => open,
-      JTAGBUSY => open,
-      JTAGLOCKED => open,
-      JTAGMODIFIED => open,
-      MUXADDR => open,
-      VAUXN => SYSMON_N, -- 16 bits AD[0-15]N
-      VAUXP => SYSMON_P, -- 16 bits AD[0-15]P
-      CONVST => '0',
-      CONVSTCLK => '0',
-      RESET => '0',
-      VN => '0',
-      VP => '0',
-      DADDR => X"00",
-      DCLK => '0',
-      DEN => '0',
-      DI => X"0000",
-      DWE => '0',
-      I2C_SCLK => '0',
-      I2C_SDA => '0'
-      );
+--  sysmone1_inst : SYSMONE1
+--    port map (
+--      ALM => open,
+--      OT => open,
+--      DO => open,
+--      DRDY => open,
+--      BUSY => open,
+--      CHANNEL => open,
+--      EOC => open,
+--      EOS => open,
+--      JTAGBUSY => open,
+--      JTAGLOCKED => open,
+--      JTAGMODIFIED => open,
+--      MUXADDR => open,
+--      VAUXN => SYSMON_N, -- 16 bits AD[0-15]N
+--      VAUXP => SYSMON_P, -- 16 bits AD[0-15]P
+--      CONVST => '0',
+--      CONVSTCLK => '0',
+--      RESET => '0',
+--      VN => '0',
+--      VP => '0',
+--      DADDR => X"00",
+--      DCLK => '0',
+--      DEN => '0',
+--      DI => X"0000",
+--      DWE => '0',
+--      I2C_SCLK => '0',
+--      I2C_SDA => '0'
+--      );
 
 end Behavioral;
