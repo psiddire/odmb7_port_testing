@@ -268,7 +268,7 @@ architecture Behavioral of odmb7_ucsb_dev is
 
   component ODMB_VME is
     generic (
-      NCFEB       : integer range 1 to 7 := NCFEB  -- Number of DCFEBS, 7 for ME1/1, 5
+      NCFEB       : integer range 1 to 7 := 7  -- Number of DCFEBS, 7 for ME1/1, 5
       );
     port (
       --------------------
@@ -381,8 +381,8 @@ architecture Behavioral of odmb7_ucsb_dev is
       DDU_PRBS_RX_EN       : out std_logic_vector(3 downto 0);
       DDU_PRBS_TST_CNT     : out std_logic_vector(15 downto 0);
       DDU_PRBS_ERR_CNT     : in  std_logic_vector(15 downto 0);
-      SPY_PRBS_TX_EN       : out std_logic;
-      SPY_PRBS_RX_EN       : out std_logic;
+      SPY_PRBS_TX_EN       : out std_logic_vector(0 downto 0);
+      SPY_PRBS_RX_EN       : out std_logic_vector(0 downto 0);
       SPY_PRBS_TST_CNT     : out std_logic_vector(15 downto 0);
       SPY_PRBS_ERR_CNT     : in  std_logic_vector(15 downto 0);
       DCFEB_PRBS_FIBER_SEL : out std_logic_vector(3 downto 0);
@@ -391,6 +391,18 @@ architecture Behavioral of odmb7_ucsb_dev is
       DCFEB_PRBS_RD_EN     : out std_logic;
       DCFEB_RXPRBSERR      : in  std_logic;
       DCFEB_PRBS_ERR_CNT   : in  std_logic_vector(15 downto 0);
+
+      -------------------
+      -- Voltage monitoring through MAX127 chips
+
+      ADC_CS0_18     : out std_logic;
+      ADC_CS1_18     : out std_logic;
+      ADC_CS2_18     : out std_logic;
+      ADC_CS3_18     : out std_logic;
+      ADC_CS4_18     : out std_logic;
+      ADC_DIN_18     : out std_logic;
+      ADC_SCK_18     : out std_logic; 
+      ADC_DOUT_18    : in  std_logic;
 
       --------------------
       -- Other
@@ -464,6 +476,10 @@ architecture Behavioral of odmb7_ucsb_dev is
   end component;
 
   component mgt_spy is
+    generic (
+      NLINK     : integer range 1 to 20 := 1;  -- number of (physical) links
+      DATAWIDTH  : integer := 16               -- receiver user data width
+      );
     port (
       mgtrefclk       : in  std_logic; -- buffer'ed reference clock signal
       txusrclk        : out std_logic; -- USRCLK for TX data preparation
@@ -476,15 +492,15 @@ architecture Behavioral of odmb7_ucsb_dev is
       txready         : out std_logic; -- Flag for tx reset done
       rxready         : out std_logic; -- Flag for rx reset done
       txdata          : in std_logic_vector(15 downto 0);  -- Data to be transmitted
-      txd_valid       : in std_logic;   -- Flag for tx data valid
+      txd_valid       : in std_logic_vector(NLINK-1 downto 0);   -- Flag for tx data valid
       txdiffctrl      : in std_logic_vector(3 downto 0);   -- Controls the TX voltage swing
       loopback        : in std_logic_vector(2 downto 0);   -- For internal loopback tests
       rxdata          : out std_logic_vector(15 downto 0);  -- Data received
-      rxd_valid       : out std_logic;   -- Flag for valid data;
-      bad_rx          : out std_logic;   -- Flag for fiber errors;
+      rxd_valid       : out std_logic_vector(NLINK-1 downto 0);   -- Flag for valid data;
+      bad_rx          : out std_logic_vector(NLINK-1 downto 0);   -- Flag for fiber errors;
       prbs_type       : in  std_logic_vector(3 downto 0);
-      prbs_tx_en      : in  std_logic;
-      prbs_rx_en      : in  std_logic;
+      prbs_tx_en      : in  std_logic_vector(NLINK-1 downto 0);
+      prbs_rx_en      : in  std_logic_vector(NLINK-1 downto 0);
       prbs_tst_cnt    : in  std_logic_vector(15 downto 0);
       prbs_err_cnt    : out std_logic_vector(15 downto 0);
       reset           : in  std_logic
@@ -504,10 +520,10 @@ architecture Behavioral of odmb7_ucsb_dev is
       daq_rx_p        : in  std_logic;
       rxready         : out std_logic; -- Flag for rx reset done
       rxdata          : out std_logic_vector(15 downto 0);  -- Data received
-      rxd_valid       : out std_logic;   -- Flag for valid data;
-      bad_rx          : out std_logic;   -- Flag for fiber errors;
+      rxd_valid       : out std_logic_vector(NLINK-1 downto 0);   -- Flag for valid data;
+      bad_rx          : out std_logic_vector(NLINK-1 downto 0);   -- Flag for fiber errors;
       prbs_type       : in  std_logic_vector(3 downto 0);
-      prbs_rx_en      : in  std_logic;
+      prbs_rx_en      : in  std_logic_vector(NLINK-1 downto 0);
       prbs_tst_cnt    : in  std_logic_vector(15 downto 0);
       prbs_err_cnt    : out std_logic_vector(15 downto 0);
       reset           : in  std_logic
@@ -591,6 +607,8 @@ architecture Behavioral of odmb7_ucsb_dev is
   component prbs_tester is
     generic (
       DDU_NRXLINK  : integer := 1;
+      SPY_NLINK  : integer := 1;
+      ALCT_NLINK  : integer := 1;
       SPYDATAWIDTH : integer := 16;
       FEBDATAWIDTH : integer := 16;
       DDUTXDWIDTH  : integer := 32;
@@ -603,10 +621,10 @@ architecture Behavioral of odmb7_ucsb_dev is
       -- Pattern generation and checking for SPY channel
       usrclk_spy_tx  : in std_logic; -- USRCLK for SPY TX data generation
       txdata_spy     : out std_logic_vector(SPYDATAWIDTH-1 downto 0); -- PRBS data out
-      txd_valid_spy  : out std_logic;
+      txd_valid_spy  : out std_logic_vector(SPY_NLINK-1 downto 0);
       usrclk_spy_rx  : in std_logic;  -- USRCLK for SPY RX data readout
       rxdata_spy     : in std_logic_vector(SPYDATAWIDTH-1 downto 0); -- PRBS data out
-      rxd_valid_spy  : in std_logic;
+      rxd_valid_spy  : in std_logic_vector(SPY_NLINK-1 downto 0);
       rxready_spy    : in std_logic; -- Flag for rx reset done
       -- Pattern generation for mgt_ddu
       usrclk_ddu_tx  : in std_logic; -- USRCLK for SPY TX data generation
@@ -637,7 +655,7 @@ architecture Behavioral of odmb7_ucsb_dev is
       -- Receiver signals for mgt_alct
       usrclk_mgta    : in std_logic; -- USRCLK for RX data readout
       rxdata_alct    : in std_logic_vector(FEBDATAWIDTH-1 downto 0);  -- Data received
-      rxd_valid_alct : in std_logic;
+      rxd_valid_alct : in std_logic_vector(ALCT_NLINK-1 downto 0);
       rxready_alct   : in std_logic; -- Flag for rx reset done
       rxdata_daq8    : in std_logic_vector(FEBDATAWIDTH-1 downto 0);  -- Data received
       rxdata_daq9    : in std_logic_vector(FEBDATAWIDTH-1 downto 0);  -- Data received
@@ -843,6 +861,12 @@ architecture Behavioral of odmb7_ucsb_dev is
   --------------------------------------
   constant SPY_SEL : std_logic := '1';
 
+  --------------------------------------
+  -- MGT signals for SPY channels
+  --------------------------------------
+  constant SPY_NLINK : integer := 1;
+  constant SPYDWIDTH : integer := 16;
+
   signal usrclk_spy_tx : std_logic; -- USRCLK for TX data preparation
   signal usrclk_spy_rx : std_logic; -- USRCLK for RX data readout
   signal spy_rx_n : std_logic;
@@ -850,16 +874,16 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal spy_txready : std_logic; -- Flag for tx reset done
   signal spy_rxready : std_logic; -- Flag for rx reset done
   signal spy_txdata : std_logic_vector(15 downto 0);  -- Data to be transmitted
-  signal spy_txd_valid : std_logic;   -- Flag for tx data valid
+  signal spy_txd_valid : std_logic_vector(SPY_NLINK-1 downto 0);   -- Flag for tx data valid
   signal spy_txdiffctrl : std_logic_vector(3 downto 0);   -- Controls the TX voltage swing
   signal spy_loopback : std_logic_vector(2 downto 0);   -- For internal loopback tests
   signal spy_rxdata : std_logic_vector(15 downto 0);  -- Data received
-  signal spy_rxd_valid : std_logic;   -- Flag for valid data;
-  signal spy_bad_rx : std_logic;   -- Flag for fiber errors;
+  signal spy_rxd_valid : std_logic_vector(SPY_NLINK-1 downto 0);   -- Flag for valid data;
+  signal spy_bad_rx : std_logic_vector(SPY_NLINK-1 downto 0);   -- Flag for fiber errors;
   signal spy_reset : std_logic;
 
-  signal spy_prbs_tx_en : std_logic;
-  signal spy_prbs_rx_en : std_logic;
+  signal spy_prbs_tx_en : std_logic_vector(SPY_NLINK-1 downto 0);
+  signal spy_prbs_rx_en : std_logic_vector(SPY_NLINK-1 downto 0);
   signal spy_prbs_tst_cnt : std_logic_vector(15 downto 0);
   signal spy_prbs_err_cnt : std_logic_vector(15 downto 0) := (others => '0');
 
@@ -870,6 +894,7 @@ architecture Behavioral of odmb7_ucsb_dev is
   constant DDU_NRXLINK : integer := 4;
   constant DDUTXDWIDTH : integer := 16;
   constant DDURXDWIDTH : integer := 16;
+
 
   signal usrclk_ddu_tx : std_logic; -- USRCLK for TX data preparation
   signal usrclk_ddu_rx : std_logic; -- USRCLK for RX data readout
@@ -921,10 +946,13 @@ architecture Behavioral of odmb7_ucsb_dev is
   --------------------------------------
   -- MGT signals for ALCT RX channels
   --------------------------------------
+  constant ALCT_NLINK : integer := 1;
+  constant ALCTDWIDTH : integer := 16;
+
   signal usrclk_mgta : std_logic;
   signal alct_rxdata : std_logic_vector(15 downto 0);  -- Data received
-  signal alct_rxd_valid : std_logic;   -- Flag for valid data;
-  signal alct_bad_rx : std_logic;   -- Flag for valid data;
+  signal alct_rxd_valid : std_logic_vector(ALCT_NLINK-1 downto 0);   -- Flag for valid data;
+  signal alct_bad_rx : std_logic_vector(ALCT_NLINK-1 downto 0);   -- Flag for valid data;
   signal alct_rxready : std_logic; -- Flag for rx reset done
   signal mgta_data_valid : std_logic_vector(4 downto 1);   -- Flag for valid data;
   signal mgta_bad_rx : std_logic_vector(4 downto 1);   -- Flag for fiber errors;
@@ -932,7 +960,7 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal mgta_reset : std_logic;
   signal mgt_reset : std_logic := '0';
 
-  signal alct_prbs_rx_en : std_logic_vector(4 downto 1);
+  signal alct_prbs_rx_en : std_logic_vector(ALCT_NLINK-1 downto 0);
   signal alct_prbs_tst_cnt : std_logic_vector(15 downto 0);
   signal alct_prbs_err_cnt : std_logic_vector(15 downto 0) := (others => '0');
 
@@ -1388,6 +1416,15 @@ begin
       DCFEB_RXPRBSERR      => dcfeb_rxprbserr,
       DCFEB_PRBS_ERR_CNT   => dcfeb_prbs_err_cnt,
 
+      ADC_CS0_18           => ADC_CS0_18, 
+      ADC_CS1_18           => ADC_CS1_18, 
+      ADC_CS2_18           => ADC_CS2_18, 
+      ADC_CS3_18           => ADC_CS3_18, 
+      ADC_CS4_18           => ADC_CS4_18, 
+      ADC_DIN_18           => ADC_DIN_18, 
+      ADC_SCK_18           => ADC_SCK_18,  
+      ADC_DOUT_18          => ADC_DOUT_18, 
+
       DIAGOUT   => diagout_inner,
       RST       => reset,
       PON_RESET => pon_reset
@@ -1518,7 +1555,7 @@ begin
       rxd_valid       => alct_rxd_valid,
       bad_rx          => alct_bad_rx,
       prbs_type       => mgt_prbs_type,
-      prbs_rx_en      => alct_prbs_rx_en(1),
+      prbs_rx_en      => alct_prbs_rx_en(ALCT_NLINK-1 downto 0),
       prbs_tst_cnt    => alct_prbs_tst_cnt,
       prbs_err_cnt    => alct_prbs_err_cnt,
       reset           => opt_reset
@@ -1566,59 +1603,59 @@ begin
   -------------------------------------------------------------------------------------------
   -- Tester
   -------------------------------------------------------------------------------------------
-  u_mgt_tester : prbs_tester
-    generic map (
-      DDU_NRXLINK   => DDU_NRXLINK,
-      SPYDATAWIDTH  => 16,
-      FEBDATAWIDTH  => 16,
-      DDUTXDWIDTH   => DDUTXDWIDTH,
-      DDURXDWIDTH   => DDURXDWIDTH,
-      SPY_PATTERN   => 0,
-      DDU_PATTERN   => 0
-      )
-    port map (
-      sysclk         => cmsclk,
-      usrclk_spy_tx  => usrclk_spy_tx,
-      txdata_spy     => spy_txdata,
-      txd_valid_spy  => spy_txd_valid,
-      usrclk_spy_rx  => usrclk_spy_rx,
-      rxdata_spy     => spy_rxdata,
-      rxd_valid_spy  => spy_rxd_valid,
-      rxready_spy    => spy_rxready,
-      usrclk_ddu_tx  => usrclk_ddu_tx,
-      txdata_ddu1    => ddu_txdata1,
-      txdata_ddu2    => ddu_txdata2,
-      txdata_ddu3    => ddu_txdata3,
-      txdata_ddu4    => ddu_txdata4,
-      txd_valid_ddu  => ddu_txd_valid,
-      usrclk_ddu_rx  => usrclk_ddu_rx,
-      rxdata_ddu1    => ddu_rxdata1,
-      rxdata_ddu2    => ddu_rxdata2,
-      rxdata_ddu3    => ddu_rxdata3,
-      rxdata_ddu4    => ddu_rxdata4,
-      rxd_valid_ddu  => ddu_rxd_valid,
-      rxready_ddu    => ddu_rxready,
-      usrclk_mgtc    => usrclk_mgtc,
-      rxdata_cfeb1   => dcfeb1_data,
-      rxdata_cfeb2   => dcfeb2_data,
-      rxdata_cfeb3   => dcfeb3_data,
-      rxdata_cfeb4   => dcfeb4_data,
-      rxdata_cfeb5   => dcfeb5_data,
-      rxdata_cfeb6   => dcfeb6_data,
-      rxdata_cfeb7   => dcfeb7_data,
-      rxd_valid_mgtc => dcfeb_rxd_valid,
-      rxready_mgtc   => dcfeb_rxready,
-      usrclk_mgta    => usrclk_mgta,
-      rxdata_alct    => alct_rxdata,
-      rxd_valid_alct => alct_rxd_valid,
-      rxready_alct   => alct_rxready,
-      rxdata_daq8    => daq8_rxdata,
-      rxdata_daq9    => daq9_rxdata,
-      rxdata_daq10   => daq10_rxdata,
-      mgta_dvalid    => mgta_data_valid,
-      led_out        => LEDS_CFV(7 downto 0),
-      reset          => mgt_reset
-      );
+  --u_mgt_tester : prbs_tester
+  --  generic map (
+  --    DDU_NRXLINK   => DDU_NRXLINK,
+  --    SPYDATAWIDTH  => 16,
+  --    FEBDATAWIDTH  => 16,
+  --    DDUTXDWIDTH   => DDUTXDWIDTH,
+  --    DDURXDWIDTH   => DDURXDWIDTH,
+  --    SPY_PATTERN   => 0,
+  --    DDU_PATTERN   => 0
+  --    )
+  --  port map (
+  --    sysclk         => cmsclk,
+  --    usrclk_spy_tx  => usrclk_spy_tx,
+  --    txdata_spy     => spy_txdata,
+  --    txd_valid_spy  => spy_txd_valid,
+  --    usrclk_spy_rx  => usrclk_spy_rx,
+  --    rxdata_spy     => spy_rxdata,
+  --    rxd_valid_spy  => spy_rxd_valid,
+  --    rxready_spy    => spy_rxready,
+  --    usrclk_ddu_tx  => usrclk_ddu_tx,
+  --    txdata_ddu1    => ddu_txdata1,
+  --    txdata_ddu2    => ddu_txdata2,
+  --    txdata_ddu3    => ddu_txdata3,
+  --    txdata_ddu4    => ddu_txdata4,
+  --    txd_valid_ddu  => ddu_txd_valid,
+  --    usrclk_ddu_rx  => usrclk_ddu_rx,
+  --    rxdata_ddu1    => ddu_rxdata1,
+  --    rxdata_ddu2    => ddu_rxdata2,
+  --    rxdata_ddu3    => ddu_rxdata3,
+  --    rxdata_ddu4    => ddu_rxdata4,
+  --    rxd_valid_ddu  => ddu_rxd_valid,
+  --    rxready_ddu    => ddu_rxready,
+  --    usrclk_mgtc    => usrclk_mgtc,
+  --    rxdata_cfeb1   => dcfeb1_data,
+  --    rxdata_cfeb2   => dcfeb2_data,
+  --    rxdata_cfeb3   => dcfeb3_data,
+  --    rxdata_cfeb4   => dcfeb4_data,
+  --    rxdata_cfeb5   => dcfeb5_data,
+  --    rxdata_cfeb6   => dcfeb6_data,
+  --    rxdata_cfeb7   => dcfeb7_data,
+  --    rxd_valid_mgtc => dcfeb_rxd_valid,
+  --    rxready_mgtc   => dcfeb_rxready,
+  --    usrclk_mgta    => usrclk_mgta,
+  --    rxdata_alct    => alct_rxdata,
+  --    rxd_valid_alct => alct_rxd_valid,
+  --    rxready_alct   => alct_rxready,
+  --    rxdata_daq8    => daq8_rxdata,
+  --    rxdata_daq9    => daq9_rxdata,
+  --    rxdata_daq10   => daq10_rxdata,
+  --    mgta_dvalid    => mgta_data_valid,
+  --    led_out        => LEDS_CFV(7 downto 0),
+  --    reset          => mgt_reset
+  --    );
 
   -------------------------------------------------------------------------------------------
   -- SYSMON module instantiation

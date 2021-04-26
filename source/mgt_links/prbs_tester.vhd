@@ -18,6 +18,8 @@ use ieee.std_logic_misc.all;
 
 entity prbs_tester is
   generic (
+    SPY_NLINK  : integer := 1;
+    ALCT_NLINK  : integer := 1;
     DDU_NRXLINK  : integer := 1;
     SPYDATAWIDTH : integer := 16;
     FEBDATAWIDTH : integer := 16;
@@ -31,10 +33,10 @@ entity prbs_tester is
     -- Pattern generation and checking for SPY channel
     usrclk_spy_tx  : in std_logic; -- USRCLK for SPY TX data generation
     txdata_spy     : out std_logic_vector(SPYDATAWIDTH-1 downto 0); -- PRBS data out
-    txd_valid_spy  : out std_logic;
+    txd_valid_spy  : out std_logic_vector(SPY_NLINK-1 downto 0);
     usrclk_spy_rx  : in std_logic;  -- USRCLK for SPY RX data readout
     rxdata_spy     : in std_logic_vector(SPYDATAWIDTH-1 downto 0); -- PRBS data out
-    rxd_valid_spy  : in std_logic;
+    rxd_valid_spy  : in std_logic_vector(SPY_NLINK-1 downto 0);
     rxready_spy    : in std_logic; -- Flag for rx reset done
     -- Pattern generation for mgt_ddu
     usrclk_ddu_tx  : in std_logic; -- USRCLK for SPY TX data generation
@@ -65,7 +67,7 @@ entity prbs_tester is
     -- Receiver signals for mgt_alct
     usrclk_mgta    : in std_logic; -- USRCLK for RX data readout
     rxdata_alct    : in std_logic_vector(FEBDATAWIDTH-1 downto 0);  -- Data received
-    rxd_valid_alct : in std_logic;
+    rxd_valid_alct : in std_logic_vector(ALCT_NLINK-1 downto 0);
     rxready_alct   : in std_logic; -- Flag for rx reset done
     rxdata_daq8    : in std_logic_vector(FEBDATAWIDTH-1 downto 0);  -- Data received
     rxdata_daq9    : in std_logic_vector(FEBDATAWIDTH-1 downto 0);  -- Data received
@@ -224,7 +226,7 @@ begin
   end generate;
 
   txdata_spy <= txdata_spy_int;
-  txd_valid_spy <= txd_valid_spy_int;
+  txd_valid_spy(0) <= txd_valid_spy_int;
 
   spy_datagen_cntr : if SPY_PATTERN = 1 generate
     txdata_spy_gen_inst : process (usrclk_spy_tx)
@@ -324,7 +326,7 @@ begin
       RST      => prbsgen_reset_vio_int,
       CLK      => usrclk_spy_rx,
       DATA_IN  => rxdata_spy,
-      EN       => rxd_valid_spy,
+      EN       => rxd_valid_spy(0),
       DATA_OUT => prbs_anyerr_spy
       );
 
@@ -402,7 +404,7 @@ begin
       RST      => prbsgen_reset_vio_int,
       CLK      => usrclk_mgta,
       DATA_IN  => rxdata_alct,
-      EN       => rxd_valid_alct,
+      EN       => rxd_valid_alct(0), --this is potentially problematic if there are 2 ALCT tx.
       DATA_OUT => prbs_anyerr_alct
       );
 
@@ -491,7 +493,7 @@ begin
       clk => sysclk,
       probe_in0 => prbs_match_ddu,
       probe_in1 => prbs_match_cfeb,
-      probe_in2 => rxd_valid_spy,
+      probe_in2 => rxd_valid_spy(0),
       probe_in3 => rxready_ddu,
       probe_in4 => std_logic_vector(spy_rxdata_err_ctr(16 downto 1)),
       probe_in5 => std_logic_vector(ddu_rxdata_err_ctr(1)(16 downto 1)),
@@ -522,7 +524,7 @@ begin
   --     );
 
   ila_spy_rx(15 downto 0)   <= rxdata_spy;
-  ila_spy_rx(16)            <= rxd_valid_spy;
+  ila_spy_rx(16)            <= rxd_valid_spy(0);
   ila_spy_rx(17)            <= rxready_spy;
   ila_spy_rx(18)            <= rxready_spy;
   ila_spy_rx(34 downto 19)  <= prbs_anyerr_spy;

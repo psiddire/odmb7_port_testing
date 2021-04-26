@@ -142,11 +142,11 @@ begin
           when S_CS_SET =>
 
             case which_chip is
-              when x"1" => ADC_CS0_18 <= '0'; 
-              when x"2" => ADC_CS1_18 <= '0'; 
-              when x"3" => ADC_CS2_18 <= '0'; 
-              when x"4" => ADC_CS3_18 <= '0'; 
-              when x"5" => ADC_CS4_18 <= '0'; 
+              when "001" => ADC_CS0_18 <= '0'; 
+              when "010" => ADC_CS1_18 <= '0'; 
+              when "011" => ADC_CS2_18 <= '0'; 
+              when "100" => ADC_CS3_18 <= '0'; 
+              when "101" => ADC_CS4_18 <= '0'; 
               when others =>
                 ADC_CS0_18 <= '1';
                 ADC_CS1_18 <= '1';

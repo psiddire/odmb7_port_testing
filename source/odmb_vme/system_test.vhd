@@ -35,8 +35,8 @@ entity SYSTEM_TEST is
     DDU_PRBS_ERR_CNT : in  std_logic_vector(15 downto 0);
 
     -- PC PRBS signals
-    PC_PRBS_TX_EN   : out std_logic;
-    PC_PRBS_RX_EN   : out std_logic;
+    PC_PRBS_TX_EN   : out std_logic_vector(0 downto 0);
+    PC_PRBS_RX_EN   : out std_logic_vector(0 downto 0);
     PC_PRBS_TST_CNT : out std_logic_vector(15 downto 0);
     PC_PRBS_ERR_CNT : in  std_logic_vector(15 downto 0);
 
@@ -167,10 +167,10 @@ begin
   STROBE_PE : PULSE_EDGE port map (DOUT => strobe_pulse, PULSE1 => open, CLK => SLOWCLK, RST => RST, NPULSE => 1, DIN => STROBE);
 
   DDU_PRBS_RX_EN <= w_ddu_prbs_rx_en;
-  PC_PRBS_RX_EN  <= w_pc_prbs_rx_en;
+  PC_PRBS_RX_EN(0)  <= w_pc_prbs_rx_en;
 
   FDC_DDU_TX_PRBS : FDC port map(Q => DDU_PRBS_TX_EN, C => w_ddu_prbs_tx_en, CLR => RST, D => or_reduce(INDATA));
-  FDC_PC_TX_PRBS  : FDC port map(Q => PC_PRBS_TX_EN, C => w_pc_prbs_tx_en, CLR => RST, D => or_reduce(INDATA));
+  FDC_PC_TX_PRBS  : FDC port map(Q => PC_PRBS_TX_EN(0), C => w_pc_prbs_tx_en, CLR => RST, D => or_reduce(INDATA));
 
   GEN_PRBS : for i in 15 downto 0 generate
   begin

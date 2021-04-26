@@ -23,6 +23,9 @@ use unisim.vcomponents.all;
 use work.ucsb_types.all;
 
 entity ODMB_VME is
+  generic (
+    NCFEB       : integer range 1 to 7 := 7
+  );
   port (
     --------------------
     -- Clock
@@ -134,8 +137,8 @@ entity ODMB_VME is
     DDU_PRBS_RX_EN       : out std_logic_vector(3 downto 0);
     DDU_PRBS_TST_CNT     : out std_logic_vector(15 downto 0);
     DDU_PRBS_ERR_CNT     : in  std_logic_vector(15 downto 0);
-    SPY_PRBS_TX_EN       : out std_logic;
-    SPY_PRBS_RX_EN       : out std_logic;
+    SPY_PRBS_TX_EN       : out std_logic_vector(0 downto 0);
+    SPY_PRBS_RX_EN       : out std_logic_vector(0 downto 0);
     SPY_PRBS_TST_CNT     : out std_logic_vector(15 downto 0);
     SPY_PRBS_ERR_CNT     : in  std_logic_vector(15 downto 0);
     DCFEB_PRBS_FIBER_SEL : out std_logic_vector(3 downto 0);
@@ -412,8 +415,8 @@ architecture Behavioral of ODMB_VME is
       DDU_PRBS_ERR_CNT : in  std_logic_vector(15 downto 0);
 
       -- PC PRBS signals
-      PC_PRBS_TX_EN   : out std_logic;
-      PC_PRBS_RX_EN   : out std_logic;
+      PC_PRBS_TX_EN   : out std_logic_vector(0 downto 0);
+      PC_PRBS_RX_EN   : out std_logic_vector(0 downto 0);
       PC_PRBS_TST_CNT : out std_logic_vector(15 downto 0);
       PC_PRBS_ERR_CNT : in  std_logic_vector(15 downto 0);
 
