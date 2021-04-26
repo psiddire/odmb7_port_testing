@@ -31,16 +31,7 @@ entity SYSTEM_MON is
 end SYSTEM_MON;
 
 architecture SYSTEM_MON_ARCH of SYSTEM_MON is
-  --component PULSE_EDGE is
-  --  port (
-  --    DOUT   : out std_logic;
-  --    PULSE1 : out std_logic;
-  --    CLK    : in  std_logic;
-  --    RST    : in  std_logic;
-  --    NPULSE : in  integer;
-  --    DIN    : in  std_logic
-  --    );
-  --end component;
+
   component oneshot is
     port (
       trigger: in  std_logic;
@@ -49,26 +40,27 @@ architecture SYSTEM_MON_ARCH of SYSTEM_MON is
       );
   end component;
 
-  component odmb7_voltageMon is
+  component voltage_mon is
     port (
-      CLK    : in  std_logic;
-      --CLK_div2    : in  std_logic;
-      CS     : out std_logic;
-      DIN    : out std_logic;
-      SCK    : out std_logic;
-      DOUT   : in  std_logic;
+      CLK      : in  std_logic;
+      -- CLK_div2 : in  std_logic;
+      CS       : out std_logic;
+      DIN      : out std_logic;
+      SCK      : out std_logic;
+      DOUT     : in  std_logic;
       DVOUT    : out std_logic;
-      DATADONE    : out std_logic;
-      DATA   : out std_logic_vector(11 downto 0);
+      DATADONE : out std_logic;
+      DATA     : out std_logic_vector(11 downto 0);
 
       startchannelvalid  : in std_logic
       );
   end component;
 
   -- SYSMON module signals
-  signal dout_sysmon : std_logic_vector(15 downto 0);
-  signal drdy      : std_logic;
-  signal den       : std_logic;
+  signal sysmon_daddr : std_logic_vector(15 downto 0) := (others => '0');
+  signal sysmon_dout  : std_logic_vector(15 downto 0);
+  signal sysmon_drdy  : std_logic;
+  signal sysmon_den   : std_logic := '0';
   signal q_strobe  : std_logic;
   signal q2_strobe : std_logic;
   signal dd_dtack, d_dtack, q_dtack : std_logic;
@@ -84,9 +76,9 @@ architecture SYSTEM_MON_ARCH of SYSTEM_MON is
   signal which_channel_inner : std_logic_vector(3 downto 0); -- there are 8 channels to read per chip
   signal cs_inner: std_logic;
 
-  signal dout_vmon : std_logic_vector(11 downto 0) := x"000";
-  signal dout_vmon_inner : std_logic_vector(11 downto 0) := x"000";
-  signal dout_valid: std_logic := '0';
+  signal vmon_dout : std_logic_vector(11 downto 0) := x"000";
+  signal vmon_dout_inner : std_logic_vector(11 downto 0) := x"000";
+  signal vmon_dout_valid: std_logic := '0';
   signal n_valid: integer := 0;
   signal startchannelvalid: std_logic := '0';
   signal startchannelvalid2: std_logic := '0';
@@ -94,6 +86,7 @@ architecture SYSTEM_MON_ARCH of SYSTEM_MON is
   signal data_done: std_logic := '0';
 
   signal cmddev : std_logic_vector (15 downto 0);
+  signal r_sys_mon: std_logic := '0';
   signal w_vol_mon: std_logic := '0';
   signal r_vol_mon: std_logic := '0';
   signal do_voltage_mon: std_logic := '0';
@@ -105,12 +98,15 @@ begin
   -- decode command
   cmddev <= "000" & DEVICE & COMMAND & "00";
 
+  -- command 71X0, to use the SYSMON module
+  r_sys_mon <= '1' when (device = '1' and WRITER = '1' and do_voltage_mon = '0') else '0';
+
   -- command 720X, where X represent nth MAX1271 chip to read
   w_vol_mon <= '1' when (cmddev(15 downto 4) = x"120" and WRITER = '0') else '0';
   r_vol_mon <= '1' when (cmddev(15 downto 0) = x"1300" and WRITER = '1') else '0';
 
   do_voltage_mon <= w_vol_mon or r_vol_mon;
-  -- this signal is not actually used in reading dout_vmon_inner
+  -- this signal is not actually used in reading vmon_dout_inner
   which_chip <= cmddev(2 downto 0) when (w_vol_mon = '1') else "000";
   which_channel <= INDATA(3 downto 0) when (do_voltage_mon = '1') else x"0";
 
@@ -118,6 +114,27 @@ begin
   u1_oneshot : oneshot port map (trigger => w_vol_mon, clk => SLOWCLK, pulse => startchannelvalid);
   u2_oneshot : oneshot port map (trigger => startchannelvalid, clk => SLOWCLK, pulse => startchannelvalid2);
 
+  -- TODO: add sysmon_dout to OUTDATA and assign sysmon_daddr from COMMAND
+
+  -- Out data selection. 
+  OUTDATA <= x"0" & outdata_inner(15 downto 4) when ( CMDDEV(11 downto 8) = x"1" ) else -- Discarding the 4 LSB
+             x"0" & vmon_dout_inner(11 downto 0) when (r_vol_mon = '1') else
+             (others => 'L');
+
+  -- Enable sysmon output in first full clock cycle after strobe goes high
+  FD_STROBE  : FD port map (Q => q_strobe, C => FASTCLK, D => STROBE);
+  FD_STROBE2 : FD port map (Q => q2_strobe, C => FASTCLK, D => q_strobe);
+  sysmon_den <= '1' when (r_sys_mon = '1' and q2_strobe = '0' and q_strobe = '1') else '0';
+
+  -- DTACK when OUTDATA contains valid data
+  dd_dtack <= device and strobe; -- and drdy;
+  FD_D_DTACK : FDC port map(Q => d_dtack, C => dd_dtack, CLR=> q_dtack, D => '1');
+  FD_Q_DTACK : FD port map(Q => q_dtack, C => SLOWCLK, D => d_dtack);
+  DTACK <= q_dtack;
+
+  -------------------------------------------------------------------------------------------
+  -- Voltage monitoring FSM and instantiation
+  -------------------------------------------------------------------------------------------
   processcs : process (SLOWCLK)
   begin
     if rising_edge(SLOWCLK) then
@@ -147,9 +164,9 @@ begin
 
           -- when starting read ADCs from MAX127, 8 readings will be returned consectively
           -- store one reading at a time per VME command...
-          if (dout_valid = '1') then
+          if (vmon_dout_valid = '1') then
             if (n_valid = (to_integer(signed(which_channel))-1)) then
-              dout_vmon_inner <= dout_vmon;
+              vmon_dout_inner <= vmon_dout;
             end if;
             n_valid <= n_valid + 1;
           end if;
@@ -166,7 +183,7 @@ begin
 
   -- when w_vol_mon goes high, make a startchannelvalid pulse as well as associated cs_inner with one of the 5 CS
   -- one of the selected 5 cs will change back to 1 after datadone
-  u_voltageMon : odmb7_voltageMon
+  u_voltageMon : voltage_mon
     port map (
       CLK  => SLOWCLK, -- 1.25 MHz
       -- CLK_div2  => CLK_div2,
@@ -174,8 +191,8 @@ begin
       DIN  => ADC_DIN,
       SCK  => ADC_SCK,
       DOUT => ADC_DOUT,
-      DVOUT => dout_valid,
-      DATA => dout_vmon,
+      DVOUT => vmon_dout_valid,
+      DATA => vmon_dout,
       DATADONE => data_done,
       startchannelvalid => startchannelvalid2
       );
@@ -183,6 +200,37 @@ begin
   -------------------------------------------------------------------------------------------
   -- SYSMON module instantiation
   -------------------------------------------------------------------------------------------
+
+  -- TODO: Find out the SYSMON configurations and assign the DADDR
+  sysmone1_inst : SYSMONE1
+    port map (
+      ALM => open,
+      OT => open,
+      DO => sysmon_dout,
+      DRDY => sysmon_drdy,
+      BUSY => open,
+      CHANNEL => open,
+      EOC => open,
+      EOS => open,
+      JTAGBUSY => open,
+      JTAGLOCKED => open,
+      JTAGMODIFIED => open,
+      MUXADDR => open,
+      VAUXN => VAUXN, -- 16 bits AD[0-15]N
+      VAUXP => VAUXP, -- 16 bits AD[0-15]P
+      CONVST => '0',
+      CONVSTCLK => '0',
+      RESET => RST,
+      VN => '0',
+      VP => '0',
+      DADDR => sysmon_daddr,
+      DCLK => FASTCLK,
+      DEN => sysmon_den,
+      DI => x"0000",
+      DWE => '0',
+      I2C_SCLK => '0',
+      I2C_SDA => '0'
+      );
 
   -- SYSMON part still need to be ported to work with KU
   --SYSMON_PM : SYSMON
@@ -235,51 +283,5 @@ begin
   --    VN        => VN,
   --    VP        => VP
   --    );
-
-  sysmone1_inst : SYSMONE1
-    port map (
-      ALM => open,
-      OT => open,
-      DO => dout_sysmon,
-      DRDY => drdy,
-      BUSY => open,
-      CHANNEL => open,
-      EOC => open,
-      EOS => open,
-      JTAGBUSY => open,
-      JTAGLOCKED => open,
-      JTAGMODIFIED => open,
-      MUXADDR => open,
-      VAUXN => VAUXN, -- 16 bits AD[0-15]N
-      VAUXP => VAUXP, -- 16 bits AD[0-15]P
-      CONVST => '0',
-      CONVSTCLK => '0',
-      RESET => RST,
-      VN => '0',
-      VP => '0',
-      DADDR => X"00",
-      DCLK => '0',
-      DEN => '0',
-      DI => X"0000",
-      DWE => '0',
-      I2C_SCLK => '0',
-      I2C_SDA => '0'
-      );
-
-  OUTDATA <= x"0" & outdata_inner(15 downto 4) when ( CMDDEV(11 downto 8) = x"1" ) else -- Discarding the 4 LSB
-             x"0" & dout_vmon_inner(11 downto 0) when (r_vol_mon = '1') else
-             (others => 'L');
-
-  -- Enable sysmon output in first full clock cycle after strobe goes high
-  FD_STROBE  : FD port map (Q => q_strobe, C => FASTCLK, D => STROBE);
-  FD_STROBE2 : FD port map (Q => q2_strobe, C => FASTCLK, D => q_strobe);
-  den <= '1' when (device = '1' and WRITER = '1' and q2_strobe = '0' and q_strobe = '1')
-         else '0';
-
-  -- DTACK when OUTDATA contains valid data
-  dd_dtack <= device and strobe; -- and drdy;
-  FD_D_DTACK : FDC port map(Q => d_dtack, C => dd_dtack, CLR=> q_dtack, D => '1');
-  FD_Q_DTACK : FD port map(Q => q_dtack, C => SLOWCLK, D => d_dtack);
-  DTACK <= q_dtack;
 
 end SYSTEM_MON_ARCH;
