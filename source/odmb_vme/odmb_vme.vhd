@@ -148,18 +148,17 @@ entity ODMB_VME is
     DCFEB_RXPRBSERR      : in  std_logic;
     DCFEB_PRBS_ERR_CNT   : in  std_logic_vector(15 downto 0);
 
-    -------------------
+    --------------------
+    -- System monitoring
+    --------------------
+    -- Current monitoring
+    SYSMON_P      : in std_logic_vector(15 downto 0);
+    SYSMON_N      : in std_logic_vector(15 downto 0);
     -- Voltage monitoring through MAX127 chips
-
-    ADC_CS0_18     : out std_logic;
-    ADC_CS1_18     : out std_logic;
-    ADC_CS2_18     : out std_logic;
-    ADC_CS3_18     : out std_logic;
-    ADC_CS4_18     : out std_logic;
-    ADC_DIN_18     : out std_logic;
-    ADC_SCK_18     : out std_logic; 
-    ADC_DOUT_18    : in  std_logic;
-    -------------------
+    ADC_CS_B      : out std_logic_vector(4 downto 0);
+    ADC_SCK       : out std_logic;
+    ADC_DIN       : out std_logic;
+    ADC_DOUT      : in std_logic;
 
     --------------------
     -- Other
@@ -357,12 +356,12 @@ architecture Behavioral of ODMB_VME is
       DEVICE  : in std_logic;
       STROBE  : in std_logic;
       COMMAND : in std_logic_vector(9 downto 0);
-      WRITER  : in std_logic
+      WRITER  : in std_logic;
 
       --VP    : in std_logic;
       --VN    : in std_logic;
-      --VAUXP : in std_logic_vector(15 downto 0);
-      --VAUXN : in std_logic_vector(15 downto 0)
+      VAUXP : in std_logic_vector(15 downto 0);
+      VAUXN : in std_logic_vector(15 downto 0)
       );
   end component;
 
@@ -564,7 +563,6 @@ begin
   outdata_dev(0) <= (others => '0');
   outdata_dev(2) <= (others => '0');
   outdata_dev(5) <= (others => '0');
-  outdata_dev(7) <= (others => '0');
   idx_dev <= to_integer(unsigned(cmd_adrs_inner(15 downto 12)));
   VME_DATA_OUT <= outdata_dev(idx_dev);
 
@@ -772,19 +770,15 @@ begin
       COMMAND => cmd,
       WRITER  => vme_write_b,
 
-      ADC_CS0_18  =>  ADC_CS0_18,  
-      ADC_CS1_18  =>  ADC_CS1_18,  
-      ADC_CS2_18  =>  ADC_CS2_18,  
-      ADC_CS3_18  =>  ADC_CS3_18,  
-      ADC_CS4_18  =>  ADC_CS4_18,  
-      ADC_DIN_18  =>  ADC_DIN_18,  
-      ADC_SCK_18  =>  ADC_SCK_18,  
-      ADC_DOUT_18 =>  ADC_DOUT_18 
+      ADC_CS_B => ADC_CS_B,
+      ADC_SCK  => ADC_SCK,
+      ADC_DIN  => ADC_DIN,
+      ADC_DOUT => ADC_DOUT,
 
       --VP    => VP,
       --VN    => VN,
-      --VAUXP => VAUXP,
-      --VAUXN => VAUXN
+      VAUXP => SYSMON_P,
+      VAUXN => SYSMON_N
       );
   
   DEV8_LVDBMON : LVDBMON
