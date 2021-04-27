@@ -343,13 +343,13 @@ begin
   port map (
                I => cms_clk_fpga_p,
                IB => cms_clk_fpga_n,
-               O => clk_in_buf
+               O => sysclk --clk_in_buf
              );
 
   ClockManager_i : clockManager_sim
   port map(
-            CLK_IN40 => clk_in_buf,
-            --CLK_OUT40 => sysclk,
+            --CLK_IN40 => clk_in_buf,
+            CLK_IN40 => sysclk,
             CLK_OUT10 => sysclk10,
             CLK_OUT80 => sysclk80,
             CLK_OUT160 => sysclk160,
@@ -429,6 +429,7 @@ begin
           if waitCounter = 0  then
             if cack = '1' then
               inputCounter <= inputCounter + 1;
+              --waitCounter <= "0000001000";
               waitCounter <= "1100000000";
               -- Initalize lut_input_addr_s
               if inputCounter = 0 then
