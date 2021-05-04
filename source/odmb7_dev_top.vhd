@@ -188,22 +188,15 @@ entity odmb7_ucsb_dev is
     ODMB_DONE     : in std_logic;                          -- "DONE" in bank 66 (pin L9), monitor DONE_0 from Bank 0 (pin N7)
 
     --------------------------------
-    -- SYSMON ports
+    -- System monitoring ports
     --------------------------------
     SYSMON_P      : in std_logic_vector(15 downto 0);
     SYSMON_N      : in std_logic_vector(15 downto 0);
 
-    --------------------------------
-    -- Voltage monitoring ports
-    --------------------------------
-    ADC_CS0_18    : out std_logic; -- Bank 46
-    ADC_CS1_18    : out std_logic; -- Bank 46 
-    ADC_CS2_18    : out std_logic; -- Bank 46 
-    ADC_CS3_18    : out std_logic; -- Bank 46 
-    ADC_CS4_18    : out std_logic; -- Bank 46 
-    ADC_DIN_18    : out std_logic; -- Bank 46 
-    ADC_SCK_18    : out std_logic; -- Bank 46 
-    ADC_DOUT_18   : in std_logic;   -- Bank 46
+    ADC_CS_B      : out std_logic_vector(4 downto 0); -- Bank 46
+    ADC_DIN       : out std_logic; -- Bank 46 
+    ADC_SCK       : out std_logic; -- Bank 46 
+    ADC_DOUT      : in std_logic;   -- Bank 46
 
     --------------------------------
     -- Others
@@ -393,16 +386,14 @@ architecture Behavioral of odmb7_ucsb_dev is
       DCFEB_PRBS_ERR_CNT   : in  std_logic_vector(15 downto 0);
 
       -------------------
-      -- Voltage monitoring through MAX127 chips
+      -- System monitoring
+      -------------------
 
-      ADC_CS0_18     : out std_logic;
-      ADC_CS1_18     : out std_logic;
-      ADC_CS2_18     : out std_logic;
-      ADC_CS3_18     : out std_logic;
-      ADC_CS4_18     : out std_logic;
-      ADC_DIN_18     : out std_logic;
-      ADC_SCK_18     : out std_logic; 
-      ADC_DOUT_18    : in  std_logic;
+      -- Voltage monitoring through MAX127 chips
+      ADC_CS_B     : out std_logic_vector(4 downto 0);
+      ADC_DIN        : out std_logic;
+      ADC_SCK        : out std_logic; 
+      ADC_DOUT       : in  std_logic;
 
       --------------------
       -- Other
@@ -1416,14 +1407,10 @@ begin
       DCFEB_RXPRBSERR      => dcfeb_rxprbserr,
       DCFEB_PRBS_ERR_CNT   => dcfeb_prbs_err_cnt,
 
-      ADC_CS0_18           => ADC_CS0_18, 
-      ADC_CS1_18           => ADC_CS1_18, 
-      ADC_CS2_18           => ADC_CS2_18, 
-      ADC_CS3_18           => ADC_CS3_18, 
-      ADC_CS4_18           => ADC_CS4_18, 
-      ADC_DIN_18           => ADC_DIN_18, 
-      ADC_SCK_18           => ADC_SCK_18,  
-      ADC_DOUT_18          => ADC_DOUT_18, 
+      ADC_CS_B             => ADC_CS_B, 
+      ADC_DIN              => ADC_DIN, 
+      ADC_SCK              => ADC_SCK,  
+      ADC_DOUT             => ADC_DOUT, 
 
       DIAGOUT   => diagout_inner,
       RST       => reset,

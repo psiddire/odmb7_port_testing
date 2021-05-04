@@ -151,14 +151,10 @@ entity ODMB_VME is
     -------------------
     -- Voltage monitoring through MAX127 chips
 
-    ADC_CS0_18     : out std_logic;
-    ADC_CS1_18     : out std_logic;
-    ADC_CS2_18     : out std_logic;
-    ADC_CS3_18     : out std_logic;
-    ADC_CS4_18     : out std_logic;
-    ADC_DIN_18     : out std_logic;
-    ADC_SCK_18     : out std_logic; 
-    ADC_DOUT_18    : in  std_logic;
+    ADC_CS_B             : out std_logic_vector(4 downto 0);
+    ADC_DIN              : out std_logic;
+    ADC_SCK              : out std_logic; 
+    ADC_DOUT             : in  std_logic;
     -------------------
 
     --------------------
@@ -341,16 +337,13 @@ architecture Behavioral of ODMB_VME is
       INDATA  : in  std_logic_vector(15 downto 0);
       DTACK   : out std_logic;
 
-      ADC_CS0_18     : out std_logic;
-      ADC_CS1_18     : out std_logic;
-      ADC_CS2_18     : out std_logic;
-      ADC_CS3_18     : out std_logic;
-      ADC_CS4_18     : out std_logic;
-      ADC_DIN_18     : out std_logic;
-      ADC_SCK_18     : out std_logic; 
-      ADC_DOUT_18    : in  std_logic;
+      ADC_CS_B    : out std_logic_vector(4 downto 0);
+      ADC_DIN     : out std_logic;
+      ADC_SCK     : out std_logic; 
+      ADC_DOUT    : in  std_logic;
 
       SLOWCLK : in std_logic;
+      SLOWCLKX2 : in std_logic;
       FASTCLK : in std_logic;
       RST     : in std_logic;
 
@@ -564,7 +557,6 @@ begin
   outdata_dev(0) <= (others => '0');
   outdata_dev(2) <= (others => '0');
   outdata_dev(5) <= (others => '0');
-  outdata_dev(7) <= (others => '0');
   idx_dev <= to_integer(unsigned(cmd_adrs_inner(15 downto 12)));
   VME_DATA_OUT <= outdata_dev(idx_dev);
 
@@ -764,6 +756,7 @@ begin
       DTACK   => dtack_dev(7),
 
       SLOWCLK => CLK1P25,
+      SLOWCLKX2 => CLK2P5,
       FASTCLK => CLK40,
       RST     => rst,
 
@@ -772,14 +765,10 @@ begin
       COMMAND => cmd,
       WRITER  => vme_write_b,
 
-      ADC_CS0_18  =>  ADC_CS0_18,  
-      ADC_CS1_18  =>  ADC_CS1_18,  
-      ADC_CS2_18  =>  ADC_CS2_18,  
-      ADC_CS3_18  =>  ADC_CS3_18,  
-      ADC_CS4_18  =>  ADC_CS4_18,  
-      ADC_DIN_18  =>  ADC_DIN_18,  
-      ADC_SCK_18  =>  ADC_SCK_18,  
-      ADC_DOUT_18 =>  ADC_DOUT_18 
+      ADC_CS_B =>  ADC_CS_B,  
+      ADC_DIN  =>  ADC_DIN,  
+      ADC_SCK  =>  ADC_SCK,  
+      ADC_DOUT =>  ADC_DOUT 
 
       --VP    => VP,
       --VN    => VN,

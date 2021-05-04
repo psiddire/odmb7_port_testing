@@ -10,7 +10,7 @@ use ieee.std_logic_unsigned.all;
 library unisim;
 use unisim.vcomponents.all;
 
-entity odmb7_voltageMon is
+entity voltage_mon is
     port (
         CLK      : in  std_logic;
 --        CLK_div2 : in  std_logic;
@@ -21,12 +21,15 @@ entity odmb7_voltageMon is
         DVOUT    : out std_logic;
         DATADONE    : out std_logic;
         DATA     : out std_logic_vector(11 downto 0);
+        DATAVALIDCNTR     : out std_logic_vector(7 downto 0);
+        CURRENTCHANNELOUT   : out std_logic_vector(2 downto 0);
+        CTRLSEQDONE    : out std_logic;
 
         startchannelvalid  : in std_logic
     );
-end odmb7_voltageMon;
+end voltage_mon;
 
-architecture Behavioral of odmb7_voltageMon is
+architecture Behavioral of voltage_mon is
 
     component SpiCsBflop is
       port (
@@ -36,30 +39,29 @@ architecture Behavioral of odmb7_voltageMon is
       );
     end component SpiCsBflop;
 
-    component ila_2 is
-        port (
-            clk : in std_logic := '0';
-            probe0 : in std_logic_vector(7 downto 0) := (others=> '0');
-            probe1 : in std_logic := '0';
-            probe2 : in std_logic := '0';
-            probe3 : in std_logic := '0';
-            probe4 : in std_logic_vector(11 downto 0) := (others=> '0');
-            probe5 : in std_logic_vector(2 downto 0) := (others=> '0');
-            probe6 : in std_logic_vector(7 downto 0) := (others=> '0');
-            probe7 : in std_logic_vector(7 downto 0) := (others=> '0');
-            probe8 : in std_logic_vector(7 downto 0) := (others=> '0');
-            probe9 : in std_logic_vector(7 downto 0) := (others=> '0');
-            probe10 : in std_logic_vector(7 downto 0) := (others=> '0');
-            probe11 : in std_logic := '0'
-
-        );
-    end component;
+--    component ila_2 is
+--        port (
+--            clk : in std_logic := '0';
+--            probe0 : in std_logic_vector(7 downto 0) := (others=> '0');
+--            probe1 : in std_logic := '0';
+--            probe2 : in std_logic := '0';
+--            probe3 : in std_logic := '0';
+--            probe4 : in std_logic_vector(11 downto 0) := (others=> '0');
+--            probe5 : in std_logic_vector(2 downto 0) := (others=> '0');
+--            probe6 : in std_logic_vector(7 downto 0) := (others=> '0');
+--            probe7 : in std_logic_vector(7 downto 0) := (others=> '0');
+--            probe8 : in std_logic_vector(7 downto 0) := (others=> '0');
+--            probe9 : in std_logic_vector(7 downto 0) := (others=> '0');
+--            probe10 : in std_logic_vector(7 downto 0) := (others=> '0');
+--            probe11 : in std_logic := '0'
+--
+--        );
+--    end component;
 
 
     signal current_channel : std_logic_vector(2 downto 0) := "000";
     signal mon_SpiCsB : std_logic := '1';
     signal SpiCsB_N        : std_logic;
-    --signal startchannelvalid : std_logic := '0';
     signal mon_start : std_logic := '0';
     signal mon_cmdcounter  : std_logic_vector(7 downto 0) := x"00";  
     signal mon_cmdreg  : std_logic_vector(7 downto 0) := x"00";  
@@ -94,10 +96,12 @@ begin
 
 SCK <= CLK;
 DIN <= mon_cmdreg(7);
---CS <= mon_SpiCsB;
 CS <= SpiCsB_N;
 DATA <= dout_data;
 DATADONE <= data_done;
+DATAVALIDCNTR <= data_valid_cntr;
+CURRENTCHANNELOUT <= current_channel;
+CTRLSEQDONE <= ctrlseq_done;
 
 processmon : process (CLK)
 begin
@@ -106,12 +110,10 @@ begin
     case monstate is 
         when S_MON_IDLE =>
         mon_SpiCsB <= '1';
-        --if (startchannelvalid = '1') then current_channel <= STARTCHANNEL; end if; -- 8 channels to read for each chip 
+        ctrlseq_done <= '0';
         if (startchannelvalid = '1') then  
-        --if (mon_start = '1') then  
             mon_start <= '1';
             current_channel <= STARTCHANNEL;
-            --mon_cmdcounter <= x"11";  -- 18 clks conversion  
             mon_inprogress <= '1';
             monstate <= S_MON_ASSCS1;
         end if;
@@ -159,11 +161,12 @@ processdout : process (CLK)
     if rising_edge(CLK) then
     case doutstate is 
     when S_DOUT_IDLE =>
-        if (mon_start = '1') then  
+
             dout_counter <= x"0c";  -- 18 clks conversion, after cs goes low for 13 clk, data starts to arrive  
             data_done <= '0';
             data_valid_cntr <= x"11";
             data_valid <= '0';
+        if (mon_start = '1') then  
             doutstate <= S_DOUT_WAIT;
         end if;
 
@@ -176,21 +179,20 @@ processdout : process (CLK)
                        
     when S_DOUT_DATA =>    
         data_valid_cntr <= data_valid_cntr - 1;
-        if (data_valid_cntr > 5 ) then -- 12 bits of valid data 
+        --if (data_valid_cntr > 5 ) then -- 12 bits of valid data 
+        if (data_valid_cntr > 4 ) then -- 12 bits of valid data 
             dout_data <= dout_data(10 downto 0) & DOUT;  
             data_valid <= '0';
-            if (data_valid_cntr = 6) then
+            --if (data_valid_cntr = 6) then
+            if (data_valid_cntr = 5) then
                 data_valid <= '1';
             end if;
-        --elsif (data_valid_cntr = 5) then 
-        --    data_valid <= '1';
         else
             data_valid <= '0';
             dout_data <= x"000"; 
             if (ctrlseq_done = '1') then
                 doutstate <= S_DOUT_IDLE;
                 data_done <= '1';
-                --mon_start <= '0';
             else
                 if (data_valid_cntr = 0) then
                     data_valid_cntr <= x"11";
@@ -203,17 +205,17 @@ end process processdout;
 
 DVOUT <= data_valid;
 
-variousflags(0) <= mon_start;
-variousflags(1) <= mon_inprogress;
-variousflags(2) <= ctrlseq_done;
-variousflags(3) <= data_done;
-variousflags(4) <= data_valid;
-variousflags(5) <= startchannelvalid;
-
-ila_trigger1(0) <= mon_start;
-ila_trigger1(1) <= mon_inprogress;
-ila_trigger1(2) <= data_done;
-ila_trigger1(3) <= ctrlseq_done;
+--variousflags(0) <= mon_start;
+--variousflags(1) <= mon_inprogress;
+--variousflags(2) <= ctrlseq_done;
+--variousflags(3) <= data_done;
+--variousflags(4) <= data_valid;
+--variousflags(5) <= startchannelvalid;
+--
+--ila_trigger1(0) <= mon_start;
+--ila_trigger1(1) <= mon_inprogress;
+--ila_trigger1(2) <= data_done;
+--ila_trigger1(3) <= ctrlseq_done;
 
 --i_ila : ila_2
 --    port map(
