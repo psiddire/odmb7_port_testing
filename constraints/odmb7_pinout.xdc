@@ -857,4 +857,3 @@ set_property PACKAGE_PIN     P21        [get_ports LEDS_CFV[10]]
 set_property IOSTANDARD      LVCMOS18   [get_ports LEDS_CFV[10]]
 set_property PACKAGE_PIN     M22        [get_ports LEDS_CFV[11]]
 set_property IOSTANDARD      LVCMOS18   [get_ports LEDS_CFV[11]]
-

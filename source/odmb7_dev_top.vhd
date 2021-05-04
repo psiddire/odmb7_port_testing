@@ -193,10 +193,10 @@ entity odmb7_ucsb_dev is
     SYSMON_P      : in std_logic_vector(15 downto 0);
     SYSMON_N      : in std_logic_vector(15 downto 0);
 
-    ADC_CS_B      : out std_logic_vector(4 downto 0);
-    ADC_SCK       : out std_logic;
-    ADC_DIN       : out std_logic;
-    ADC_DOUT      : in std_logic;
+    ADC_CS_B      : out std_logic_vector(4 downto 0);      -- Bank 46
+    ADC_DIN       : out std_logic;                         -- Bank 46
+    ADC_SCK       : out std_logic;                         -- Bank 46
+    ADC_DOUT      : in std_logic;                          -- Bank 46
 
     --------------------------------
     -- Others
@@ -393,8 +393,8 @@ architecture Behavioral of odmb7_ucsb_dev is
       SYSMON_N      : in std_logic_vector(15 downto 0);
       -- Voltage monitoring through MAX127 chips
       ADC_CS_B      : out std_logic_vector(4 downto 0);
-      ADC_SCK       : out std_logic;
       ADC_DIN       : out std_logic;
+      ADC_SCK       : out std_logic;
       ADC_DOUT      : in std_logic;
 
       --------------------
@@ -1412,8 +1412,8 @@ begin
       SYSMON_P             => SYSMON_P,
       SYSMON_N             => SYSMON_N,
       ADC_CS_B             => ADC_CS_B,
-      ADC_SCK              => ADC_SCK,
       ADC_DIN              => ADC_DIN,
+      ADC_SCK              => ADC_SCK,
       ADC_DOUT             => ADC_DOUT,
 
       DIAGOUT   => diagout_inner,
