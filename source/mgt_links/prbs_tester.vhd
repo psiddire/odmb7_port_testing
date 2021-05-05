@@ -18,6 +18,7 @@ use ieee.std_logic_misc.all;
 
 entity prbs_tester is
   generic (
+    NCFEBLINK    : integer := 7;
     DDU_NRXLINK  : integer := 1;
     SPYDATAWIDTH : integer := 16;
     FEBDATAWIDTH : integer := 16;
@@ -172,8 +173,8 @@ architecture Behavioral of prbs_tester is
   signal ddu_rxdata_err_ctr : errctr_array_four;
   signal ddu_rxdata_nml_ctr : nmlctr_array_four;
 
-  type errctr_array_ncfeb is array (1 to NCFEB) of unsigned(16 downto 0);
-  type nmlctr_array_ncfeb is array (1 to NCFEB) of unsigned(63 downto 0);
+  type errctr_array_ncfeb is array (1 to NCFEBLINK) of unsigned(16 downto 0);
+  type nmlctr_array_ncfeb is array (1 to NCFEBLINK) of unsigned(63 downto 0);
   signal cfeb_rxdata_err_ctr : errctr_array_ncfeb;
   signal cfeb_rxdata_nml_ctr : nmlctr_array_ncfeb;
 
@@ -182,6 +183,7 @@ architecture Behavioral of prbs_tester is
   signal ila_spy_tx : std_logic_vector(127 downto 0);
   signal ila_ddu_tx : std_logic_vector(127 downto 0);
   signal ila_ddu_rx : std_logic_vector(127 downto 0);
+  signal ila_cfeb_rx : std_logic_vector(127 downto 0);
 
 begin
 
@@ -354,6 +356,9 @@ begin
         );
 
     prbs_match_ddu(I) <= not or_reduce(prbs_anyerr_ddu(I));
+    prbs_match_ddu(I) <= not or_reduce(prbs_anyerr_ddu(I)) when txd_valid_vio_int = '1' else 
+                         '1' when (rxdata_ddu_ch(I)(15 downto 0) = x"50BC") else '0';
+
   end generate gen_prbs_checking_ddu;
 
   -- assign the rest of the prbs match for unused rx channels to true
@@ -386,7 +391,8 @@ begin
         DATA_OUT => prbs_anyerr_cfeb(I)
         );
 
-    prbs_match_cfeb(I) <= not or_reduce(prbs_anyerr_cfeb(I));
+    prbs_match_cfeb(I) <= not or_reduce(prbs_anyerr_cfeb(I)) when txd_valid_vio_int = '1' else 
+                          '1' when (rxdata_cfeb_ch(I) = x"50BC") else '0';
   end generate gen_prbs_checking_cfeb;
 
   -- Checking for 1 channel alct data
@@ -456,12 +462,12 @@ begin
   begin
     if (rising_edge(usrclk_mgtc)) then
       if (rxdata_errctr_reset_vio_int = '1') then
-        for I in 1 to NCFEB loop
+        for I in 1 to NCFEBLINK loop
           cfeb_rxdata_nml_ctr(I) <= (others => '0');
           cfeb_rxdata_err_ctr(I) <= (others => '0');
         end loop;
       elsif (rxready_mgtc = '1') then
-        for I in 1 to NCFEB loop
+        for I in 1 to NCFEBLINK loop
           cfeb_rxdata_nml_ctr(I) <= cfeb_rxdata_nml_ctr(I) + 1;
           if (prbs_match_cfeb(I) = '0') then
             cfeb_rxdata_err_ctr(I) <= cfeb_rxdata_err_ctr(I) + 1;
@@ -498,7 +504,7 @@ begin
       probe_in6 => std_logic_vector(spy_rxdata_nml_ctr(39 downto 24)),
       probe_in7 => std_logic_vector(ddu_rxdata_nml_ctr(1)(39 downto 24)),
       probe_in8 => std_logic_vector(txd_spy_init_ctr),
-      probe_in9 => std_logic_vector(alct_rxdata_nml_ctr(39 downto 24)),
+      probe_in9 => std_logic_vector(cfeb_rxdata_nml_ctr(1)(39 downto 24)),
       probe_out0 => rxdata_errctr_reset_vio_int,
       probe_out1 => prbsgen_reset_vio_int,
       probe_out2 => txd_valid_vio_int,

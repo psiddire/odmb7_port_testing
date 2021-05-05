@@ -57,15 +57,15 @@ entity odmb7_ucsb_dev is
     VME_DTACK_KUS_B : out std_logic;                       -- Bank 44
 
     -- From/To PPIB (connectors J3 and J4)
-    DCFEB_TCK_P    : out std_logic_vector(NCFEB downto 1); -- Bank 68
-    DCFEB_TCK_N    : out std_logic_vector(NCFEB downto 1); -- Bank 68
+    DCFEB_TCK_P    : out std_logic_vector(7 downto 1);     -- Bank 68
+    DCFEB_TCK_N    : out std_logic_vector(7 downto 1);     -- Bank 68
     DCFEB_TMS_P    : out std_logic;                        -- Bank 68
     DCFEB_TMS_N    : out std_logic;                        -- Bank 68
     DCFEB_TDI_P    : out std_logic;                        -- Bank 68
     DCFEB_TDI_N    : out std_logic;                        -- Bank 68
-    DCFEB_TDO_P    : in  std_logic_vector(NCFEB downto 1); -- "C_TDO" in Bank 67-68
-    DCFEB_TDO_N    : in  std_logic_vector(NCFEB downto 1); -- "C_TDO" in Bank 67-68
-    DCFEB_DONE     : in  std_logic_vector(NCFEB downto 1); -- "DONE_*" in Bank 68
+    DCFEB_TDO_P    : in  std_logic_vector(7 downto 1);     -- "C_TDO" in Bank 67-68
+    DCFEB_TDO_N    : in  std_logic_vector(7 downto 1);     -- "C_TDO" in Bank 67-68
+    DCFEB_DONE     : in  std_logic_vector(7 downto 1);     -- "DONE_*" in Bank 68
     RESYNC_P       : out std_logic;                        -- Bank 66
     RESYNC_N       : out std_logic;                        -- Bank 66
     BC0_P          : out std_logic;                        -- Bank 68
@@ -76,9 +76,10 @@ entity odmb7_ucsb_dev is
     EXTPLS_N       : out std_logic;                        -- Bank 66, ODMB CTRL
     L1A_P          : out std_logic;                        -- Bank 66, ODMB CTRL
     L1A_N          : out std_logic;                        -- Bank 66, ODMB CTRL
-    L1A_MATCH_P    : out std_logic_vector(NCFEB downto 1); -- Bank 66, ODMB CTRL
-    L1A_MATCH_N    : out std_logic_vector(NCFEB downto 1); -- Bank 66, ODMB CTRL
+    L1A_MATCH_P    : out std_logic_vector(7 downto 1);     -- Bank 66, ODMB CTRL
+    L1A_MATCH_N    : out std_logic_vector(7 downto 1);     -- Bank 66, ODMB CTRL
     PPIB_OUT_EN_B  : out std_logic;                        -- Bank 68
+    DCFEB_REPROG_B : out std_logic;                        -- Bank 68, not used before
 
     --------------------
     -- CCB Signals
@@ -119,7 +120,7 @@ entity odmb7_ucsb_dev is
     -- OTMB communication signals
     --------------------------------
     OTMB        : in  std_logic_vector(35 downto 0);      -- "TMB[35:0]" in Bank 44-45
-    RAWLCT      : in  std_logic_vector(NCFEB-1 downto 0); -- Bank 45
+    RAWLCT      : in  std_logic_vector(6 downto 0);       -- Bank 45
     OTMB_DAV    : in  std_logic;                          -- "TMB_DAV" in Bank 45
     OTMB_FF_CLK : in  std_logic;                          -- "TMB_FF_CLK" in Bank 45
     RSVTD_IN    : in  std_logic_vector(7 downto 3);       -- "RSVTD[7:3]" in Bank 44-45
@@ -202,6 +203,10 @@ end odmb7_ucsb_dev;
 
 architecture Behavioral of odmb7_ucsb_dev is
 
+  -- Constants different between ODMB7 and ODMB5
+  constant NCFEB : integer range 1 to 7 := 7;  -- Number of DCFEBS, 7 for ME1/1, 5
+
+  -- Components declaration
   component odmb_clocking is
     port (
       -- Input ports
@@ -297,7 +302,8 @@ architecture Behavioral of odmb7_ucsb_dev is
       DCFEB_TDO    : in  std_logic_vector (NCFEB downto 1);
 
       DCFEB_DONE     : in std_logic_vector (NCFEB downto 1);
-      DCFEB_INITJTAG : in std_logic;   -- TODO: where does this fit in
+      DCFEB_INITJTAG : in std_logic;
+      DCFEB_REPROG_B : out std_logic;  -- Hard reset to DCFEBs
 
       --------------------
       -- From/To LVMB: ODMB & ODMB7 design, ODMB5 to be seen
@@ -578,6 +584,7 @@ architecture Behavioral of odmb7_ucsb_dev is
 
   component prbs_tester is
     generic (
+      NCFEBLINK    : integer := 7;
       DDU_NRXLINK  : integer := 1;
       SPYDATAWIDTH : integer := 16;
       FEBDATAWIDTH : integer := 16;
@@ -735,9 +742,9 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal pon_reset          : std_logic := '0';
   signal done_cnt_en        : std_logic_vector(NCFEB downto 1);
   signal done_cnt_rst       : std_logic_vector(NCFEB downto 1);
-  signal done_cnt           : done_cnt_type;
-  signal done_next_state    : done_state_array_type;
-  signal done_current_state : done_state_array_type;
+  signal done_cnt           : t_done_cnt_arr(NCFEB downto 1);
+  signal done_next_state    : t_done_state_arr(NCFEB downto 1);
+  signal done_current_state : t_done_state_arr(NCFEB downto 1);
   signal dcfeb_done_pulse   : std_logic_vector(NCFEB downto 1) := (others => '0');
   signal dcfeb_initjtag     : std_logic := '0';
   signal dcfeb_initjtag_d   : std_logic := '0';
@@ -746,7 +753,6 @@ architecture Behavioral of odmb7_ucsb_dev is
   --------------------------------------
   -- CCB production test signals
   --------------------------------------
-
   signal ccb_cmd_bxev    : std_logic_vector(7 downto 0) := (others => '0');
   signal ccb_cmd_reg     : std_logic_vector(15 downto 0) := (others => '0');
   signal ccb_data_reg    : std_logic_vector(15 downto 0) := (others => '0');
@@ -1309,6 +1315,7 @@ begin
       DCFEB_TDO      => dcfeb_tdo,
       DCFEB_DONE     => DCFEB_DONE,
       DCFEB_INITJTAG => dcfeb_initjtag,
+      DCFEB_REPROG_B => DCFEB_REPROG_B,
 
       LVMB_PON    => LVMB_PON,
       PON_LOAD_B  => PON_LOAD_B,
@@ -1556,6 +1563,7 @@ begin
   -------------------------------------------------------------------------------------------
   u_mgt_tester : prbs_tester
     generic map (
+      NCFEBLINK     => NCFEB,
       DDU_NRXLINK   => DDU_NRXLINK,
       SPYDATAWIDTH  => 16,
       FEBDATAWIDTH  => 16,

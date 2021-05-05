@@ -8,6 +8,9 @@ use work.ucsb_types.all;
 
 
 entity CFEBJTAG is
+  generic (
+    NCFEB   : integer range 1 to 7 := 7  -- Number of DCFEBs
+    );
   port (
     FASTCLK : in std_logic;
     SLOWCLK : in std_logic;

@@ -151,6 +151,26 @@ architecture Behavioral of mgt_cfeb is
       );
   end component;
 
+  component vio_1
+    port (
+      clk : in std_logic;
+      probe_in0  : in std_logic_vector(3 downto 0);
+      probe_in1  : in std_logic_vector(6 downto 0);
+      probe_in2  : in std_logic;
+      probe_in3  : in std_logic;
+      probe_in4  : in std_logic_vector(15 downto 0);
+      probe_in5  : in std_logic_vector(15 downto 0);
+      probe_in6  : in std_logic_vector(15 downto 0);
+      probe_in7  : in std_logic_vector(15 downto 0);
+      probe_in8  : in std_logic_vector(15 downto 0);
+      probe_in9  : in std_logic_vector(15 downto 0);
+      probe_out0 : out std_logic;
+      probe_out1 : out std_logic;
+      probe_out2 : out std_logic;
+      probe_out3 : out std_logic
+      );
+  end component;
+
   -- Synchronize the latched link down reset input and the VIO-driven signal into the free-running clock domain
   -- signals passed to wizard
   signal gthrxn_int : std_logic_vector(NLINK-1 downto 0) := (others => '0');
@@ -211,6 +231,7 @@ architecture Behavioral of mgt_cfeb is
   signal bad_rx_ch : std_logic_vector(NLINK-1 downto 0);
   signal good_crc_ch : std_logic_vector(NLINK-1 downto 0);
   signal crc_valid_ch : std_logic_vector(NLINK-1 downto 0);
+  signal reset_rxd_ch : std_logic_vector(NLINK-1 downto 0);
   signal rxready_int : std_logic;
 
   type t_rxd_arr is array (integer range <>) of std_logic_vector(DATAWIDTH-1 downto 0);
@@ -273,12 +294,13 @@ begin
 
     -- Power down the RX for killed DCFEB
     rxpd_int(2*I+1 downto 2*I) <= "11" when KILL_RXPD(I+1) = '1' else "00";
+    reset_rxd_ch(I) <= reset or KILL_RXOUT(I+1);
 
     -- Module for RXDATA validity checks, working for 16 bit datawidth only
     rx_data_check_i : rx_frame_proc
       port map (
         CLK => gtwiz_userclk_rx_usrclk2_int,
-        RST => reset or KILL_RXOUT(I+1),
+        RST => reset_rxd_ch(I),
         RXDATA => rxdata_i_ch(I),
         RX_IS_K => rxcharisk_ch(I),
         RXDISPERR => rxdisperr_ch(I),
@@ -410,10 +432,30 @@ begin
   ila_data_rx(359 downto 353) <= kill_rxpd;
   ila_data_rx(360)            <= reset;
 
-  mgt_ddu_ila_inst : ila_2
+  mgt_cfeb_ila_inst : ila_2
     port map(
       clk => gtwiz_userclk_rx_usrclk2_int,
       probe0 => ila_data_rx
+      );
+
+
+  mgt_cfeb_vio_inst : vio_1
+    port map (
+      clk => sysclk,
+      probe_in0 => (others => '0'),
+      probe_in1 => rxbyteisaligned_int,
+      probe_in2 => '0',
+      probe_in3 => rxready_int,
+      probe_in4 => (others => '0'),
+      probe_in5 => (others => '0'),
+      probe_in6 => (others => '0'),
+      probe_in7 => (others => '0'),
+      probe_in8 => (others => '0'),
+      probe_in9 => (others => '0'),
+      probe_out0 => gtwiz_reset_rx_pll_and_datapath_int,
+      probe_out1 => gtwiz_reset_rx_datapath_int,
+      probe_out2 => open,
+      probe_out3 => open
       );
 
 end Behavioral;
