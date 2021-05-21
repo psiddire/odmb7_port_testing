@@ -595,69 +595,69 @@ architecture Behavioral of odmb7_ucsb_dev is
       );
   end component;
 
-  component prbs_tester is
-    generic (
-      DDU_NRXLINK  : integer := 1;
-      SPY_NLINK  : integer := 1;
-      ALCT_NLINK  : integer := 1;
-      SPYDATAWIDTH : integer := 16;
-      FEBDATAWIDTH : integer := 16;
-      DDUTXDWIDTH  : integer := 32;
-      DDURXDWIDTH  : integer := 16;
-      SPY_PATTERN  : integer := 0;        -- 0 for PRBS, 1 for counter
-      DDU_PATTERN  : integer := 0         -- 0 for PRBS, 1 for counter
-      );
-    port (
-      sysclk         : in std_logic; -- sysclk
-      -- Pattern generation and checking for SPY channel
-      usrclk_spy_tx  : in std_logic; -- USRCLK for SPY TX data generation
-      txdata_spy     : out std_logic_vector(SPYDATAWIDTH-1 downto 0); -- PRBS data out
-      txd_valid_spy  : out std_logic_vector(SPY_NLINK-1 downto 0);
-      usrclk_spy_rx  : in std_logic;  -- USRCLK for SPY RX data readout
-      rxdata_spy     : in std_logic_vector(SPYDATAWIDTH-1 downto 0); -- PRBS data out
-      rxd_valid_spy  : in std_logic_vector(SPY_NLINK-1 downto 0);
-      rxready_spy    : in std_logic; -- Flag for rx reset done
-      -- Pattern generation for mgt_ddu
-      usrclk_ddu_tx  : in std_logic; -- USRCLK for SPY TX data generation
-      txdata_ddu1    : out std_logic_vector(DDUTXDWIDTH-1 downto 0); -- PRBS data out
-      txdata_ddu2    : out std_logic_vector(DDUTXDWIDTH-1 downto 0); -- PRBS data out
-      txdata_ddu3    : out std_logic_vector(DDUTXDWIDTH-1 downto 0); -- PRBS data out
-      txdata_ddu4    : out std_logic_vector(DDUTXDWIDTH-1 downto 0); -- PRBS data out
-      txd_valid_ddu  : out std_logic_vector(4 downto 1);
-      -- Pattern checking for mgt_ddu
-      usrclk_ddu_rx  : in std_logic;  -- USRCLK for DDU RX data readout
-      rxdata_ddu1    : in std_logic_vector(DDURXDWIDTH-1 downto 0);   -- Data received
-      rxdata_ddu2    : in std_logic_vector(DDURXDWIDTH-1 downto 0);   -- Data received
-      rxdata_ddu3    : in std_logic_vector(DDURXDWIDTH-1 downto 0);   -- Data received
-      rxdata_ddu4    : in std_logic_vector(DDURXDWIDTH-1 downto 0);   -- Data received
-      rxd_valid_ddu  : in std_logic_vector(DDU_NRXLINK downto 1);
-      rxready_ddu    : in std_logic; -- Flag for rx reset done
-      -- Receiver signals for mgt_cfeb
-      usrclk_mgtc    : in std_logic; -- USRCLK for RX data readout
-      rxdata_cfeb1   : in std_logic_vector(FEBDATAWIDTH-1 downto 0);  -- Data received
-      rxdata_cfeb2   : in std_logic_vector(FEBDATAWIDTH-1 downto 0);  -- Data received
-      rxdata_cfeb3   : in std_logic_vector(FEBDATAWIDTH-1 downto 0);  -- Data received
-      rxdata_cfeb4   : in std_logic_vector(FEBDATAWIDTH-1 downto 0);  -- Data received
-      rxdata_cfeb5   : in std_logic_vector(FEBDATAWIDTH-1 downto 0);  -- Data received
-      rxdata_cfeb6   : in std_logic_vector(FEBDATAWIDTH-1 downto 0);  -- Data received
-      rxdata_cfeb7   : in std_logic_vector(FEBDATAWIDTH-1 downto 0);  -- Data received
-      rxd_valid_mgtc : in std_logic_vector(7 downto 1);   -- Flag for valid data;
-      rxready_mgtc   : in std_logic; -- Flag for rx reset done
-      -- Receiver signals for mgt_alct
-      usrclk_mgta    : in std_logic; -- USRCLK for RX data readout
-      rxdata_alct    : in std_logic_vector(FEBDATAWIDTH-1 downto 0);  -- Data received
-      rxd_valid_alct : in std_logic_vector(ALCT_NLINK-1 downto 0);
-      rxready_alct   : in std_logic; -- Flag for rx reset done
-      rxdata_daq8    : in std_logic_vector(FEBDATAWIDTH-1 downto 0);  -- Data received
-      rxdata_daq9    : in std_logic_vector(FEBDATAWIDTH-1 downto 0);  -- Data received
-      rxdata_daq10   : in std_logic_vector(FEBDATAWIDTH-1 downto 0);  -- Data received
-      mgta_dvalid    : in std_logic_vector(4 downto 1);   -- Flag for valid data;
-      -- LED indicator
-      led_out       : out std_logic_vector(7 downto 0);
-      -- Reset
-      reset         : out std_logic
-      );
-  end component;
+  --component prbs_tester is
+  --  generic (
+  --    DDU_NRXLINK  : integer := 1;
+  --    SPY_NLINK  : integer := 1;
+  --    ALCT_NLINK  : integer := 1;
+  --    SPYDATAWIDTH : integer := 16;
+  --    FEBDATAWIDTH : integer := 16;
+  --    DDUTXDWIDTH  : integer := 32;
+  --    DDURXDWIDTH  : integer := 16;
+  --    SPY_PATTERN  : integer := 0;        -- 0 for PRBS, 1 for counter
+  --    DDU_PATTERN  : integer := 0         -- 0 for PRBS, 1 for counter
+  --    );
+  --  port (
+  --    sysclk         : in std_logic; -- sysclk
+  --    -- Pattern generation and checking for SPY channel
+  --    usrclk_spy_tx  : in std_logic; -- USRCLK for SPY TX data generation
+  --    txdata_spy     : out std_logic_vector(SPYDATAWIDTH-1 downto 0); -- PRBS data out
+  --    txd_valid_spy  : out std_logic_vector(SPY_NLINK-1 downto 0);
+  --    usrclk_spy_rx  : in std_logic;  -- USRCLK for SPY RX data readout
+  --    rxdata_spy     : in std_logic_vector(SPYDATAWIDTH-1 downto 0); -- PRBS data out
+  --    rxd_valid_spy  : in std_logic_vector(SPY_NLINK-1 downto 0);
+  --    rxready_spy    : in std_logic; -- Flag for rx reset done
+  --    -- Pattern generation for mgt_ddu
+  --    usrclk_ddu_tx  : in std_logic; -- USRCLK for SPY TX data generation
+  --    txdata_ddu1    : out std_logic_vector(DDUTXDWIDTH-1 downto 0); -- PRBS data out
+  --    txdata_ddu2    : out std_logic_vector(DDUTXDWIDTH-1 downto 0); -- PRBS data out
+  --    txdata_ddu3    : out std_logic_vector(DDUTXDWIDTH-1 downto 0); -- PRBS data out
+  --    txdata_ddu4    : out std_logic_vector(DDUTXDWIDTH-1 downto 0); -- PRBS data out
+  --    txd_valid_ddu  : out std_logic_vector(4 downto 1);
+  --    -- Pattern checking for mgt_ddu
+  --    usrclk_ddu_rx  : in std_logic;  -- USRCLK for DDU RX data readout
+  --    rxdata_ddu1    : in std_logic_vector(DDURXDWIDTH-1 downto 0);   -- Data received
+  --    rxdata_ddu2    : in std_logic_vector(DDURXDWIDTH-1 downto 0);   -- Data received
+  --    rxdata_ddu3    : in std_logic_vector(DDURXDWIDTH-1 downto 0);   -- Data received
+  --    rxdata_ddu4    : in std_logic_vector(DDURXDWIDTH-1 downto 0);   -- Data received
+  --    rxd_valid_ddu  : in std_logic_vector(DDU_NRXLINK downto 1);
+  --    rxready_ddu    : in std_logic; -- Flag for rx reset done
+  --    -- Receiver signals for mgt_cfeb
+  --    usrclk_mgtc    : in std_logic; -- USRCLK for RX data readout
+  --    rxdata_cfeb1   : in std_logic_vector(FEBDATAWIDTH-1 downto 0);  -- Data received
+  --    rxdata_cfeb2   : in std_logic_vector(FEBDATAWIDTH-1 downto 0);  -- Data received
+  --    rxdata_cfeb3   : in std_logic_vector(FEBDATAWIDTH-1 downto 0);  -- Data received
+  --    rxdata_cfeb4   : in std_logic_vector(FEBDATAWIDTH-1 downto 0);  -- Data received
+  --    rxdata_cfeb5   : in std_logic_vector(FEBDATAWIDTH-1 downto 0);  -- Data received
+  --    rxdata_cfeb6   : in std_logic_vector(FEBDATAWIDTH-1 downto 0);  -- Data received
+  --    rxdata_cfeb7   : in std_logic_vector(FEBDATAWIDTH-1 downto 0);  -- Data received
+  --    rxd_valid_mgtc : in std_logic_vector(7 downto 1);   -- Flag for valid data;
+  --    rxready_mgtc   : in std_logic; -- Flag for rx reset done
+  --    -- Receiver signals for mgt_alct
+  --    usrclk_mgta    : in std_logic; -- USRCLK for RX data readout
+  --    rxdata_alct    : in std_logic_vector(FEBDATAWIDTH-1 downto 0);  -- Data received
+  --    rxd_valid_alct : in std_logic_vector(ALCT_NLINK-1 downto 0);
+  --    rxready_alct   : in std_logic; -- Flag for rx reset done
+  --    rxdata_daq8    : in std_logic_vector(FEBDATAWIDTH-1 downto 0);  -- Data received
+  --    rxdata_daq9    : in std_logic_vector(FEBDATAWIDTH-1 downto 0);  -- Data received
+  --    rxdata_daq10   : in std_logic_vector(FEBDATAWIDTH-1 downto 0);  -- Data received
+  --    mgta_dvalid    : in std_logic_vector(4 downto 1);   -- Flag for valid data;
+  --    -- LED indicator
+  --    led_out       : out std_logic_vector(7 downto 0);
+  --    -- Reset
+  --    reset         : out std_logic
+  --    );
+  --end component;
 
   --------------------------------------
   -- Clock signals
