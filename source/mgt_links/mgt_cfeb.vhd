@@ -93,9 +93,8 @@ architecture Behavioral of mgt_cfeb is
       gtwiz_reset_rx_done_out : out std_logic;
       gtwiz_userdata_tx_in : in std_logic_vector(111 downto 0);
       gtwiz_userdata_rx_out : out std_logic_vector(111 downto 0);
-      gtrefclk00_in : in std_logic_vector(1 downto 0);
-      qpll0outclk_out : out std_logic_vector(1 downto 0);
-      qpll0outrefclk_out : out std_logic_vector(1 downto 0);
+      drpclk_in : in std_logic_vector(6 downto 0);
+      gtrefclk0_in : in std_logic_vector(6 downto 0);
       rx8b10ben_in : in std_logic_vector(6 downto 0);
       rxcommadeten_in : in std_logic_vector(6 downto 0);
       rxmcommaalignen_in : in std_logic_vector(6 downto 0);
@@ -198,7 +197,7 @@ architecture Behavioral of mgt_cfeb is
   signal gtwiz_reset_rx_done_int : std_logic := '0';
   signal gtwiz_userdata_tx_int : std_logic_vector(NLINK*DATAWIDTH-1 downto 0) := (others => '0');
   signal gtwiz_userdata_rx_int : std_logic_vector(NLINK*DATAWIDTH-1 downto 0) := (others => '0');
-  -- signal drpclk_int : std_logic_vector(NLINK-1 downto 0) := (others => '0');
+  signal drpclk_int : std_logic_vector(NLINK-1 downto 0) := (others => '0');
   signal gtpowergood_int : std_logic_vector(NLINK-1 downto 0) := (others => '0');
   signal rxbyteisaligned_int : std_logic_vector(NLINK-1 downto 0) := (others => '0');
   signal rxbyterealign_int : std_logic_vector(NLINK-1 downto 0) := (others => '0');
@@ -213,8 +212,7 @@ architecture Behavioral of mgt_cfeb is
   signal hb_gtwiz_reset_all_int : std_logic := '0';
 
   -- ref clock
-  signal gtrefclk0_int : std_logic := '0';
-  signal gtrefclk00_int : std_logic_vector(1 downto 0);
+  signal gtrefclk0_int : std_logic_vector(6 downto 0);
   signal qpll0outclk_int : std_logic_vector(1 downto 0);
   signal qpll0outrefclk_int : std_logic_vector(1 downto 0);
 
@@ -321,8 +319,12 @@ begin
   rxready_int <= gtwiz_userclk_rx_active_int and gtwiz_reset_rx_done_int;
 
   -- MGT reference clk
-  gtrefclk00_int <= (others => MGTREFCLK);
+  gtrefclk0_int <= (others => MGTREFCLK);
   RXUSRCLK <= gtwiz_userclk_rx_usrclk2_int;
+
+  -- For GTH core configurations which utilize the transceiver channel CPLL, the drpclk_in port must be driven by
+  -- the free-running clock at the exact frequency specified during core customization, for reliable bring-up
+  drpclk_int <= (others => SYSCLK);
 
   ---------------------------------------------------------------------------------------------------------------------
   -- USER CLOCKING RESETS
@@ -374,9 +376,8 @@ begin
       gtwiz_reset_rx_done_out            => gtwiz_reset_rx_done_int,
       gtwiz_userdata_tx_in               => gtwiz_userdata_tx_int,
       gtwiz_userdata_rx_out              => gtwiz_userdata_rx_int,
-      gtrefclk00_in                      => gtrefclk00_int,
-      qpll0outclk_out                    => qpll0outclk_int,
-      qpll0outrefclk_out                 => qpll0outrefclk_int,
+      drpclk_in                          => drpclk_int,
+      gtrefclk0_in                       => gtrefclk0_int,
       rx8b10ben_in                       => (others => '1'),
       rxcommadeten_in                    => (others => '1'),
       rxmcommaalignen_in                 => (others => '1'),

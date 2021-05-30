@@ -80,9 +80,8 @@ module gtwiz_cfeb_r7_example_wrapper (
  ,output wire [0:0] gtwiz_reset_rx_done_out
  ,input  wire [111:0] gtwiz_userdata_tx_in
  ,output wire [111:0] gtwiz_userdata_rx_out
- ,input  wire [1:0] gtrefclk00_in
- ,output wire [1:0] qpll0outclk_out
- ,output wire [1:0] qpll0outrefclk_out
+ ,input  wire [6:0] drpclk_in
+ ,input  wire [6:0] gtrefclk0_in
  ,input  wire [6:0] rx8b10ben_in
  ,input  wire [6:0] rxcommadeten_in
  ,input  wire [6:0] rxmcommaalignen_in
@@ -231,9 +230,8 @@ module gtwiz_cfeb_r7_example_wrapper (
    ,.gtwiz_reset_rx_done_out                 (gtwiz_reset_rx_done_out)
    ,.gtwiz_userdata_tx_in                    (gtwiz_userdata_tx_in)
    ,.gtwiz_userdata_rx_out                   (gtwiz_userdata_rx_out)
-   ,.gtrefclk00_in                           (gtrefclk00_in)
-   ,.qpll0outclk_out                         (qpll0outclk_out)
-   ,.qpll0outrefclk_out                      (qpll0outrefclk_out)
+   ,.drpclk_in                               (drpclk_in)
+   ,.gtrefclk0_in                            (gtrefclk0_in)
    ,.rx8b10ben_in                            (rx8b10ben_in)
    ,.rxcommadeten_in                         (rxcommadeten_in)
    ,.rxmcommaalignen_in                      (rxmcommaalignen_in)

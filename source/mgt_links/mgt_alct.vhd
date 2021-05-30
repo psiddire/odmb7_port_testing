@@ -253,8 +253,11 @@ begin
 
   -- MGT reference clk
   gtrefclk0_int <= MGTREFCLK;
-
   RXUSRCLK <= gtwiz_userclk_rx_usrclk2_int;
+
+  -- For GTH core configurations which utilize the transceiver channel CPLL, the drpclk_in port must be driven by
+  -- the free-running clock at the exact frequency specified during core customization, for reliable bring-up
+  drpclk_int <= (others => SYSCLK);
 
   ---------------------------------------------------------------------------------------------------------------------
   -- USER CLOCKING RESETS

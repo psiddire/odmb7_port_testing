@@ -299,6 +299,10 @@ begin
   rxprbssel_int(3 downto 0) <= PRBS_TYPE when PRBS_RX_EN(0) = '1' else x"0";
   txprbssel_int(3 downto 0) <= PRBS_TYPE when PRBS_TX_EN(0) = '1' else x"0";
 
+  -- For GTH core configurations which utilize the transceiver channel CPLL, the drpclk_in port must be driven by
+  -- the free-running clock at the exact frequency specified during core customization, for reliable bring-up
+  drpclk_int <= (others => SYSCLK);
+
   -- rxprbserr_int  -- TODO: later
   -- rxprbslocked_int -- TODO: later
   -- txprbsforceerr_int -- TODO: later
