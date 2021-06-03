@@ -193,10 +193,10 @@ entity odmb7_ucsb_dev is
     SYSMON_P      : in std_logic_vector(15 downto 0);
     SYSMON_N      : in std_logic_vector(15 downto 0);
 
-    ADC_CS_B      : out std_logic_vector(4 downto 0); -- Bank 46
-    ADC_DIN       : out std_logic; -- Bank 46 
-    ADC_SCK       : out std_logic; -- Bank 46 
-    ADC_DOUT      : in std_logic;   -- Bank 46
+    ADC_CS_B      : out std_logic_vector(4 downto 0);      -- Bank 46
+    ADC_DIN       : out std_logic;                         -- Bank 46
+    ADC_SCK       : out std_logic;                         -- Bank 46
+    ADC_DOUT      : in std_logic;                          -- Bank 46
 
     --------------------------------
     -- Others
@@ -385,15 +385,17 @@ architecture Behavioral of odmb7_ucsb_dev is
       DCFEB_RXPRBSERR      : in  std_logic;
       DCFEB_PRBS_ERR_CNT   : in  std_logic_vector(15 downto 0);
 
-      -------------------
+      --------------------
       -- System monitoring
-      -------------------
-
+      --------------------
+      -- Current monitoring
+      SYSMON_P      : in std_logic_vector(15 downto 0);
+      SYSMON_N      : in std_logic_vector(15 downto 0);
       -- Voltage monitoring through MAX127 chips
-      ADC_CS_B     : out std_logic_vector(4 downto 0);
-      ADC_DIN        : out std_logic;
-      ADC_SCK        : out std_logic; 
-      ADC_DOUT       : in  std_logic;
+      ADC_CS_B      : out std_logic_vector(4 downto 0);
+      ADC_DIN       : out std_logic;
+      ADC_SCK       : out std_logic;
+      ADC_DOUT      : in std_logic;
 
       --------------------
       -- Other
@@ -1407,10 +1409,12 @@ begin
       DCFEB_RXPRBSERR      => dcfeb_rxprbserr,
       DCFEB_PRBS_ERR_CNT   => dcfeb_prbs_err_cnt,
 
-      ADC_CS_B             => ADC_CS_B, 
-      ADC_DIN              => ADC_DIN, 
-      ADC_SCK              => ADC_SCK,  
-      ADC_DOUT             => ADC_DOUT, 
+      SYSMON_P             => SYSMON_P,
+      SYSMON_N             => SYSMON_N,
+      ADC_CS_B             => ADC_CS_B,
+      ADC_DIN              => ADC_DIN,
+      ADC_SCK              => ADC_SCK,
+      ADC_DOUT             => ADC_DOUT,
 
       DIAGOUT   => diagout_inner,
       RST       => reset,
@@ -1643,38 +1647,5 @@ begin
   --    led_out        => LEDS_CFV(7 downto 0),
   --    reset          => mgt_reset
   --    );
-
-  -------------------------------------------------------------------------------------------
-  -- SYSMON module instantiation
-  -------------------------------------------------------------------------------------------
---  sysmone1_inst : SYSMONE1
---    port map (
---      ALM => open,
---      OT => open,
---      DO => open,
---      DRDY => open,
---      BUSY => open,
---      CHANNEL => open,
---      EOC => open,
---      EOS => open,
---      JTAGBUSY => open,
---      JTAGLOCKED => open,
---      JTAGMODIFIED => open,
---      MUXADDR => open,
---      VAUXN => SYSMON_N, -- 16 bits AD[0-15]N
---      VAUXP => SYSMON_P, -- 16 bits AD[0-15]P
---      CONVST => '0',
---      CONVSTCLK => '0',
---      RESET => '0',
---      VN => '0',
---      VP => '0',
---      DADDR => X"00",
---      DCLK => '0',
---      DEN => '0',
---      DI => X"0000",
---      DWE => '0',
---      I2C_SCLK => '0',
---      I2C_SDA => '0'
---      );
 
 end Behavioral;
