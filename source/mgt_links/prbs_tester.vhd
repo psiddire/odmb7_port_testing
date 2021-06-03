@@ -100,25 +100,25 @@ architecture Behavioral of prbs_tester is
       );
   end component;
 
-  component vio_1
-    port (
-      clk : in std_logic;
-      probe_in0  : in std_logic_vector(3 downto 0);
-      probe_in1  : in std_logic_vector(6 downto 0);
-      probe_in2  : in std_logic;
-      probe_in3  : in std_logic;
-      probe_in4  : in std_logic_vector(15 downto 0);
-      probe_in5  : in std_logic_vector(15 downto 0);
-      probe_in6  : in std_logic_vector(15 downto 0);
-      probe_in7  : in std_logic_vector(15 downto 0);
-      probe_in8  : in std_logic_vector(15 downto 0);
-      probe_in9  : in std_logic_vector(15 downto 0);
-      probe_out0 : out std_logic;
-      probe_out1 : out std_logic;
-      probe_out2 : out std_logic;
-      probe_out3 : out std_logic
-      );
-  end component;
+--  component vio_1
+--    port (
+--      clk : in std_logic;
+--      probe_in0  : in std_logic_vector(3 downto 0);
+--      probe_in1  : in std_logic_vector(6 downto 0);
+--      --probe_in2  : in std_logic;
+--      probe_in3  : in std_logic;
+--      probe_in4  : in std_logic_vector(15 downto 0);
+--      probe_in5  : in std_logic_vector(15 downto 0);
+--      probe_in6  : in std_logic_vector(15 downto 0);
+--      probe_in7  : in std_logic_vector(15 downto 0);
+--      probe_in8  : in std_logic_vector(15 downto 0);
+--      probe_in9  : in std_logic_vector(15 downto 0);
+--      probe_out0 : out std_logic;
+--      probe_out1 : out std_logic;
+--      probe_out2 : out std_logic;
+--      probe_out3 : out std_logic
+--      );
+--  end component;
 
   component ila_1
     port (
@@ -488,24 +488,24 @@ begin
     end if;
   end process;
 
-  prbs_test_vio_inst : vio_1
-    port map (
-      clk => sysclk,
-      probe_in0 => prbs_match_ddu,
-      probe_in1 => prbs_match_cfeb,
-      probe_in2 => rxd_valid_spy(0),
-      probe_in3 => rxready_ddu,
-      probe_in4 => std_logic_vector(spy_rxdata_err_ctr(16 downto 1)),
-      probe_in5 => std_logic_vector(ddu_rxdata_err_ctr(1)(16 downto 1)),
-      probe_in6 => std_logic_vector(spy_rxdata_nml_ctr(39 downto 24)),
-      probe_in7 => std_logic_vector(ddu_rxdata_nml_ctr(1)(39 downto 24)),
-      probe_in8 => std_logic_vector(txd_spy_init_ctr),
-      probe_in9 => std_logic_vector(alct_rxdata_nml_ctr(39 downto 24)),
-      probe_out0 => rxdata_errctr_reset_vio_int,
-      probe_out1 => prbsgen_reset_vio_int,
-      probe_out2 => txd_valid_vio_int,
-      probe_out3 => global_reset
-      );
+--  prbs_test_vio_inst : vio_1
+--    port map (
+--      clk => sysclk,
+--      probe_in0 => prbs_match_ddu,
+--      probe_in1 => prbs_match_cfeb,
+--      --probe_in2 => rxd_valid_spy(0),
+--      probe_in3 => rxready_ddu,
+--      probe_in4 => std_logic_vector(spy_rxdata_err_ctr(16 downto 1)),
+--      probe_in5 => std_logic_vector(ddu_rxdata_err_ctr(1)(16 downto 1)),
+--      probe_in6 => std_logic_vector(spy_rxdata_nml_ctr(39 downto 24)),
+--      probe_in7 => std_logic_vector(ddu_rxdata_nml_ctr(1)(39 downto 24)),
+--      probe_in8 => std_logic_vector(txd_spy_init_ctr),
+--      probe_in9 => std_logic_vector(alct_rxdata_nml_ctr(39 downto 24)),
+--      probe_out0 => rxdata_errctr_reset_vio_int,
+--      probe_out1 => prbsgen_reset_vio_int,
+--      probe_out2 => txd_valid_vio_int,
+--      probe_out3 => global_reset
+--      );
 
   -- spy_tx_ila_inst : ila_1
   --   port map (
@@ -535,9 +535,9 @@ begin
   --     probe0 => ila_ddu_tx
   --     );
 
-  -- ila_ddu_tx(31 downto 0)   <= txdata_ddu_int;
-  ila_ddu_tx(15 downto 0)   <= txdata_ddu_prbs_int;
-  ila_ddu_tx(31 downto 16)  <= txdata_ddu_cntr_int;
+  --ila_ddu_tx(31 downto 0)   <= txdata_ddu_int;
+  ila_ddu_tx(15 downto 0)   <= txdata_ddu_prbs_int(15 downto 0);
+  ila_ddu_tx(31 downto 16)  <= txdata_ddu_cntr_int(15 downto 0);
   ila_ddu_tx(32)            <= txd_valid_ddu_int(1);
   ila_ddu_tx(48 downto 33)  <= std_logic_vector(txd_ddu_init_ctr);
   ila_ddu_tx(64 downto 49)  <= txdata_spy_int;
