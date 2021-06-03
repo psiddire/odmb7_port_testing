@@ -338,7 +338,6 @@ architecture Behavioral of ODMB_VME is
   component SYSTEM_MON is
     port (
       OUTDATA   : out std_logic_vector(15 downto 0);
-      INDATA    : in  std_logic_vector(15 downto 0);
       DTACK     : out std_logic;
 
       ADC_CS_B  : out std_logic_vector(4 downto 0);
@@ -347,7 +346,6 @@ architecture Behavioral of ODMB_VME is
       ADC_DOUT  : in  std_logic;
 
       SLOWCLK   : in std_logic;
-      SLOWCLKX2 : in std_logic;
       FASTCLK   : in std_logic;
       RST       : in std_logic;
 
@@ -356,8 +354,6 @@ architecture Behavioral of ODMB_VME is
       COMMAND   : in std_logic_vector(9 downto 0);
       WRITER    : in std_logic;
 
-      --VP      : in std_logic;
-      --VN      : in std_logic;
       VAUXP     : in std_logic_vector(15 downto 0);
       VAUXN     : in std_logic_vector(15 downto 0)
       );
@@ -756,11 +752,9 @@ begin
   DEV7_SYSMON : SYSTEM_MON
     port map(
       OUTDATA => outdata_dev(7),
-      INDATA => VME_DATA_IN,
       DTACK   => dtack_dev(7),
 
       SLOWCLK => CLK1P25,
-      SLOWCLKX2 => CLK2P5,
       FASTCLK => CLK40,
       RST     => rst,
 
@@ -772,10 +766,8 @@ begin
       ADC_CS_B =>  ADC_CS_B,  
       ADC_DIN  =>  ADC_DIN,  
       ADC_SCK  =>  ADC_SCK,  
-      ADC_DOUT =>  ADC_DOUT 
+      ADC_DOUT =>  ADC_DOUT,
 
-      --VP    => VP,
-      --VN    => VN,
       VAUXP => SYSMON_P,
       VAUXN => SYSMON_N
       );

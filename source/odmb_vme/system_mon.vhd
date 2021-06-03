@@ -9,7 +9,6 @@ use ieee.std_logic_misc.all;
 entity SYSTEM_MON is
   port (
     OUTDATA   : out std_logic_vector(15 downto 0);
-    INDATA    : in  std_logic_vector(15 downto 0);
     DTACK     : out std_logic;
 
     ADC_CS_B  : out std_logic_vector(4 downto 0);
@@ -18,15 +17,13 @@ entity SYSTEM_MON is
     ADC_DOUT  : in std_logic;
 
     SLOWCLK   : in std_logic;
-    SLOWCLKX2 : in std_logic;
     FASTCLK   : in std_logic;
     RST       : in std_logic;
     DEVICE    : in std_logic;
     STROBE    : in std_logic;
     COMMAND   : in std_logic_vector(9 downto 0);
     WRITER    : in std_logic;
-    -- VP     : in std_logic;
-    -- VN     : in std_logic;
+
     VAUXP     : in std_logic_vector(15 downto 0);
     VAUXN     : in std_logic_vector(15 downto 0)
     );
@@ -83,10 +80,11 @@ architecture SYSTEM_MON_ARCH of SYSTEM_MON is
   end component;
 
   -- SYSMON module signals
-  signal sysmon_daddr : std_logic_vector(15 downto 0) := (others => '0');
+  signal sysmon_daddr : std_logic_vector(7 downto 0) := (others => '0');
   signal sysmon_dout  : std_logic_vector(15 downto 0);
   signal sysmon_drdy  : std_logic;
   signal sysmon_den   : std_logic := '0';
+  signal sysmon_alm   : std_logic_vector(15 downto 0);
   signal q_strobe  : std_logic;
   signal q2_strobe : std_logic;
 
@@ -144,14 +142,17 @@ begin
 
   -- command R 7XY0, to use the SYSMON module, XY is the channel number of SYSMON module
   r_sys_mon <= '1' when (device = '1' and WRITER = '1' and r_vol_mon = '0') else '0';
-  -- command W 72Y0, where Y represent nth MAX1271 chip to read, vmedata can be anything
-  w_vol_mon <= '1' when (cmddev(15 downto 8) = x"12" and WRITER = '0') else '0';
-  -- command R 73Y0, where Y represent nth MAX1271 chip to read
-  r_vol_mon <= '1' when (cmddev(15 downto 8) = x"13" and WRITER = '1') else '0';
+  -- command W 73Y0, where Y represent nth MAX1271 chip to read, vmedata can be anything
+  w_vol_mon <= '1' when (cmddev(15 downto 8) = x"13" and WRITER = '0') else '0';
+  -- command R 74Y0, where Y represent nth MAX1271 chip to read
+  r_vol_mon <= '1' when (cmddev(15 downto 8) = x"14" and WRITER = '1') else '0';
 
   -- this signal is not actually used in reading vmon_dout_inner
   which_chip <= cmddev(7 downto 4) when (w_vol_mon = '1') else x"0";
   which_chan <= cmddev(7 downto 4) when (r_vol_mon = '1') else x"0";
+
+  -- this is the channel
+  sysmon_daddr <= cmddev(11 downto 4) when (r_sys_mon = '1') else x"00";
 
   -- when w_vol_mon has a rising edge, trigger a sequence sent to MAX1271
   u1_oneshot : oneshot port map (trigger => w_vol_mon, clk => SLOWCLK, pulse => startchannelvalid);
@@ -217,91 +218,58 @@ begin
   -------------------------------------------------------------------------------------------
   -- TODO: Find out the SYSMON configurations and assign the DADDR
   sysmone1_inst : SYSMONE1
-  port map (
-    ALM => open,
-    OT => open,
-    DO => sysmon_dout,
-    DRDY => sysmon_drdy,
-    BUSY => open,
-    CHANNEL => open,
-    EOC => open,
-    EOS => open,
-    JTAGBUSY => open,
-    JTAGLOCKED => open,
-    JTAGMODIFIED => open,
-    MUXADDR => open,
-    VAUXN => VAUXN, -- 16 bits AD[0-15]N
-    VAUXP => VAUXP, -- 16 bits AD[0-15]P
-    CONVST => '0',
-    CONVSTCLK => '0',
-    RESET => RST,
-    VN => '0',
-    VP => '0',
-    DADDR => sysmon_daddr,
-    DCLK => FASTCLK,
-    DEN => sysmon_den,
-    DI => x"0000",
-    DWE => '0',
-    I2C_SCLK => '0',
-    I2C_SDA => '0'
-    );
+    generic map (
+      INIT_40 => x"3000",    -- Set to average 256 samples
+      INIT_41 => x"2080",    -- Set continuous sequence mode, and calibration mode CAL3
+      INIT_42 => x"0A00",    -- Set DCLK division for the ADC clock to 10
+      INIT_48 => x"7F01",    -- Turns on the voltage monitors
+      INIT_49 => x"FFFF",    -- Turns on all the ADC channels
+      INIT_4A => x"0F00",    -- Enable averaging for temperature and Vcc
+      INIT_4B => x"FFFF",    -- Enable averaging for all ADC channels
+      INIT_4C => x"0000",    -- Sequencer Bipolar selection
+      INIT_4D => x"0000",    -- Sequencer Bipolar selection
+      INIT_4E => x"0800",    -- Set Acquisition time as 10 ADCCLK cycles
+      INIT_4F => x"FFFF",    -- Set Acquisition time as 10 ADCCLK cycles
+      INIT_50 => x"B5ED",    -- Temp upper alarm limit
+      INIT_51 => x"5999",    -- Vccint upper alarm limit
+      INIT_52 => x"E000",    -- Vccaux upper alarm limit
+      INIT_53 => x"B5C3",    -- Temp alarm OT upper (Default 125C -> ca33, 85C -> b5c3)
+      INIT_54 => x"A93A",    -- Temp lower alarm limit
+      INIT_55 => x"5111",    -- Vccint lower alarm limit
+      INIT_56 => x"CAAA",    -- Vccaux lower alarm limit
+      INIT_57 => x"B0CE"     -- Temp alarm OT reset (Default 70C -> ae4e, 75C -> b0ce)
+      )
+    port map (
+      ALM => sysmon_alm,     -- to be connected
+      OT => open,
+      DO => sysmon_dout,
+      DRDY => sysmon_drdy,
+      BUSY => open,
+      CHANNEL => open,
+      EOC => open,
+      EOS => open,
+      JTAGBUSY => open,
+      JTAGLOCKED => open,
+      JTAGMODIFIED => open,
+      MUXADDR => open,
+      VAUXN => VAUXN, -- 16 bits AD[0-15]N
+      VAUXP => VAUXP, -- 16 bits AD[0-15]P
+      CONVST => '0',
+      CONVSTCLK => '0',
+      RESET => RST,
+      VN => '0',
+      VP => '0',
+      DADDR => sysmon_daddr,
+      DCLK => FASTCLK,
+      DEN => sysmon_den,
+      DI => x"0000",
+      DWE => '0',
+      I2C_SCLK => '0',
+      I2C_SDA => '0'
+      );
 
-  -- SYSMON part still need to be ported to work with KU
-  --SYSMON_PM : SYSMON
-  --  generic map(
-  --    INIT_40          => X"3000",      -- config reg 0
-  --    INIT_41          => X"20f0",      -- config reg 1
-  --    INIT_42          => X"0a00",      -- config reg 2
-  --    INIT_48          => X"3f01",      -- Sequencer channel selection
-  --    INIT_49          => X"ffff",      -- Sequencer channel selection
-  --    INIT_4A          => X"0f00",      -- Sequencer Average selection
-  --    INIT_4B          => X"ffff",      -- Sequencer Average selection
-  --    INIT_4C          => X"0000",      -- Sequencer Bipolar selection
-  --    INIT_4D          => X"0000",      -- Sequencer Bipolar selection
-  --    INIT_4E          => X"0800",      -- Sequencer Acq time selection
-  --    INIT_4F          => X"ffff",      -- Sequencer Acq time selection
-  --    INIT_50          => X"b5ed",      -- Temp alarm trigger
-  --    INIT_51          => X"5999",      -- Vccint upper alarm limit
-  --    INIT_52          => X"e000",      -- Vccaux upper alarm limit
-  --    INIT_53          => X"b5c3",      -- Temp alarm OT upper (Default 125C -> ca33, 85C -> b5c3)
-  --    INIT_54          => X"a93a",      -- Temp alarm reset
-  --    INIT_55          => X"5111",      -- Vccint lower alarm limit
-  --    INIT_56          => X"caaa",      -- Vccaux lower alarm limit
-  --    INIT_57          => X"b0ce",      -- Temp alarm OT reset (Default 70C -> ae4e, 75C -> b0ce)
-  --    SIM_DEVICE       => "VIRTEX6",
-  --    SIM_MONITOR_FILE => "/home/adam/odmb_ucsb_v2_testing/source/odmb_vme/auxfile.txt"
-  --    )
-  --  port map(
-  --    ALM          => open,
-  --    BUSY         => open,
-  --    CHANNEL      => open,
-  --    DO           => outdata_inner,
-  --    DRDY         => drdy,
-  --    EOC          => open,
-  --    EOS          => open,
-  --    JTAGBUSY     => open,
-  --    JTAGLOCKED   => open,
-  --    JTAGMODIFIED => open,
-  --    OT           => open,
-
-  --    CONVST    => '0',
-  --    CONVSTCLK => '0',
-  --    DADDR     => command(8 downto 2),
-  --    DCLK      => FASTCLK,
-  --    DEN       => den,
-  --    DI        => x"0000",
-  --    DWE       => '0',
-  --    RESET     => RST,
-  --    VAUXN     => VAUXN,
-  --    VAUXP     => VAUXP,
-  --    VN        => VN,
-  --    VP        => VP
-  --    );
-
-  -- TODO: add sysmon_dout to OUTDATA and assign sysmon_daddr from COMMAND
-  -- OUTDATA <= x"0" & outdata_inner(15 downto 4) when ( CMDDEV(11 downto 8) = x"1" ) else -- Discarding the 4 LSB
-
-  OUTDATA <= x"0" & vmon_dout_chan(vmon_chidx) when (r_vol_mon = '1') else 
+  OUTDATA <= x"0" & vmon_dout_chan(vmon_chanidx) when (r_vol_mon = '1') else
+             x"0" & sysmon_dout(15 downto 4)     when (r_sys_mon = '1') else -- Discarding the 4 LSB
              (others => 'L');
 
   -- Enable sysmon output in first full clock cycle after strobe goes high
@@ -322,7 +290,7 @@ begin
   -- ILA for voltageMon debug
   i_ila : ila_volMon
     port map(
-      clk => SLOWCLKX2,
+      clk => FASTCLK,
       probe0 => ila_trigger,
       probe1 => variousflags, 
       probe2 => vmon_dout,  
