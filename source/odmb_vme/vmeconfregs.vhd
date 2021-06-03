@@ -12,6 +12,9 @@ use ieee.std_logic_misc.all;
 use work.ucsb_types.all;
 
 entity VMECONFREGS is
+  generic (
+    NCFEB   : integer range 1 to 7 := 7  -- Number of DCFEBS, 7 for ME1/1, 5
+    );
   port (
     SLOWCLK : in std_logic;
     CLK     : in std_logic;

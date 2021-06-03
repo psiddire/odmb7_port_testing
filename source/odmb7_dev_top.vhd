@@ -57,15 +57,15 @@ entity odmb7_ucsb_dev is
     VME_DTACK_KUS_B : out std_logic;                       -- Bank 44
 
     -- From/To PPIB (connectors J3 and J4)
-    DCFEB_TCK_P    : out std_logic_vector(NCFEB downto 1); -- Bank 68
-    DCFEB_TCK_N    : out std_logic_vector(NCFEB downto 1); -- Bank 68
+    DCFEB_TCK_P    : out std_logic_vector(7 downto 1);     -- Bank 68
+    DCFEB_TCK_N    : out std_logic_vector(7 downto 1);     -- Bank 68
     DCFEB_TMS_P    : out std_logic;                        -- Bank 68
     DCFEB_TMS_N    : out std_logic;                        -- Bank 68
     DCFEB_TDI_P    : out std_logic;                        -- Bank 68
     DCFEB_TDI_N    : out std_logic;                        -- Bank 68
-    DCFEB_TDO_P    : in  std_logic_vector(NCFEB downto 1); -- "C_TDO" in Bank 67-68
-    DCFEB_TDO_N    : in  std_logic_vector(NCFEB downto 1); -- "C_TDO" in Bank 67-68
-    DCFEB_DONE     : in  std_logic_vector(NCFEB downto 1); -- "DONE_*" in Bank 68
+    DCFEB_TDO_P    : in  std_logic_vector(7 downto 1);     -- "C_TDO" in Bank 67-68
+    DCFEB_TDO_N    : in  std_logic_vector(7 downto 1);     -- "C_TDO" in Bank 67-68
+    DCFEB_DONE     : in  std_logic_vector(7 downto 1);     -- "DONE_*" in Bank 68
     RESYNC_P       : out std_logic;                        -- Bank 66
     RESYNC_N       : out std_logic;                        -- Bank 66
     BC0_P          : out std_logic;                        -- Bank 68
@@ -76,8 +76,8 @@ entity odmb7_ucsb_dev is
     EXTPLS_N       : out std_logic;                        -- Bank 66, ODMB CTRL
     L1A_P          : out std_logic;                        -- Bank 66, ODMB CTRL
     L1A_N          : out std_logic;                        -- Bank 66, ODMB CTRL
-    L1A_MATCH_P    : out std_logic_vector(NCFEB downto 1); -- Bank 66, ODMB CTRL
-    L1A_MATCH_N    : out std_logic_vector(NCFEB downto 1); -- Bank 66, ODMB CTRL
+    L1A_MATCH_P    : out std_logic_vector(7 downto 1);     -- Bank 66, ODMB CTRL
+    L1A_MATCH_N    : out std_logic_vector(7 downto 1);     -- Bank 66, ODMB CTRL
     PPIB_OUT_EN_B  : out std_logic;                        -- Bank 68
 
     --------------------
@@ -119,11 +119,11 @@ entity odmb7_ucsb_dev is
     -- OTMB communication signals
     --------------------------------
     OTMB        : in  std_logic_vector(35 downto 0);      -- "TMB[35:0]" in Bank 44-45
-    RAWLCT      : in  std_logic_vector(NCFEB-1 downto 0); -- Bank 45
+    RAWLCT      : in  std_logic_vector(6 downto 0);       -- Bank 45 <-- To be updated
     OTMB_DAV    : in  std_logic;                          -- "TMB_DAV" in Bank 45
     OTMB_FF_CLK : in  std_logic;                          -- "TMB_FF_CLK" in Bank 45
-    RSVTD_IN    : in  std_logic_vector(7 downto 3);       -- "RSVTD[7:3]" in Bank 44-45
-    RSVTD_OUT   : out std_logic_vector(2 downto 0);       -- "RSVTD[2:0]" in Bank 44-45
+    RSVTD_IN    : in  std_logic_vector(7 downto 3);       -- "RSVTD[7:3]" in Bank 44-45  <-- To be updated
+    RSVTD_OUT   : out std_logic_vector(2 downto 0);       -- "RSVTD[2:0]" in Bank 44-45  <-- To be updated
     LCT_RQST    : out std_logic_vector(2 downto 1);       -- Bank 45
 
     --------------------------------
@@ -206,6 +206,7 @@ entity odmb7_ucsb_dev is
 end odmb7_ucsb_dev;
 
 architecture Behavioral of odmb7_ucsb_dev is
+  constant NCFEB  : integer range 1 to 7 := 7;  -- Number of DCFEBS, 7 for ODMB7
 
   component odmb_clocking is
     port (
@@ -758,9 +759,9 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal pon_reset          : std_logic := '0';
   signal done_cnt_en        : std_logic_vector(NCFEB downto 1);
   signal done_cnt_rst       : std_logic_vector(NCFEB downto 1);
-  signal done_cnt           : done_cnt_type;
-  signal done_next_state    : done_state_array_type;
-  signal done_current_state : done_state_array_type;
+  signal done_cnt           : t_done_cnt_arr(NCFEB downto 1);
+  signal done_next_state    : t_done_state_arr(NCFEB downto 1);
+  signal done_current_state : t_done_state_arr(NCFEB downto 1);
   signal dcfeb_done_pulse   : std_logic_vector(NCFEB downto 1) := (others => '0');
   signal dcfeb_initjtag     : std_logic := '0';
   signal dcfeb_initjtag_d   : std_logic := '0';

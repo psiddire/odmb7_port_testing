@@ -25,7 +25,7 @@ use work.ucsb_types.all;
 entity ODMB_VME is
   generic (
     NCFEB       : integer range 1 to 7 := 7
-  );
+    );
   port (
     --------------------
     -- Clock
@@ -157,7 +157,7 @@ entity ODMB_VME is
     -- Voltage monitoring through MAX127 chips
     ADC_CS_B      : out std_logic_vector(4 downto 0);
     ADC_DIN       : out std_logic;
-    ADC_SCK       : out std_logic; 
+    ADC_SCK       : out std_logic;
     ADC_DOUT      : in  std_logic;
     -------------------
 
@@ -174,42 +174,45 @@ architecture Behavioral of ODMB_VME is
   -- Constants
   constant bw_data  : integer := 16; -- data bit width
   constant num_dev  : integer := 9;  -- number of devices (exclude dev0)
-  
+
   component VMECONFREGS is
+    generic (
+      NCFEB   : integer range 1 to 7 := 7
+      );
     port (
       SLOWCLK : in std_logic;
       CLK     : in std_logic;
       RST     : in std_logic;
-      
+
       DEVICE   : in  std_logic;
       STROBE   : in  std_logic;
       COMMAND  : in  std_logic_vector(9 downto 0);
       WRITER   : in  std_logic;
       DTACK    : out std_logic;
-      
+
       INDATA  : in  std_logic_vector(15 downto 0);
       OUTDATA : out std_logic_vector(15 downto 0);
-      
-      -- Configuration registers    
+
+      -- Configuration registers
       LCT_L1A_DLY   : out std_logic_vector(5 downto 0);
       CABLE_DLY     : out integer range 0 to 1;
       OTMB_PUSH_DLY : out integer range 0 to 63;
       ALCT_PUSH_DLY : out integer range 0 to 63;
       BX_DLY        : out integer range 0 to 4095;
-      
+
       INJ_DLY    : out std_logic_vector(4 downto 0);
       EXT_DLY    : out std_logic_vector(4 downto 0);
       CALLCT_DLY : out std_logic_vector(3 downto 0);
-      
+
       ODMB_ID      : out std_logic_vector(15 downto 0);
       NWORDS_DUMMY : out std_logic_vector(15 downto 0);
       KILL         : out std_logic_vector(NCFEB+2 downto 1);
       CRATEID      : out std_logic_vector(7 downto 0);
-      
+
       -- From ODMB_UCSB_V2 to change registers
       CHANGE_REG_DATA  : in std_logic_vector(15 downto 0);
       CHANGE_REG_INDEX : in integer range 0 to NREGS;
-      
+
       -- To/From SPI Interface
       SPI_CFG_UL_PULSE   : in std_logic;
       SPI_CONST_UL_PULSE : in std_logic;
@@ -224,6 +227,9 @@ architecture Behavioral of ODMB_VME is
   end component;
 
   component CFEBJTAG is
+    generic (
+      NCFEB     : integer range 1 to 7 := 7
+      );
     port (
       -- CSP_LVMB_LA_CTRL : inout std_logic_vector(35 downto 0);
 
@@ -248,29 +254,32 @@ architecture Behavioral of ODMB_VME is
   end component;
 
   component VMEMON is
+    generic (
+      NCFEB   : integer range 1 to 7 := 7
+      );
     port (
       SLOWCLK : in std_logic;
       CLK40   : in std_logic;
       RST     : in std_logic;
-      
+
       DEVICE  : in std_logic;
       STROBE  : in std_logic;
       COMMAND : in std_logic_vector(9 downto 0);
       WRITER  : in std_logic;
-      
+
       INDATA  : in  std_logic_vector(15 downto 0);
       OUTDATA : out std_logic_vector(15 downto 0);
-      
+
       DTACK : out std_logic;
-      
+
       DCFEB_DONE  : in std_logic_vector(NCFEB downto 1);
-      
+
       --reset signals
       OPT_RESET_PULSE : out std_logic;
       L1A_RESET_PULSE : out std_logic;
       FW_RESET        : out std_logic;
       REPROG_B        : out std_logic;
-      
+
       --pulses
       TEST_INJ        : out std_logic;
       TEST_PLS        : out std_logic;
@@ -278,7 +287,7 @@ architecture Behavioral of ODMB_VME is
       TEST_BC0        : out std_logic;
       OTMB_LCT_RQST   : out std_logic;
       OTMB_EXT_TRIG   : out std_logic;
-      
+
       --internal register outputs
       ODMB_CAL        : out std_logic;
       TP_SEL          : out std_logic_vector(15 downto 0);
@@ -292,13 +301,13 @@ architecture Behavioral of ODMB_VME is
       TEST_PED        : out std_logic;
       MASK_L1A        : out std_logic_vector(NCFEB downto 0);
       MASK_PLS        : out std_logic;
-      
+
       --exernal registers
       ODMB_DATA_SEL : out std_logic_vector(7 downto 0);
-      ODMB_DATA     : in  std_logic_vector(15 downto 0)      
+      ODMB_DATA     : in  std_logic_vector(15 downto 0)
       );
   end component;
-  
+
   component SPI_PORT is
     port (
       SLOWCLK              : in std_logic;
@@ -342,7 +351,7 @@ architecture Behavioral of ODMB_VME is
 
       ADC_CS_B  : out std_logic_vector(4 downto 0);
       ADC_DIN   : out std_logic;
-      ADC_SCK   : out std_logic; 
+      ADC_SCK   : out std_logic;
       ADC_DOUT  : in  std_logic;
 
       SLOWCLK   : in std_logic;
@@ -458,20 +467,20 @@ architecture Behavioral of ODMB_VME is
       LED     : out std_logic_vector(2 downto 0)
       );
   end component;
-  
+
   component SPI_CTRL is
     port (
-      
+
       CLK40   : in std_logic;
       CLK2P5  : in std_logic;
       RST     : in std_logic;
-      
+
       CMD_FIFO_IN : in std_logic_vector(15 downto 0);
       CMD_FIFO_WRITE_EN : in std_logic;
       READBACK_FIFO_OUT : out std_logic_vector(15 downto 0);
       READBACK_FIFO_READ_EN : in std_logic;
       READ_BUSY : out std_logic;
-      
+
       NCMDS_SPICTRL : out unsigned(15 downto 0);
       NCMDS_SPIINTR : out unsigned(15 downto 0);
       DIAGOUT : out std_logic_vector(17 downto 0)
@@ -499,9 +508,9 @@ architecture Behavioral of ODMB_VME is
   signal dl_jtag_tdi_inner, dl_jtag_tms_inner : std_logic;
 
   signal cmd_adrs_inner : std_logic_vector(17 downto 2) := (others => '0');
-  
+
   signal odmb_id_inner : std_logic_vector(15 downto 0);
-  
+
   --------------------------------------
   -- OTMB signals assembly
   --------------------------------------
@@ -528,7 +537,7 @@ architecture Behavioral of ODMB_VME is
   signal spi_cfg_regs               : cfg_regs_array;
   signal spi_ncmds_spictrl          : unsigned (15 downto 0);
   signal spi_ncmds_spiintr          : unsigned (15 downto 0);
-  
+
   --------------------------------------
   -- PROM signals
   --------------------------------------
@@ -537,7 +546,7 @@ architecture Behavioral of ODMB_VME is
   signal spi_readback_fifo_read_en : std_logic := '0';
   signal spi_readback_fifo_out     : std_logic_vector(15 downto 0) := x"0000";
   signal spi_read_busy             : std_logic := '0';
-  
+
 
 begin
 
@@ -561,7 +570,7 @@ begin
   VME_DATA_OUT <= outdata_dev(idx_dev);
 
   VME_DTACK_B <= not or_reduce(dtack_dev);
-  
+
   ----------------------------------
   -- OTMB backplane pins
   ----------------------------------
@@ -577,7 +586,7 @@ begin
   --                      eof_otmb_data(16 downto 15) & eof_alct_data(14 downto 0) & eof_otmb_data(14 downto 0);
 
   otmb_tx(14 downto 0)  <= OTMB(14 downto 0);    -- tmb_data[14:0]      // fifo data
-  otmb_tx(29 downto 15) <= OTMB(32 downto 18);   -- alct_data[14:0]     // alct data	
+  otmb_tx(29 downto 15) <= OTMB(32 downto 18);   -- alct_data[14:0]     // alct data
   otmb_tx(30)           <= OTMB(15);             -- tmb_ddu_special     // DDU special
   otmb_tx(31)           <= OTMB(16);             -- tmb_last_frame      // DMB last
   otmb_tx(32)           <= OTMB_DAV;             -- tmb_first_frame     // DMB data available
@@ -609,6 +618,9 @@ begin
   ----------------------------------
 
   DEV1_CFEBJTAG : CFEBJTAG
+    generic map (
+      NCFEB => NCFEB
+      )
     port map (
       -- CSP_LVMB_LA_CTRL => CSP_LVMB_LA_CTRL,
       FASTCLK => clk40,
@@ -635,6 +647,9 @@ begin
       );
 
   DEV3_VMEMON : VMEMON
+    generic map (
+      NCFEB => NCFEB
+      )
     port map (
       SLOWCLK => clk2p5,
       CLK40   => clk40,
@@ -677,76 +692,79 @@ begin
       TXDIFFCTRL      => open,      -- TX voltage swing, W 3110 is disabled: constant output x"8"
       LOOPBACK        => open       -- For internal loopback tests, bbb for W 3100 bbb
       );
-  
+
   DEV4_VMECONFREGS : VMECONFREGS
-      port map (
-        SLOWCLK => CLK2P5,
-        CLK => CLK40,
-        RST => RST, 
-        DEVICE  => device(4),
-        STROBE  => strobe,
-        COMMAND => cmd,
-        WRITER => VME_WRITE_B,
-        DTACK => dtack_dev(4),
-        INDATA => VME_DATA_IN,
-        OUTDATA => outdata_dev(4),
-        
-        LCT_L1A_DLY => LCT_L1A_DLY,
-        CABLE_DLY => CABLE_DLY,
-        OTMB_PUSH_DLY => OTMB_PUSH_DLY, 
-        ALCT_PUSH_DLY => ALCT_PUSH_DLY,
-        BX_DLY => BX_DLY, 
-        INJ_DLY => INJ_DLY, 
-        EXT_DLY => EXT_DLY, 
-        CALLCT_DLY => CALLCT_DLY,
-        ODMB_ID => odmb_id_inner,
-        NWORDS_DUMMY => NWORDS_DUMMY,
-        KILL => KILL,
-        CRATEID => CRATEID,
-        
-        CHANGE_REG_DATA  => CHANGE_REG_DATA,
-        CHANGE_REG_INDEX => CHANGE_REG_INDEX,
-        
-        SPI_CFG_UL_PULSE    => spi_cfg_ul_pulse,
-        SPI_CONST_UL_PULSE  => spi_const_ul_pulse,
-        SPI_REG_IN          => spi_reg_in,
-        SPI_CONST_BUSY      => spi_const_busy,
-        SPI_CONST_REG_WE    => spi_const_reg_we,
-        SPI_CFG_BUSY        => spi_cfg_busy,
-        SPI_CFG_REG_WE      => spi_cfg_reg_we,  
-        SPI_CONST_REGS      => spi_const_regs,
-        SPI_CFG_REGS        => spi_cfg_regs
-      );      
-      
+    generic map (
+      NCFEB => NCFEB
+      )
+    port map (
+      SLOWCLK => CLK2P5,
+      CLK => CLK40,
+      RST => RST,
+      DEVICE  => device(4),
+      STROBE  => strobe,
+      COMMAND => cmd,
+      WRITER => VME_WRITE_B,
+      DTACK => dtack_dev(4),
+      INDATA => VME_DATA_IN,
+      OUTDATA => outdata_dev(4),
+
+      LCT_L1A_DLY => LCT_L1A_DLY,
+      CABLE_DLY => CABLE_DLY,
+      OTMB_PUSH_DLY => OTMB_PUSH_DLY,
+      ALCT_PUSH_DLY => ALCT_PUSH_DLY,
+      BX_DLY => BX_DLY,
+      INJ_DLY => INJ_DLY,
+      EXT_DLY => EXT_DLY,
+      CALLCT_DLY => CALLCT_DLY,
+      ODMB_ID => odmb_id_inner,
+      NWORDS_DUMMY => NWORDS_DUMMY,
+      KILL => KILL,
+      CRATEID => CRATEID,
+
+      CHANGE_REG_DATA  => CHANGE_REG_DATA,
+      CHANGE_REG_INDEX => CHANGE_REG_INDEX,
+
+      SPI_CFG_UL_PULSE    => spi_cfg_ul_pulse,
+      SPI_CONST_UL_PULSE  => spi_const_ul_pulse,
+      SPI_REG_IN          => spi_reg_in,
+      SPI_CONST_BUSY      => spi_const_busy,
+      SPI_CONST_REG_WE    => spi_const_reg_we,
+      SPI_CFG_BUSY        => spi_cfg_busy,
+      SPI_CFG_REG_WE      => spi_cfg_reg_we,
+      SPI_CONST_REGS      => spi_const_regs,
+      SPI_CFG_REGS        => spi_cfg_regs
+      );
+
   DEV6_SPI_PORT_I : SPI_PORT
     port map (
-        SLOWCLK => CLK2P5,
-        CLK => CLK40,
-        RST => RST, 
-        DEVICE => device(6),
-        STROBE => strobe,
-        COMMAND => cmd,
-        WRITER => VME_WRITE_B,
-        DTACK => dtack_dev(6),
-        INDATA => VME_DATA_IN,
-        OUTDATA => outdata_dev(6),
-        SPI_CFG_UL_PULSE => spi_cfg_ul_pulse,
-        SPI_CONST_UL_PULSE   => spi_const_ul_pulse,
-        SPI_UL_REG => spi_reg_in,     
-        SPI_CFG_BUSY => spi_cfg_busy,
-        SPI_CONST_BUSY => spi_const_busy,
-        SPI_CONST_REG_WE => spi_const_reg_we,
-        SPI_CFG_REG_WE => spi_cfg_reg_we,
-        SPI_CFG_REGS => spi_cfg_regs,
-        SPI_CONST_REGS => spi_const_regs,
-        SPI_CMD_FIFO_WRITE_EN => spi_cmd_fifo_write_en,
-        SPI_CMD_FIFO_IN => spi_cmd_fifo_in,
-        SPI_READBACK_FIFO_OUT => spi_readback_fifo_out,
-        SPI_READBACK_FIFO_READ_EN => spi_readback_fifo_read_en,
-        SPI_READ_BUSY => spi_read_busy,
-        SPI_NCMDS_SPICTRL => spi_ncmds_spictrl,
-        SPI_NCMDS_SPIINTR => spi_ncmds_spiintr,
-        DIAGOUT => open
+      SLOWCLK => CLK2P5,
+      CLK => CLK40,
+      RST => RST,
+      DEVICE => device(6),
+      STROBE => strobe,
+      COMMAND => cmd,
+      WRITER => VME_WRITE_B,
+      DTACK => dtack_dev(6),
+      INDATA => VME_DATA_IN,
+      OUTDATA => outdata_dev(6),
+      SPI_CFG_UL_PULSE => spi_cfg_ul_pulse,
+      SPI_CONST_UL_PULSE   => spi_const_ul_pulse,
+      SPI_UL_REG => spi_reg_in,
+      SPI_CFG_BUSY => spi_cfg_busy,
+      SPI_CONST_BUSY => spi_const_busy,
+      SPI_CONST_REG_WE => spi_const_reg_we,
+      SPI_CFG_REG_WE => spi_cfg_reg_we,
+      SPI_CFG_REGS => spi_cfg_regs,
+      SPI_CONST_REGS => spi_const_regs,
+      SPI_CMD_FIFO_WRITE_EN => spi_cmd_fifo_write_en,
+      SPI_CMD_FIFO_IN => spi_cmd_fifo_in,
+      SPI_READBACK_FIFO_OUT => spi_readback_fifo_out,
+      SPI_READBACK_FIFO_READ_EN => spi_readback_fifo_read_en,
+      SPI_READ_BUSY => spi_read_busy,
+      SPI_NCMDS_SPICTRL => spi_ncmds_spictrl,
+      SPI_NCMDS_SPIINTR => spi_ncmds_spiintr,
+      DIAGOUT => open
       );
 
   DEV7_SYSMON : SYSTEM_MON
@@ -763,15 +781,15 @@ begin
       COMMAND => cmd,
       WRITER  => vme_write_b,
 
-      ADC_CS_B =>  ADC_CS_B,  
-      ADC_DIN  =>  ADC_DIN,  
-      ADC_SCK  =>  ADC_SCK,  
+      ADC_CS_B =>  ADC_CS_B,
+      ADC_DIN  =>  ADC_DIN,
+      ADC_SCK  =>  ADC_SCK,
       ADC_DOUT =>  ADC_DOUT,
 
       VAUXP => SYSMON_P,
       VAUXN => SYSMON_N
       );
-  
+
   DEV8_LVDBMON : LVDBMON
     port map(
       SLOWCLK => CLK1P25,
@@ -793,7 +811,7 @@ begin
       R_LVTURNON => R_LVMB_PON,
       LOADON => PON_LOAD_B,
       DIAGOUT => open
-    );
+      );
 
   DEV9_SYSTEST : SYSTEM_TEST
     port map (
@@ -862,8 +880,8 @@ begin
       DIAGOUT => open,
       LED     => led_command
       );
-     
-  SPI_CTRL_I : SPI_CTRL 
+
+  SPI_CTRL_I : SPI_CTRL
     port map (
       CLK40 => CLK40,
       CLK2P5 => CLK2P5,

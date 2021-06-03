@@ -6,8 +6,10 @@ use work.Latches_Flipflops.all;
 use ieee.std_logic_1164.all;
 use work.ucsb_types.all;
 
-
 entity CFEBJTAG is
+  generic (
+    NCFEB   : integer range 1 to 7 := 7  -- Number of DCFEBS, 7 for ME1/1, 5
+    );
   port (
     FASTCLK : in std_logic;
     SLOWCLK : in std_logic;
