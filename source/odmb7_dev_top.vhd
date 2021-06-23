@@ -517,7 +517,7 @@ architecture Behavioral of odmb7_ucsb_dev is
       );
   end component;
 
-  component mgt_cfeb is
+  component mgt_cfeb_mod is
     generic (
       NLINK     : integer range 1 to 20 := 7;  -- number of links
       DATAWIDTH : integer := 16                -- user data width
@@ -543,10 +543,10 @@ architecture Behavioral of odmb7_ucsb_dev is
       kill_rxpd    : in  std_logic_vector(NLINK downto 1);   -- Kill bad DCFEB with power down RX
       fifo_full    : in  std_logic_vector(NLINK downto 1);   -- Flag for FIFO full
       fifo_afull   : in  std_logic_vector(NLINK downto 1);   -- Flag for FIFO almost full
-      prbs_type    : in  std_logic_vector(3 downto 0);
-      prbs_rx_en   : in  std_logic_vector(NLINK downto 1);
-      prbs_tst_cnt : in  std_logic_vector(15 downto 0);
-      prbs_err_cnt : out std_logic_vector(15 downto 0);
+      --prbs_type    : in  std_logic_vector(3 downto 0);
+      --prbs_rx_en   : in  std_logic_vector(NLINK downto 1);
+      --prbs_tst_cnt : in  std_logic_vector(15 downto 0);
+      --prbs_err_cnt : out std_logic_vector(15 downto 0);
       reset        : in  std_logic
       );
   end component;
@@ -1396,7 +1396,7 @@ begin
       reset           => opt_reset
       );
 
-  GTH_DCFEB : mgt_cfeb
+  GTH_DCFEB : mgt_cfeb_mod
     generic map (
       NLINK     => 7,  -- number of links
       DATAWIDTH => 16  -- user data width
@@ -1422,10 +1422,10 @@ begin
       kill_rxpd    => (others => '0'),
       fifo_full    => dcfeb_datafifo_full,
       fifo_afull   => dcfeb_datafifo_afull,
-      prbs_type    => mgt_prbs_type,
-      prbs_rx_en   => dcfeb_prbs_rx_en,
-      prbs_tst_cnt => dcfeb_prbs_tst_cnt,
-      prbs_err_cnt => dcfeb_prbs_err_cnt,
+      --prbs_type    => mgt_prbs_type,
+      --prbs_rx_en   => dcfeb_prbs_rx_en,
+      --prbs_tst_cnt => dcfeb_prbs_tst_cnt,
+      --prbs_err_cnt => dcfeb_prbs_err_cnt,
       reset        => opt_reset
       );
 
