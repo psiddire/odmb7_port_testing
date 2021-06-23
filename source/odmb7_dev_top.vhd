@@ -452,17 +452,28 @@ architecture Behavioral of odmb7_ucsb_dev is
       INJ_DLY       : in std_logic_vector(4 downto 0);
       EXT_DLY       : in std_logic_vector(4 downto 0);
       CALLCT_DLY    : in std_logic_vector(3 downto 0);
+      OTMB_PUSH_DLY : in integer range 0 to 63;
+      ALCT_PUSH_DLY : in integer range 0 to 63;
+      PUSH_DLY      : in integer range 0 to 63;
 
       --------------------
       -- Configuration
       --------------------
       CAL_MODE      : in std_logic;
       PEDESTAL      : in std_logic;
+      PEDESTAL_OTMB   : in  std_logic;
 
       --------------------
-      -- Triggers
+      -- TRGCNTRL 
       --------------------
       RAW_L1A       : in std_logic;
+      RAWLCT        : in std_logic_vector (NFEB downto 0);
+
+      --------------------
+      -- DAV 
+      --------------------
+      OTMB_DAV : in std_logic;            
+      ALCT_DAV : in std_logic;            
 
       --------------------
       -- To/From DCFEBs (FF-EMU-MOD)
@@ -472,10 +483,15 @@ architecture Behavioral of odmb7_ucsb_dev is
       DCFEB_L1A       : out std_logic;
       DCFEB_L1A_MATCH : out std_logic_vector(NCFEB downto 1);
 
+      ALCT_DAV_SYNC_OUT : out std_logic;
+      OTMB_DAV_SYNC_OUT : out std_logic;
+
       --------------------
       -- Other
       --------------------
       DIAGOUT     : out std_logic_vector (17 downto 0); -- for debugging
+      KILL        : in std_logic_vector(NFEB+2 downto 1);
+      LCT_ERR     : out std_logic;            -- To an LED in the original design
       RST         : in std_logic
       );
   end component;
@@ -687,6 +703,11 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal test_l1a    : std_logic := '0';
   signal raw_l1a     : std_logic := '0';
   signal raw_lct     : std_logic_vector(NCFEB downto 0);
+  signal int_alct_dav, tc_alct_dav : std_logic;
+  signal int_otmb_dav, tc_otmb_dav : std_logic;
+  signal otmb_push_dly_p1, alct_push_dly_p1        : integer range 0 to 64;
+  signal tc_lct                    : std_logic_vector(NFEB downto 0);
+  signal alct_dav_sync_out, otmb_dav_sync_out : std_logic;
 
   --------------------------------------
   -- Internal configuration signals
@@ -864,6 +885,9 @@ architecture Behavioral of odmb7_ucsb_dev is
   --------------------------------------
   signal odmb_data : std_logic_vector(15 downto 0) := (others => '0');
   signal odmb_data_sel : std_logic_vector(7 downto 0) := (others => '0');
+
+  -- for TRGCNTRL
+  constant push_dly    : integer := 63;  -- It needs to be > alct/otmb_push_dly
 
 begin
 
@@ -1072,10 +1096,31 @@ begin
   IB_LVMB_SDOUT: IBUFDS port map (O => lvmb_sdout, I => LVMB_SDOUT_P, IB => LVMB_SDOUT_N);
 
   -------------------------------------------------------------------------------------------
-  -- Handle Triggers
+  -- Handle Triggers and DAVs
   -------------------------------------------------------------------------------------------
   LCTDLY_GTRG : LCTDLY port map(DOUT => test_l1a, CLK => cmsclk, DELAY => lct_l1a_dly, DIN => test_lct);
   raw_l1a <= test_l1a;
+  raw_lct <= test_lct; 
+  --raw_l1a <= '1' when test_l1a = '1' else
+  --           tc_l1a when (testctrl_sel = '1') else
+  --           not ccb_l1acc_b;
+  --raw_lct <= (others => '1') when test_pb_lct = '1' else
+  --           tc_lct when (testctrl_sel = '1') else
+  --           rawlct;
+
+  LCTDLY_GTRG : LCTDLY port map(test_lct, clk40, LCT_L1A_DLY, test_l1a);
+
+  otmb_push_dly_p1 <= otmb_push_dly + 1;
+  alct_push_dly_p1 <= alct_push_dly + 1;
+  DS_OTMB_PUSH : DELAY_SIGNAL generic map (64)port map(test_otmb_dav, clk40, otmb_push_dly_p1, test_l1a);
+  DS_ALCT_PUSH : DELAY_SIGNAL generic map (64)port map(test_alct_dav, clk40, alct_push_dly_p1, test_l1a);
+
+  int_alct_dav <= '1' when test_alct_dav = '1' else
+                  --tc_alct_dav when (testctrl_sel = '1') else
+                  alctdav;              -- lctdav2
+  int_otmb_dav <= '1' when test_otmb_dav = '1' else
+                  --tc_otmb_dav when (testctrl_sel = '1') else
+                  otmbdav;              -- lctdav1
 
   -------------------------------------------------------------------------------------------
   -- Handle Internal configuration signals
@@ -1276,8 +1321,8 @@ begin
 
       LCT_L1A_DLY      => lct_l1a_dly,
       CABLE_DLY        => cable_dly,
-      OTMB_PUSH_DLY    => open,
-      ALCT_PUSH_DLY    => open,
+      OTMB_PUSH_DLY    => OTMB_PUSH_DLY,
+      ALCT_PUSH_DLY    => ALCT_PUSH_DLY,
       BX_DLY           => open,
       INJ_DLY          => inj_dly,
       EXT_DLY          => ext_dly,
@@ -1331,13 +1376,21 @@ begin
 
       CAL_MODE => odmb_ctrl_reg(0),
       PEDESTAL => odmb_ctrl_reg(13),
+      PEDESTAL_OTMB => odmb_ctrl_reg(14),
 
       RAW_L1A => raw_l1a,
+      RAWLCT => raw_lct,
 
       LCT_L1A_DLY => lct_l1a_dly,
       INJ_DLY     => inj_dly,
       EXT_DLY     => ext_dly,
       CALLCT_DLY  => callct_dly,
+      OTMB_PUSH_DLY => OTMB_PUSH_DLY;
+      ALCT_PUSH_DLY => ALCT_PUSH_DLY;
+      PUSH_DLY      => push_dly;
+
+      OTMB_DAV => int_otmb_dav,         -- lctdav1 - from J4
+      ALCT_DAV => int_alct_dav,         -- lctdav2 - from J4
 
       DCFEB_INJPULSE  => premask_injpls,
       DCFEB_EXTPULSE  => premask_extpls,
@@ -1345,6 +1398,8 @@ begin
       DCFEB_L1A_MATCH => odmbctrl_l1a_match,
 
       DIAGOUT => open,
+      KILL => "000000000",
+      LCT_ERR => open,            -- To an LED in the original design
       RST     => reset
       );
 
