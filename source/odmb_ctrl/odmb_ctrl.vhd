@@ -10,6 +10,7 @@ use ieee.std_logic_misc.all;
 library unisim;
 use unisim.vcomponents.all;
 use work.ucsb_types.all;
+use work.odmb7_components.all;
 
 entity ODMB_CTRL is
   generic (
@@ -36,18 +37,29 @@ entity ODMB_CTRL is
     INJ_DLY       : in std_logic_vector(4 downto 0);
     EXT_DLY       : in std_logic_vector(4 downto 0);
     CALLCT_DLY    : in std_logic_vector(3 downto 0);
+    OTMB_PUSH_DLY : in integer range 0 to 63;
+    ALCT_PUSH_DLY : in integer range 0 to 63;
+    PUSH_DLY      : in integer range 0 to 63;
 
     --------------------
     -- Configuration
     --------------------
     CAL_MODE      : in std_logic;
     PEDESTAL      : in std_logic;
+    PEDESTAL_OTMB   : in  std_logic;
 
     --------------------
-    -- Triggers
+    -- TRGCNTRL
     --------------------
     RAW_L1A       : in std_logic;
+    RAWLCT        : in std_logic_vector (NFEB downto 0);
     
+    --------------------
+    -- DAV 
+    --------------------
+    OTMB_DAV : in std_logic;            
+    ALCT_DAV : in std_logic;            
+
     --------------------
     -- To/From DCFEBs (FF-EMU-MOD)
     --------------------
@@ -56,10 +68,14 @@ entity ODMB_CTRL is
     DCFEB_L1A       : out std_logic;
     DCFEB_L1A_MATCH : out std_logic_vector(NCFEB downto 1);
 
+    ALCT_DAV_SYNC_OUT : out std_logic;
+    OTMB_DAV_SYNC_OUT : out std_logic;
     --------------------
     -- Other
     --------------------
     DIAGOUT     : out std_logic_vector (17 downto 0); -- for debugging
+    KILL        : in std_logic_vector(NFEB+2 downto 1);
+    LCT_ERR     : out std_logic;            -- To an LED in the original design
     RST         : in std_logic
     );
 end ODMB_CTRL;
@@ -95,23 +111,30 @@ architecture Behavioral of ODMB_CTRL is
       );
   end component;
 
-  component DUMMY_TRIGCTRL is
-    generic (
-      NCFEB : integer range 1 to 7 := 7
-      );
-    port (
-      CLK40       : in  std_logic;
-      RAW_L1A     : in  std_logic;
-      CAL_L1A     : in  std_logic;
-      CAL_MODE    : in  std_logic;
-      PEDESTAL    : in  std_logic;
-      DCFEB_L1A   : out std_logic;
-      DCFEB_L1A_MATCH : out std_logic_vector(NCFEB downto 1)
-      );
-  end component;
+
+  --component DUMMY_TRIGCTRL is
+  --  generic (
+  --    NCFEB : integer range 1 to 7 := 7
+  --    );
+  --  port (
+  --    CLK40       : in  std_logic;
+  --    RAW_L1A     : in  std_logic;
+  --    CAL_L1A     : in  std_logic;
+  --    CAL_MODE    : in  std_logic;
+  --    PEDESTAL    : in  std_logic;
+  --    DCFEB_L1A   : out std_logic;
+  --    DCFEB_L1A_MATCH : out std_logic_vector(NCFEB downto 1)
+  --    );
+  --end component;
 
   signal plsinjen, plsinjen_inv : std_logic := '0';
-  signal cal_gtrg : std_logic := '0';
+
+  signal CAL_LCT       : std_logic;
+  signal cal_gtrg     : std_logic;
+
+-- TRGCNTRL outputs
+  signal cafifo_l1a_match_in_inner : std_logic_vector(NFEB+2 downto 0);
+  signal cafifo_push               : std_logic;  -- PUSH from TRGCNTRL to CAFIFO
 
 begin
 
@@ -147,25 +170,55 @@ begin
       RNDMGTRG => '0',            --unused
       PEDESTAL => open,           --unused
       CAL_GTRG => cal_gtrg,           
-      CALLCT => open,             --TODO connect to TRGCNTRL
+      CALLCT => cal_lct,             --TODO connect to TRGCNTRL
       INJBACK => DCFEB_INJPULSE,
       PLSBACK => DCFEB_EXTPULSE,
       LCTRQST => open, 
       INJPLS => open              --unused
       );
 
-  DUMMY_TRIGCTRL_PM : DUMMY_TRIGCTRL
-    generic map (
-      NCFEB => NCFEB
-    )
+  --DUMMY_TRIGCTRL_PM : DUMMY_TRIGCTRL
+  --  generic map (
+  --    NCFEB => NCFEB
+  --  )
+  --  port map (
+  --    CLK40 => CLK40,
+  --    RAW_L1A => RAW_L1A,
+  --    CAL_L1A => cal_gtrg,
+  --    CAL_MODE => CAL_MODE,
+  --    PEDESTAL => PEDESTAL,
+  --    DCFEB_L1A => DCFEB_L1A,
+  --    DCFEB_L1A_MATCH => DCFEB_L1A_MATCH
+  --  );
+
+  TRGCNTRL_PM : TRGCNTRL
+    generic map (NFEB => NFEB)
     port map (
-      CLK40 => CLK40,
-      RAW_L1A => RAW_L1A,
-      CAL_L1A => cal_gtrg,
-      CAL_MODE => CAL_MODE,
-      PEDESTAL => PEDESTAL,
-      DCFEB_L1A => DCFEB_L1A,
-      DCFEB_L1A_MATCH => DCFEB_L1A_MATCH
-    );
+      CLK           => clk40,
+      RAW_L1A       => raw_l1a,
+      RAW_LCT       => rawlct,
+      CAL_LCT       => cal_lct,
+      CAL_L1A       => cal_gtrg,
+      LCT_L1A_DLY   => lct_l1a_dly,
+      OTMB_PUSH_DLY => otmb_push_dly,
+      ALCT_PUSH_DLY => alct_push_dly,
+      PUSH_DLY      => push_dly,
+      ALCT_DAV      => alct_dav,
+      OTMB_DAV      => otmb_dav,
+
+      CAL_MODE      => cal_mode,
+      KILL          => kill(NFEB+2 downto 1),
+      PEDESTAL      => pedestal,
+      PEDESTAL_OTMB => pedestal_otmb,
+
+      ALCT_DAV_SYNC_OUT => ALCT_DAV_SYNC_OUT,
+      OTMB_DAV_SYNC_OUT => OTMB_DAV_SYNC_OUT,
+
+      DCFEB_L1A       => dcfeb_l1a,
+      DCFEB_L1A_MATCH => dcfeb_l1a_match,
+      FIFO_PUSH       => cafifo_push,
+      FIFO_L1A_MATCH  => cafifo_l1a_match_in_inner,
+      LCT_ERR         => lct_err
+      );
 
 end Behavioral;

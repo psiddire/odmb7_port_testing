@@ -3,6 +3,44 @@ use ieee.std_logic_1164.all;
 
 PACKAGE odmb7_components is
 
+  -- components used in odmb_ctrl
+  component TRGCNTRL is
+    generic (
+      NFEB : integer range 1 to 7 := 5  -- Number of DCFEBS, 7 in the final design
+      );  
+    port (
+      CLK           : in std_logic;
+      RAW_L1A       : in std_logic;
+      RAW_LCT       : in std_logic_vector(NFEB downto 0);
+      CAL_LCT       : in std_logic;
+      CAL_L1A       : in std_logic;
+      LCT_L1A_DLY   : in std_logic_vector(5 downto 0);
+      OTMB_PUSH_DLY : in integer range 0 to 63;
+      ALCT_PUSH_DLY : in integer range 0 to 63;
+      PUSH_DLY      : in integer range 0 to 63;
+      ALCT_DAV      : in std_logic;
+      OTMB_DAV      : in std_logic;
+
+      CAL_MODE      : in std_logic;
+      KILL          : in std_logic_vector(NFEB+2 downto 1);
+      PEDESTAL      : in std_logic;
+      PEDESTAL_OTMB : in std_logic;
+
+      ALCT_DAV_SYNC_OUT : out std_logic;
+      OTMB_DAV_SYNC_OUT : out std_logic;
+
+      DCFEB_L1A       : out std_logic;
+      DCFEB_L1A_MATCH : out std_logic_vector(NFEB downto 1);
+      FIFO_PUSH       : out std_logic;
+      FIFO_L1A_MATCH  : out std_logic_vector(NFEB+2 downto 0);
+      LCT_ERR         : out std_logic
+      );
+  end component;
+
+  --
+  --==--
+  --
+
   -- GTH wizard wrapper for DCFEBs
   component gtwizard_ultrascale_0_example_wrapper
     port (
