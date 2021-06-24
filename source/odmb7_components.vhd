@@ -6,12 +6,12 @@ PACKAGE odmb7_components is
   -- components used in odmb_ctrl
   component TRGCNTRL is
     generic (
-      NFEB : integer range 1 to 7 := 5  -- Number of DCFEBS, 7 in the final design
+      NCFEB : integer range 1 to 7 := 5  -- Number of DCFEBS, 7 in the final design
       );  
     port (
       CLK           : in std_logic;
       RAW_L1A       : in std_logic;
-      RAW_LCT       : in std_logic_vector(NFEB downto 0);
+      RAW_LCT       : in std_logic_vector(NCFEB downto 0);
       CAL_LCT       : in std_logic;
       CAL_L1A       : in std_logic;
       LCT_L1A_DLY   : in std_logic_vector(5 downto 0);
@@ -22,7 +22,7 @@ PACKAGE odmb7_components is
       OTMB_DAV      : in std_logic;
 
       CAL_MODE      : in std_logic;
-      KILL          : in std_logic_vector(NFEB+2 downto 1);
+      KILL          : in std_logic_vector(NCFEB+2 downto 1);
       PEDESTAL      : in std_logic;
       PEDESTAL_OTMB : in std_logic;
 
@@ -30,9 +30,9 @@ PACKAGE odmb7_components is
       OTMB_DAV_SYNC_OUT : out std_logic;
 
       DCFEB_L1A       : out std_logic;
-      DCFEB_L1A_MATCH : out std_logic_vector(NFEB downto 1);
+      DCFEB_L1A_MATCH : out std_logic_vector(NCFEB downto 1);
       FIFO_PUSH       : out std_logic;
-      FIFO_L1A_MATCH  : out std_logic_vector(NFEB+2 downto 0);
+      FIFO_L1A_MATCH  : out std_logic_vector(NCFEB+2 downto 0);
       LCT_ERR         : out std_logic
       );
   end component;
@@ -117,25 +117,27 @@ PACKAGE odmb7_components is
       );
   end component;
 
-  COMPONENT vio_cfeb
-  PORT (
-    clk : IN STD_LOGIC;
-    probe_in0 : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
-    probe_in1 : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
-    probe_in2 : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
-    probe_in3 : IN STD_LOGIC_VECTOR(6 DOWNTO 0);
-    probe_in4 : IN STD_LOGIC_VECTOR(6 DOWNTO 0);
-    probe_in5 : IN STD_LOGIC_VECTOR(6 DOWNTO 0);
-    probe_in6 : IN STD_LOGIC;
-    probe_in7 : IN STD_LOGIC;
-    probe_out0 : OUT STD_LOGIC;
-    probe_out1 : OUT STD_LOGIC;
-    probe_out2 : OUT STD_LOGIC;
-    probe_out3 : OUT STD_LOGIC;
-    probe_out4 : OUT STD_LOGIC;
-    probe_out5 : OUT STD_LOGIC_VECTOR(6 DOWNTO 0)
-  );
-  END component;
+  -- somehow this gives error during compilation in simulation, in sythesis is
+  -- fine
+  --COMPONENT vio_cfeb
+  --PORT (
+  --  clk : IN STD_LOGIC;
+  --  probe_in0 : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
+  --  probe_in1 : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
+  --  probe_in2 : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
+  --  probe_in3 : IN STD_LOGIC_VECTOR(6 DOWNTO 0);
+  --  probe_in4 : IN STD_LOGIC_VECTOR(6 DOWNTO 0);
+  --  probe_in5 : IN STD_LOGIC_VECTOR(6 DOWNTO 0);
+  --  probe_in6 : IN STD_LOGIC;
+  --  probe_in7 : IN STD_LOGIC;
+  --  probe_out0 : OUT STD_LOGIC;
+  --  probe_out1 : OUT STD_LOGIC;
+  --  probe_out2 : OUT STD_LOGIC;
+  --  probe_out3 : OUT STD_LOGIC;
+  --  probe_out4 : OUT STD_LOGIC;
+  --  probe_out5 : OUT STD_LOGIC_VECTOR(6 DOWNTO 0)
+  --);
+  --END component;
 
   component gtwizard_ultrascale_0_example_bit_synchronizer 
   PORT (

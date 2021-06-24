@@ -52,7 +52,7 @@ entity ODMB_CTRL is
     -- TRGCNTRL
     --------------------
     RAW_L1A       : in std_logic;
-    RAWLCT        : in std_logic_vector (NFEB downto 0);
+    RAWLCT        : in std_logic_vector (NCFEB downto 0);
     
     --------------------
     -- DAV 
@@ -74,7 +74,7 @@ entity ODMB_CTRL is
     -- Other
     --------------------
     DIAGOUT     : out std_logic_vector (17 downto 0); -- for debugging
-    KILL        : in std_logic_vector(NFEB+2 downto 1);
+    KILL        : in std_logic_vector(NCFEB+2 downto 1);
     LCT_ERR     : out std_logic;            -- To an LED in the original design
     RST         : in std_logic
     );
@@ -133,7 +133,7 @@ architecture Behavioral of ODMB_CTRL is
   signal cal_gtrg     : std_logic;
 
 -- TRGCNTRL outputs
-  signal cafifo_l1a_match_in_inner : std_logic_vector(NFEB+2 downto 0);
+  signal cafifo_l1a_match_in_inner : std_logic_vector(NCFEB+2 downto 0);
   signal cafifo_push               : std_logic;  -- PUSH from TRGCNTRL to CAFIFO
 
 begin
@@ -192,7 +192,7 @@ begin
   --  );
 
   TRGCNTRL_PM : TRGCNTRL
-    generic map (NFEB => NFEB)
+    generic map (NCFEB => NCFEB)
     port map (
       CLK           => clk40,
       RAW_L1A       => raw_l1a,
@@ -207,7 +207,7 @@ begin
       OTMB_DAV      => otmb_dav,
 
       CAL_MODE      => cal_mode,
-      KILL          => kill(NFEB+2 downto 1),
+      KILL          => kill(NCFEB+2 downto 1),
       PEDESTAL      => pedestal,
       PEDESTAL_OTMB => pedestal_otmb,
 

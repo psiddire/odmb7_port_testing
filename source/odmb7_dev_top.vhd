@@ -122,6 +122,7 @@ entity odmb7_ucsb_dev is
     OTMB        : in  std_logic_vector(35 downto 0);      -- "TMB[35:0]" in Bank 44-45
     RAWLCT      : in  std_logic_vector(6 downto 0);       -- Bank 45 <-- To be updated
     OTMB_DAV    : in  std_logic;                          -- "TMB_DAV" in Bank 45
+    -- ALCTDAV     : in  std_logic;          --  lctdav2
     OTMB_FF_CLK : in  std_logic;                          -- "TMB_FF_CLK" in Bank 45
     RSVTD_IN    : in  std_logic_vector(7 downto 3);       -- "RSVTD[7:3]" in Bank 44-45  <-- To be updated
     RSVTD_OUT   : out std_logic_vector(2 downto 0);       -- "RSVTD[2:0]" in Bank 44-45  <-- To be updated
@@ -341,7 +342,7 @@ architecture Behavioral of odmb7_ucsb_dev is
       -- OTMB signals
       --------------------
       OTMB        : in  std_logic_vector(35 downto 0);      -- "TMB[35:0]" in Bank 44-45
-      RAWLCT      : in  std_logic_vector(NCFEB-1 downto 0); -- Bank 45
+      RAWLCT      : in  std_logic_vector(NCFEB -1  downto 0); -- Bank 45
       OTMB_DAV    : in  std_logic;                          -- "TMB_DAV" in Bank 45
       OTMB_FF_CLK : in  std_logic;                          -- "TMB_FF_CLK" in Bank 45
       RSVTD_IN    : in  std_logic_vector(7 downto 3);       -- "RSVTD[7:3]" in Bank 44-45
@@ -467,7 +468,7 @@ architecture Behavioral of odmb7_ucsb_dev is
       -- TRGCNTRL 
       --------------------
       RAW_L1A       : in std_logic;
-      RAWLCT        : in std_logic_vector (NFEB downto 0);
+      RAWLCT        : in std_logic_vector (NCFEB downto 0);
 
       --------------------
       -- DAV 
@@ -490,7 +491,7 @@ architecture Behavioral of odmb7_ucsb_dev is
       -- Other
       --------------------
       DIAGOUT     : out std_logic_vector (17 downto 0); -- for debugging
-      KILL        : in std_logic_vector(NFEB+2 downto 1);
+      KILL        : in std_logic_vector(NCFEB+2 downto 1);
       LCT_ERR     : out std_logic;            -- To an LED in the original design
       RST         : in std_logic
       );
@@ -706,7 +707,7 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal int_alct_dav, tc_alct_dav : std_logic;
   signal int_otmb_dav, tc_otmb_dav : std_logic;
   signal otmb_push_dly_p1, alct_push_dly_p1        : integer range 0 to 64;
-  signal tc_lct                    : std_logic_vector(NFEB downto 0);
+  signal tc_lct                    : std_logic_vector(NCFEB-1 downto 0);
   signal alct_dav_sync_out, otmb_dav_sync_out : std_logic;
 
   --------------------------------------
@@ -888,6 +889,10 @@ architecture Behavioral of odmb7_ucsb_dev is
 
   -- for TRGCNTRL
   constant push_dly    : integer := 63;  -- It needs to be > alct/otmb_push_dly
+  constant push_dlyp4  : integer := push_dly+4;  -- push_dly+4
+  signal alct_push_dly : integer range 0 to 63;
+  signal otmb_push_dly : integer range 0 to 63;
+  signal test_otmb_dav, test_alct_dav              : std_logic := '0';
 
 begin
 
@@ -1099,8 +1104,9 @@ begin
   -- Handle Triggers and DAVs
   -------------------------------------------------------------------------------------------
   LCTDLY_GTRG : LCTDLY port map(DOUT => test_l1a, CLK => cmsclk, DELAY => lct_l1a_dly, DIN => test_lct);
+
   raw_l1a <= test_l1a;
-  raw_lct <= test_lct; 
+  raw_lct <= (others => '1') when (test_lct = '1') else rawlct; 
   --raw_l1a <= '1' when test_l1a = '1' else
   --           tc_l1a when (testctrl_sel = '1') else
   --           not ccb_l1acc_b;
@@ -1108,12 +1114,11 @@ begin
   --           tc_lct when (testctrl_sel = '1') else
   --           rawlct;
 
-  LCTDLY_GTRG : LCTDLY port map(test_lct, clk40, LCT_L1A_DLY, test_l1a);
 
   otmb_push_dly_p1 <= otmb_push_dly + 1;
   alct_push_dly_p1 <= alct_push_dly + 1;
-  DS_OTMB_PUSH : DELAY_SIGNAL generic map (64)port map(test_otmb_dav, clk40, otmb_push_dly_p1, test_l1a);
-  DS_ALCT_PUSH : DELAY_SIGNAL generic map (64)port map(test_alct_dav, clk40, alct_push_dly_p1, test_l1a);
+  DS_OTMB_PUSH : DELAY_SIGNAL generic map (64)port map(DOUT=>test_otmb_dav, CLK=>cmsclk, NCYCLES=>otmb_push_dly_p1, DIN=>test_l1a);
+  DS_ALCT_PUSH : DELAY_SIGNAL generic map (64)port map(DOUT=>test_alct_dav, CLK=>cmsclk, NCYCLES=>alct_push_dly_p1, DIN=>test_l1a);
 
   int_alct_dav <= '1' when test_alct_dav = '1' else
                   --tc_alct_dav when (testctrl_sel = '1') else
@@ -1294,8 +1299,8 @@ begin
       LVMB_SDOUT  => lvmb_sdout,
 
       OTMB        => OTMB,
-      RAWLCT      => RAWLCT,
-      OTMB_DAV    => OTMB_DAV,
+      RAWLCT      => RAWLCT(6 downto 0),
+      OTMB_DAV    => OTMBDAV,
       OTMB_FF_CLK => OTMB_FF_CLK,
       RSVTD_IN    => RSVTD_IN,
       RSVTD_OUT   => RSVTD_OUT,
@@ -1374,20 +1379,19 @@ begin
       TEST_CCBPLS => test_pls,
       TEST_CCBPED => test_ped,
 
+      LCT_L1A_DLY => lct_l1a_dly,
+      INJ_DLY     => inj_dly,
+      EXT_DLY     => ext_dly,
+      CALLCT_DLY  => callct_dly,
+      OTMB_PUSH_DLY => OTMB_PUSH_DLY,
+      ALCT_PUSH_DLY => ALCT_PUSH_DLY,
+      PUSH_DLY      => push_dly,
       CAL_MODE => odmb_ctrl_reg(0),
       PEDESTAL => odmb_ctrl_reg(13),
       PEDESTAL_OTMB => odmb_ctrl_reg(14),
 
       RAW_L1A => raw_l1a,
       RAWLCT => raw_lct,
-
-      LCT_L1A_DLY => lct_l1a_dly,
-      INJ_DLY     => inj_dly,
-      EXT_DLY     => ext_dly,
-      CALLCT_DLY  => callct_dly,
-      OTMB_PUSH_DLY => OTMB_PUSH_DLY;
-      ALCT_PUSH_DLY => ALCT_PUSH_DLY;
-      PUSH_DLY      => push_dly;
 
       OTMB_DAV => int_otmb_dav,         -- lctdav1 - from J4
       ALCT_DAV => int_alct_dav,         -- lctdav2 - from J4
@@ -1396,6 +1400,9 @@ begin
       DCFEB_EXTPULSE  => premask_extpls,
       DCFEB_L1A       => odmbctrl_l1a,
       DCFEB_L1A_MATCH => odmbctrl_l1a_match,
+
+      ALCT_DAV_SYNC_OUT => open,
+      OTMB_DAV_SYNC_OUT => open,
 
       DIAGOUT => open,
       KILL => "000000000",
