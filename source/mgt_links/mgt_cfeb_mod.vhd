@@ -438,23 +438,23 @@ begin
       probe0 => ila_data_rx
       );
 
-  mgt_cfeb_vio_inst : vio_cfeb
-  PORT MAP (
-    clk => gtwiz_userclk_rx_usrclk2_int,
-    probe_in0 => "0",
-    probe_in1 => "0",
-    probe_in2 => "0",
-    probe_in3 => gtpowergood_vio_sync,
-    probe_in4 => txpmaresetdone_vio_sync,
-    probe_in5 => rxpmaresetdone_vio_sync,
-    probe_in6 => gtwiz_reset_tx_done_vio_sync,
-    probe_in7 => gtwiz_reset_rx_done_vio_sync,
-    probe_out0 => gtwiz_reset_all_vio_int,
-    probe_out1 => gtwiz_reset_tx_pll_and_datapath_vio_int,
-    probe_out2 => gtwiz_reset_tx_datapath_vio_int,
-    probe_out3 => gtwiz_reset_rx_pll_and_datapath_vio_int,
-    probe_out4 => gtwiz_reset_rx_datapath_vio_int,
-    probe_out5 => gtwiz_reset_rx_buf_vio_int 
-  );
+  --mgt_cfeb_vio_inst : vio_cfeb
+  --PORT MAP (
+  --  clk => gtwiz_userclk_rx_usrclk2_int,
+  --  probe_in0 => "0",
+  --  probe_in1 => "0",
+  --  probe_in2 => "0",
+  --  probe_in3 => gtpowergood_vio_sync,
+  --  probe_in4 => txpmaresetdone_vio_sync,
+  --  probe_in5 => rxpmaresetdone_vio_sync,
+  --  probe_in6 => gtwiz_reset_tx_done_vio_sync,
+  --  probe_in7 => gtwiz_reset_rx_done_vio_sync,
+  --  probe_out0 => gtwiz_reset_all_vio_int,
+  --  probe_out1 => gtwiz_reset_tx_pll_and_datapath_vio_int,
+  --  probe_out2 => gtwiz_reset_tx_datapath_vio_int,
+  --  probe_out3 => gtwiz_reset_rx_pll_and_datapath_vio_int,
+  --  probe_out4 => gtwiz_reset_rx_datapath_vio_int,
+  --  probe_out5 => gtwiz_reset_rx_buf_vio_int 
+  --);
 
 end Behavioral;
