@@ -345,7 +345,7 @@ architecture Behavioral of odmb7_ucsb_dev is
       RAWLCT      : in  std_logic_vector(NCFEB -1  downto 0); -- Bank 45
       OTMB_DAV    : in  std_logic;                          -- "TMB_DAV" in Bank 45
       OTMB_FF_CLK : in  std_logic;                          -- "TMB_FF_CLK" in Bank 45
-      RSVTD_IN    : in  std_logic_vector(7 downto 3);       -- "RSVTD[7:3]" in Bank 44-45
+      --RSVTD_IN    : in  std_logic_vector(7 downto 3);       -- "RSVTD[7:3]" in Bank 44-45
       RSVTD_OUT   : out std_logic_vector(2 downto 0);       -- "RSVTD[2:0]" in Bank 44-45
       LCT_RQST    : out std_logic_vector(2 downto 1);       -- Bank 45
 
@@ -1105,11 +1105,12 @@ begin
   -------------------------------------------------------------------------------------------
   LCTDLY_GTRG : LCTDLY port map(DOUT => test_l1a, CLK => cmsclk, DELAY => lct_l1a_dly, DIN => test_lct);
 
-  raw_l1a <= test_l1a;
+  --raw_l1a <= test_l1a;
   raw_lct <= (others => '1') when (test_lct = '1') else rawlct; 
-  --raw_l1a <= '1' when test_l1a = '1' else
+  raw_l1a <= '1' when test_l1a = '1' else
+             not ccb_l1a_b;
   --           tc_l1a when (testctrl_sel = '1') else
-  --           not ccb_l1acc_b;
+
   --raw_lct <= (others => '1') when test_pb_lct = '1' else
   --           tc_lct when (testctrl_sel = '1') else
   --           rawlct;
@@ -1302,7 +1303,7 @@ begin
       RAWLCT      => RAWLCT(6 downto 0),
       OTMB_DAV    => OTMBDAV,
       OTMB_FF_CLK => OTMB_FF_CLK,
-      RSVTD_IN    => RSVTD_IN,
+      --RSVTD_IN    => RSVTD_IN,
       RSVTD_OUT   => RSVTD_OUT,
       LCT_RQST    => LCT_RQST,
 
@@ -1372,8 +1373,8 @@ begin
       NCFEB => NCFEB
       )
     port map (
-      CLK80 => sysclk80,
-      CLK40 => cmsclk,
+      CLK80  => sysclk80,
+      CLK40  => cmsclk,
 
       TEST_CCBINJ => test_inj,
       TEST_CCBPLS => test_pls,

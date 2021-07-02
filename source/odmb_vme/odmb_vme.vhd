@@ -97,7 +97,7 @@ entity ODMB_VME is
     RAWLCT      : in  std_logic_vector(NCFEB-1 downto 0); -- Bank 45
     OTMB_DAV    : in  std_logic;                          -- "TMB_DAV" in Bank 45
     OTMB_FF_CLK : in  std_logic;                          -- "TMB_FF_CLK" in Bank 45, not used
-    RSVTD_IN    : in  std_logic_vector(7 downto 3);       -- "RSVTD[7:3]" in Bank 44-45
+    --RSVTD_IN    : in  std_logic_vector(7 downto 3);       -- "RSVTD[7:3]" in Bank 44-45
     RSVTD_OUT   : out std_logic_vector(2 downto 0);       -- "RSVTD[2:0]" in Bank 44-45
     LCT_RQST    : out std_logic_vector(2 downto 1);       -- Bank 45
 
@@ -639,11 +639,11 @@ begin
   otmb_tx(40)           <= OTMB(35);             -- alct_/wr_enable     // ALCT _wr_fifo
   otmb_tx(41)           <= OTMB(33);             -- alct_ddu_special    // ALCT ddu_special (alct_data[15])
   otmb_tx(42)           <= OTMB(34);             -- alct_last_frame     // ALCT last frame  (alct_data[16])
-  otmb_tx(43)           <= RSVTD_IN(7);          -- alct_first_frame    // ALCT first frame (ALCT_DAV)
-  otmb_tx(45 downto 44) <= RSVTD_IN(5 downto 4); -- res_to_dmb[2:1]     // DMB active cfeb list
-  otmb_tx(46)           <= RSVTD_IN(6);          -- res_to_dmb[3]       // Not used, ='1' in PRBS test
-  otmb_tx(47)           <= RAWLCT(6);            -- res_to_dmb[4]       // Not used, ='0' in PRBS test
-  otmb_tx(48)           <= RSVTD_IN(3);          -- res_to_dmb[5]       // Not used, ='1' in PRBS test
+  --otmb_tx(43)           <= RSVTD_IN(7);          -- alct_first_frame    // ALCT first frame (ALCT_DAV)
+  --otmb_tx(45 downto 44) <= RSVTD_IN(5 downto 4); -- res_to_dmb[2:1]     // DMB active cfeb list
+  --otmb_tx(46)           <= RSVTD_IN(6);          -- res_to_dmb[3]       // Not used, ='1' in PRBS test
+  --otmb_tx(47)           <= RAWLCT(6);            -- res_to_dmb[4]       // Not used, ='0' in PRBS test
+  --otmb_tx(48)           <= RSVTD_IN(3);          -- res_to_dmb[5]       // Not used, ='1' in PRBS test
 
   ----------------------------------
   -- misc

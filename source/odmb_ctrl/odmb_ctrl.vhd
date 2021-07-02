@@ -195,6 +195,7 @@ begin
     generic map (NCFEB => NCFEB)
     port map (
       CLK           => clk40,
+      CLK80        =>  clk80,
       RAW_L1A       => raw_l1a,
       RAW_LCT       => rawlct,
       CAL_LCT       => cal_lct,
