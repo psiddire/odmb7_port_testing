@@ -7,39 +7,40 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.ucsb_types.all;
 
+--! @brief VME device that acts as user interface to EPROM
 entity SPI_PORT is
   port (
-    SLOWCLK              : in std_logic;
-    CLK                  : in std_logic;
-    RST                  : in std_logic;
+    SLOWCLK              : in std_logic; --! 2.5 MHz clock input
+    CLK                  : in std_logic; --! 45 MHz clock iput
+    RST                  : in std_logic; --! Soft reset signal
     --VME signals
-    DEVICE               : in  std_logic;
-    STROBE               : in  std_logic;
-    COMMAND              : in  std_logic_vector(9 downto 0);
-    WRITER               : in  std_logic;
-    DTACK                : out std_logic;
-    INDATA               : in  std_logic_vector(15 downto 0);
-    OUTDATA              : out std_logic_vector(15 downto 0);
+    DEVICE               : in  std_logic; --! Indicates whether this is the selected VME device
+    STROBE               : in  std_logic; --! Indicates VME command is ready to be executed
+    COMMAND              : in  std_logic_vector(9 downto 0); --! VME command to be executed (x"6" & COMMAND & "00" is user-readble version)
+    WRITER               : in  std_logic; --! Indicates if VME command is a read or write command
+    DTACK                : out std_logic; --! Data acknowledge to be sent once command is initialized/executed
+    INDATA               : in  std_logic_vector(15 downto 0); --! Input data from VME backplane
+    OUTDATA              : out std_logic_vector(15 downto 0); --! Output data to VME backplane
     --CONFREGS signals
-    SPI_CFG_UL_PULSE     : out std_logic;
-    SPI_CONST_UL_PULSE   : out std_logic;
-    SPI_UL_REG           : out std_logic_vector(15 downto 0);
-    SPI_CFG_BUSY         : out std_logic;
-    SPI_CONST_BUSY       : out std_logic;
-    SPI_CFG_REG_WE       : out integer range 0 to NREGS;
-    SPI_CONST_REG_WE     : out integer range 0 to NREGS;
-    SPI_CFG_REGS         : in cfg_regs_array;
-    SPI_CONST_REGS       : in cfg_regs_array;
+    SPI_CFG_UL_PULSE     : out std_logic; --! Signal from VMECONFREGS to upload CFG registers to PROM
+    SPI_CONST_UL_PULSE   : out std_logic; --! Signal from VMECONFREGS to upload const registers to PROM
+    SPI_UL_REG           : out std_logic_vector(15 downto 0); --! Contents of CFG/const registers read from PROM
+    SPI_CFG_BUSY         : out std_logic; --! Indicates CFG register upload in progress
+    SPI_CONST_BUSY       : out std_logic; --! Indicated const register upload in progress
+    SPI_CFG_REG_WE       : out integer range 0 to NREGS; --! Write enable for each CFG register
+    SPI_CONST_REG_WE     : out integer range 0 to NREGS; --! Write enable for each const register
+    SPI_CFG_REGS         : in cfg_regs_array; --! Contents of CFG registers read from PROM
+    SPI_CONST_REGS       : in cfg_regs_array; --! Contents of const registers read from PROM
     --signals to/from QSPI_CTRL
-    SPI_CMD_FIFO_WRITE_EN     : out std_logic;
-    SPI_CMD_FIFO_IN           : out std_logic_vector(15 downto 0);
-    SPI_READBACK_FIFO_OUT     : in std_logic_vector(15 downto 0);
-    SPI_READBACK_FIFO_READ_EN : out std_logic;
-    SPI_READ_BUSY             : in std_logic;
-    SPI_NCMDS_SPICTRL         : in unsigned(15 downto 0);
-    SPI_NCMDS_SPIINTR         : in unsigned(15 downto 0);
+    SPI_CMD_FIFO_WRITE_EN     : out std_logic; --! Write enable to write command to PROM controller module
+    SPI_CMD_FIFO_IN           : out std_logic_vector(15 downto 0); --! Command to be written to PROM controller module
+    SPI_READBACK_FIFO_OUT     : in std_logic_vector(15 downto 0); --! Contents readback from PROM
+    SPI_READBACK_FIFO_READ_EN : out std_logic; --! Read enable to progress through contents readback from PROM
+    SPI_READ_BUSY             : in std_logic; --! Indicates a PROM read in progress
+    SPI_NCMDS_SPICTRL         : in unsigned(15 downto 0); --Debug signal: number of commands received by SPICTRL
+    SPI_NCMDS_SPIINTR         : in unsigned(15 downto 0); --Debug signal: number of commands processed by SPICTRL
     --debug
-    DIAGOUT                   : out std_logic_vector(17 downto 0)
+    DIAGOUT                   : out std_logic_vector(17 downto 0) --Debug signals
     );
 end SPI_PORT;
 
@@ -49,6 +50,13 @@ architecture SPI_PORT_Arch of SPI_PORT is
   --                                               x"0008", x"0008", x"0004", x"0000",
   --                                               x"D3B7", x"D3B7", x"00FF", x"0100",
   --                                               x"FFFC", x"FFFD", x"FFFE", x"FFFF");
+  
+  component ila_spi
+  port (
+    clk : in std_logic;
+    probe0 : in std_logic_vector(511 downto 0)
+    );
+  end component;
   
   --CFG register download signals
   type cfg_download_states is (S_IDLE, S_SET_ADDR_LOWER, S_ERASE, S_BUFFER_PROGRAM, S_WRITE);
@@ -99,8 +107,25 @@ architecture SPI_PORT_Arch of SPI_PORT is
   signal do_ncmds_spiport_read : std_logic := '0';
   signal do_ncmds_spictrl_read : std_logic := '0';
   signal do_ncmds_spiintr_read : std_logic := '0';
+  signal outdata_inner         : std_logic_vector(15 downto 0) := x"0000";
+  signal ila_probe             : std_logic_vector(511 downto 0) := (others => '0');
 
 begin
+
+  --debug
+  ila_spi_port_i : ila_spi
+  PORT MAP (
+    clk => CLK,
+    probe0 => ila_probe
+  );
+  ila_probe(0) <= DEVICE;
+  ila_probe(1) <= STROBE;
+  ila_probe(3 downto 2) <= "00";
+  ila_probe(13 downto 4) <= command;
+  ila_probe(17 downto 14) <= "0110";
+  ila_probe(18) <= q_dtack;
+  ila_probe(34 downto 19) <= INDATA;
+  ila_probe(50 downto 35) <= outdata_inner;
 
   --Decode command
   cmddev    <= "000" & DEVICE & COMMAND & "00";
@@ -137,10 +162,12 @@ begin
   end process;            
   
   --handle SPI read command
-  OUTDATA <= std_logic_vector(ncmds_spiport) when (do_ncmds_spiport_read = '1') else
+  outdata_inner <= std_logic_vector(ncmds_spiport) when (do_ncmds_spiport_read = '1') else
              std_logic_vector(SPI_NCMDS_SPICTRL) when (do_ncmds_spictrl_read = '1') else
              std_logic_vector(SPI_NCMDS_SPIINTR) when (do_ncmds_spiintr_read = '1') else
              spi_read_data; --currently the only output in this module, will fix later
+  
+  OUTDATA <= outdata_inner; --temp, for debugging
              
   spi_read_proc : process (SLOWCLK)
   begin
@@ -334,10 +361,11 @@ begin
   
   --TODO: upload CFG registers on reset
   
-  
   -- DTACK: always just issue on second SLOWCLK edge after STROBE
-  d_dtack <= strobe_qq when (rising_edge(SLOWCLK) and DEVICE = '1');
-  q_dtack <= d_dtack when rising_edge(SLOWCLK);
+  ce_d_dtack <= strobe_qq and DEVICE;
+  FD_D_DTACK : FDCE port map(Q => d_dtack, C => SLOWCLK, CE => ce_d_dtack, CLR => q_dtack, D => '1');
+  FD_Q_DTACK : FD port map(Q => q_dtack, C => SLOWCLK, D => d_dtack);
+  DTACK    <= q_dtack;
   
   --FD_D_DTACK : FDCE port map(Q => d_dtack, C => SLOWCLK, CE => ce_d_dtack, CLR => q_dtack, D => '1');
   --FD_Q_DTACK : FD port map(Q => q_dtack, C => SLOWCLK, D => d_dtack);

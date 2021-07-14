@@ -6,23 +6,24 @@ use ieee.numeric_std.all;
 use work.ucsb_types.all;
 use unisim.vcomponents.all;
 
+--! @brief Module that controls post-startup communication with EPROMs
 entity SPI_CTRL is
   port (
     
-    CLK40   : in std_logic;
-    CLK2P5  : in std_logic;
-    RST     : in std_logic;
+    CLK40   : in std_logic; --! 40 MHz clock input
+    CLK2P5  : in std_logic; --! 2.5 MHz clock input
+    RST     : in std_logic; --! Soft reset signal
     
-    CMD_FIFO_IN : in std_logic_vector(15 downto 0);
-    CMD_FIFO_WRITE_EN : in std_logic;
+    CMD_FIFO_IN : in std_logic_vector(15 downto 0); --! SPI_CTRL command, clocked on CLK2P5
+    CMD_FIFO_WRITE_EN : in std_logic; --! Enable for SPI_CTRL command, clocked on CLK2P5
     
-    READBACK_FIFO_OUT : out std_logic_vector(15 downto 0);
-    READBACK_FIFO_READ_EN : in std_logic;
-    READ_BUSY : out std_logic;
+    READBACK_FIFO_OUT : out std_logic_vector(15 downto 0); --! Read output from readback FIFO, clocked on CLK2P5
+    READBACK_FIFO_READ_EN : in std_logic; --! Read enable for readback FIFO, clocked on CLK2P5
+    READ_BUSY : out std_logic; --! Indicates if a PROM read is in progress
     
-    NCMDS_SPICTRL : out unsigned(15 downto 0);
-    NCMDS_SPIINTR : out unsigned(15 downto 0);
-    DIAGOUT : out std_logic_vector(17 downto 0)
+    NCMDS_SPICTRL : out unsigned(15 downto 0); --! Debug signal that counts the number of commands received by SPI_CTRL
+    NCMDS_SPIINTR : out unsigned(15 downto 0); --! Debug signal that counts the number of commands passed to SPI_INTERFACE
+    DIAGOUT : out std_logic_vector(17 downto 0) --! Debug signals
 
     );
 end SPI_CTRL;
@@ -95,6 +96,13 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
     rd_rst_busy : OUT STD_LOGIC
     );
   end component;
+  
+  component ila_spi
+  port (
+    clk : in std_logic;
+    probe0 : in std_logic_vector(511 downto 0)
+    );
+  end component;
 
   --CMD FIFO signals
   signal cmd_fifo_empty   : std_logic := '1';
@@ -143,8 +151,31 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
   signal ncmds_spiintr_inner    : unsigned (15 downto 0) := x"0000";
   signal cmd_fifo_read_en_q     : std_logic := '0';
   signal cmd_fifo_read_en_pulse : std_logic := '0';
+  signal ila_probe              : std_logic_vector(511 downto 0) := (others => '0');
 
 begin
+
+  ila_spi_i : ila_spi
+    PORT MAP (
+      clk => CLK40,
+      probe0 => ila_probe
+    );
+  ila_probe(0) <= CMD_FIFO_WRITE_EN;
+  ila_probe(16 downto 1) <= CMD_FIFO_IN;
+  ila_probe(32 downto 17) <= cmd_fifo_out;
+  ila_probe(33) <= write_fifo_write_en;
+  ila_probe(65 downto 34) <= prom_addr;
+  ila_probe(66) <= prom_load_addr;
+  ila_probe(78 downto 67) <= std_logic_vector(program_nwords);
+  ila_probe(79) <= prom_write_en;
+  ila_probe(80) <= write_done;
+  ila_probe(92 downto 81) <= std_logic_vector(read_nwords);
+  ila_probe(93) <= prom_read_en;
+  ila_probe(94) <= read_done;
+  ila_probe(95) <= prom_erase_en;
+  ila_probe(96) <= erase_done;
+  ila_probe(112 downto 97) <= spi_readdata;
+  ila_probe(113) <= readback_fifo_wr_en;
 
   ncmds_spictrl_inner <= (ncmds_spictrl_inner + 1) when (rising_edge(CLK2P5) and CMD_FIFO_WRITE_EN='1') else
                          ncmds_spictrl_inner;

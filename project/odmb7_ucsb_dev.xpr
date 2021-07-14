@@ -3,7 +3,7 @@
 <!--                                                         -->
 <!-- Copyright 1986-2019 Xilinx, Inc. All Rights Reserved.   -->
 
-<Project Version="7" Minor="44" Path="/data/sicheng/working/odmb7_dev/odmb7_vmon_dev/project/odmb7_ucsb_dev.xpr">
+<Project Version="7" Minor="44" Path="/net/top/homes/oshiro/odmb/firmware/odmb7_ucsb_dev_2/project/odmb7_ucsb_dev.xpr">
   <DefaultLaunch Dir="$PRUNDIR"/>
   <Configuration>
     <Option Name="Id" Val="34987868ce874aabb5b38a22396ce0db"/>
@@ -30,20 +30,20 @@
     <Option Name="IPUserFilesDir" Val="$PIPUSERFILESDIR"/>
     <Option Name="IPStaticSourceDir" Val="$PIPUSERFILESDIR/ipstatic"/>
     <Option Name="EnableBDX" Val="FALSE"/>
-    <Option Name="WTXSimLaunchSim" Val="58"/>
+    <Option Name="WTXSimLaunchSim" Val="62"/>
     <Option Name="WTModelSimLaunchSim" Val="0"/>
     <Option Name="WTQuestaLaunchSim" Val="0"/>
     <Option Name="WTIesLaunchSim" Val="0"/>
     <Option Name="WTVcsLaunchSim" Val="0"/>
     <Option Name="WTRivieraLaunchSim" Val="0"/>
     <Option Name="WTActivehdlLaunchSim" Val="0"/>
-    <Option Name="WTXSimExportSim" Val="57"/>
-    <Option Name="WTModelSimExportSim" Val="57"/>
-    <Option Name="WTQuestaExportSim" Val="57"/>
-    <Option Name="WTIesExportSim" Val="57"/>
-    <Option Name="WTVcsExportSim" Val="57"/>
-    <Option Name="WTRivieraExportSim" Val="57"/>
-    <Option Name="WTActivehdlExportSim" Val="57"/>
+    <Option Name="WTXSimExportSim" Val="67"/>
+    <Option Name="WTModelSimExportSim" Val="67"/>
+    <Option Name="WTQuestaExportSim" Val="67"/>
+    <Option Name="WTIesExportSim" Val="67"/>
+    <Option Name="WTVcsExportSim" Val="67"/>
+    <Option Name="WTRivieraExportSim" Val="67"/>
+    <Option Name="WTActivehdlExportSim" Val="67"/>
     <Option Name="GenerateIPUpgradeLog" Val="TRUE"/>
     <Option Name="XSimRadix" Val="hex"/>
     <Option Name="XSimTimeUnit" Val="ns"/>
@@ -74,6 +74,13 @@
         </FileInfo>
       </File>
       <File Path="$PPRDIR/../ip/spi_cmd_fifo/spi_cmd_fifo.xci">
+        <FileInfo>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PPRDIR/../ip/ila_spi/ila_spi.xci">
         <FileInfo>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
@@ -292,8 +299,10 @@
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
-      <File Path="$PPRDIR/../simulation/data/Input1_lvmb.coe">
+      <File Path="$PSRCDIR/sources_1/imports/data/Input1_lvmb.coe">
         <FileInfo>
+          <Attr Name="ImportPath" Val="$PPRDIR/../simulation/data/Input1_lvmb.coe"/>
+          <Attr Name="ImportTime" Val="1625248313"/>
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
@@ -309,6 +318,18 @@
       </File>
       <File Path="$PPRDIR/../simulation/data/Input1_volMon.coe">
         <FileInfo>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PPRDIR/../simulation/data/Input1_spi.coe">
+        <FileInfo>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PPRDIR/../simulation/data/Input2_spi.coe">
+        <FileInfo>
+          <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
@@ -469,6 +490,20 @@
         <Option Name="TopAutoSet" Val="TRUE"/>
       </Config>
     </FileSet>
+    <FileSet Name="ila_spi" Type="BlockSrcs" RelSrcDir="$PSRCDIR/ila_spi">
+      <File Path="$PSRCDIR/sources_1/ip/ila_spi/ila_spi.xci">
+        <FileInfo>
+          <Attr Name="AutoDisabled" Val="1"/>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <Config>
+        <Option Name="TopModule" Val="ila_spi"/>
+        <Option Name="UseBlackboxStub" Val="1"/>
+      </Config>
+    </FileSet>
   </FileSets>
   <Simulators>
     <Simulator Name="XSim">
@@ -505,6 +540,16 @@
       <Report Name="ROUTE_DESIGN.REPORT_METHODOLOGY" Enabled="1"/>
       <RQSFiles/>
     </Run>
+    <Run Id="ila_spi_synth_1" Type="Ft3:Synth" SrcSet="ila_spi" Part="xcku035-ffva1156-1-c" ConstrsSet="ila_spi" Description="Vivado Synthesis Defaults" AutoIncrementalCheckpoint="false" WriteIncrSynthDcp="false" Dir="$PRUNDIR/ila_spi_synth_1" IncludeInArchive="true">
+      <Strategy Version="1" Minor="2">
+        <StratHandle Name="Vivado Synthesis Defaults" Flow="Vivado Synthesis 2019"/>
+        <Step Id="synth_design"/>
+      </Strategy>
+      <GeneratedRun Dir="$PRUNDIR" File="gen_run.xml"/>
+      <ReportStrategy Name="Vivado Synthesis Default Reports" Flow="Vivado Synthesis 2019"/>
+      <Report Name="ROUTE_DESIGN.REPORT_METHODOLOGY" Enabled="1"/>
+      <RQSFiles/>
+    </Run>
     <Run Id="impl_1" Type="Ft2:EntireDesign" Part="xcku035-ffva1156-1-c" ConstrsSet="constrs_1" Description="Default settings for Implementation." AutoIncrementalCheckpoint="false" WriteIncrSynthDcp="false" State="current" Dir="$PRUNDIR/impl_1" SynthRun="synth_1" IncludeInArchive="true" GenFullBitstream="true">
       <Strategy Version="1" Minor="2">
         <StratHandle Name="Vivado Implementation Defaults" Flow="Vivado Implementation 2019"/>
@@ -519,6 +564,23 @@
         <Step Id="write_bitstream"/>
       </Strategy>
       <GeneratedRun Dir="$PRUNDIR" File="gen_run.xml"/>
+      <ReportStrategy Name="Vivado Implementation Default Reports" Flow="Vivado Implementation 2019"/>
+      <Report Name="ROUTE_DESIGN.REPORT_METHODOLOGY" Enabled="1"/>
+      <RQSFiles/>
+    </Run>
+    <Run Id="ila_spi_impl_1" Type="Ft2:EntireDesign" Part="xcku035-ffva1156-1-c" ConstrsSet="ila_spi" Description="Default settings for Implementation." AutoIncrementalCheckpoint="false" WriteIncrSynthDcp="false" SynthRun="ila_spi_synth_1" IncludeInArchive="false" GenFullBitstream="true">
+      <Strategy Version="1" Minor="2">
+        <StratHandle Name="Vivado Implementation Defaults" Flow="Vivado Implementation 2019"/>
+        <Step Id="init_design"/>
+        <Step Id="opt_design"/>
+        <Step Id="power_opt_design"/>
+        <Step Id="place_design"/>
+        <Step Id="post_place_power_opt_design"/>
+        <Step Id="phys_opt_design" EnableStepBool="1"/>
+        <Step Id="route_design"/>
+        <Step Id="post_route_phys_opt_design"/>
+        <Step Id="write_bitstream"/>
+      </Strategy>
       <ReportStrategy Name="Vivado Implementation Default Reports" Flow="Vivado Implementation 2019"/>
       <Report Name="ROUTE_DESIGN.REPORT_METHODOLOGY" Enabled="1"/>
       <RQSFiles/>

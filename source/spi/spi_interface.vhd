@@ -471,13 +471,13 @@ process_write : process (CLK)
   case write_state is 
    when S_WRITE_IDLE =>
         write_spi_cs_bar <= '1';
-        write_done <= '0';
         --initalize program process when START_WRITE received
         if (START_ADDRESS_VALID = '1') then write_address <= START_ADDRESS(23 downto 0) & x"00"; end if; --currently, 3-byte addressing
         if (START_WRITE = '1') then
           write_fifo_read_enable <= '0';
           write_word_limit <= (x"00000" & WRITE_NWORDS(11 downto 0)) + 1; 
           dopin_ts <= "1110";
+          write_done <= '0';
           write_state <= S_WRITE_ASSERT_CS_WRITE_ENABLE;
         end if;
 
