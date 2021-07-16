@@ -14,35 +14,42 @@ use ieee.numeric_std.all;
 use UNISIM.vcomponents.all;
 use work.ucsb_types.all;
 
+--! @brief Module that directly generates SPI signals for post-startup communication with EPROMS
 entity spi_interface is
   port
   (
-    CLK                     : in std_logic;
-    RST                     : in std_logic;
+    CLK                     : in std_logic; --! 40 MHz clock input
+    RST                     : in std_logic; --! Soft reset signal
     ------------------ Signals to FIFO
-    WRITE_FIFO_INPUT        : in std_logic_vector(15 downto 0);
-    WRITE_FIFO_WRITE_ENABLE : in std_logic;
+    WRITE_FIFO_INPUT        : in std_logic_vector(15 downto 0); --! Data to write to programming FIFO
+    WRITE_FIFO_WRITE_ENABLE : in std_logic; --! Write enable for programming FIFO
     ------------------ Address loading signals
-    START_ADDRESS           : in std_logic_vector(31 downto 0);
-    START_ADDRESS_VALID     : in std_logic;
+    START_ADDRESS           : in std_logic_vector(31 downto 0); --! Address to start operation. Only bottom 3 bytes used
+    START_ADDRESS_VALID     : in std_logic; --! Signal to load address
     --PAGE_COUNT              : in std_logic_vector(17 downto 0);
     --PAGE_COUNT_VALID        : in std_logic;
     --SECTOR_COUNT            : in std_logic_vector(13 downto 0);
     --SECTOR_COUNT_VALID      : in std_logic;
     ------------------ Commands
-    WRITE_NWORDS            : in unsigned(11 downto 0);
-    START_WRITE             : in std_logic;
-    OUT_WRITE_DONE          : out std_logic;
-    READ_NWORDS             : in unsigned(11 downto 0);
-    START_READ              : in std_logic;
-    OUT_READ_DONE           : out std_logic;
-    START_ERASE             : in std_logic;
-    OUT_ERASE_DONE          : out std_logic;
+    WRITE_NWORDS            : in unsigned(11 downto 0); --! Number of words to program
+    START_WRITE             : in std_logic;             --! Signal to begin programming
+    OUT_WRITE_DONE          : out std_logic;            --! '1' unless program in progress
+    READ_NWORDS             : in unsigned(11 downto 0); --! Number of words to read
+    START_READ              : in std_logic;             --! Signal to begin read
+    OUT_READ_DONE           : out std_logic;            --! '1' unless read in progress
+    START_ERASE             : in std_logic;             --! Signal to begin erase (1 sector)
+    OUT_ERASE_DONE          : out std_logic;            --! '1' unless erase in progress
     ------------------ Read output
-    OUT_READ_DATA           : out std_logic_vector(15 downto 0);
-    OUT_READ_DATA_VALID     : out std_logic;
+    OUT_READ_DATA           : out std_logic_vector(15 downto 0); --! Data read out from PROM
+    OUT_READ_DATA_VALID     : out std_logic;                     --! Indicates when data from PROM is valid
+    ------------------ Signals to/from second EPROM
+    PROM_SELECT             : in std_logic;                     --! Selector for which PROM is used (0=primary, 1=secondary)
+    CNFG_DATA_IN            : in std_logic_vector(7 downto 4);  --! Data in from second EPROM
+    CNFG_DATA_OUT           : out std_logic_vector(7 downto 4); --! Data out to second EPROM
+    CNFG_DATA_DIR           : out std_logic_vector(7 downto 4); --! Tristate controller for second EPROM (1=to PROM)
+    PROM_CS2_B              : out std_logic;                    --! Chip select for second EPROM
     ------------------ Debug
-    DIAGOUT                 : out std_logic_vector(17 downto 0)
+    DIAGOUT                 : out std_logic_vector(17 downto 0) --! Debug signals
    ); 	
 end spi_interface;
 
@@ -227,7 +234,12 @@ END COMPONENT;
   signal erase_state  : erase_states := S_ERASE_IDLE;
 
  begin
+   
+  ----------------------------------------------------------------------------
+  -- Deal with signals to PROMs
+  ----------------------------------------------------------------------------
 
+  --Signals to PROM connected to bank 0 go through STARTUPE3 module
   STARTUPE3_inst : STARTUPE3
   port map (
           CFGCLK => open,
@@ -249,12 +261,28 @@ END COMPONENT;
           USRDONEO => '1',
           USRDONETS => '0'    
   );
-  
+
+  CNFG_DATA_OUT <= qspi_io(3 downto 1) & spi_mosi;
   do_in <= qspi_io(3 downto 1) & spi_mosi;
-  spi_miso <= di_out(1);
+  spi_miso <= di_out(1) when PROM_SELECT='0' else
+              CNFG_DATA_IN(5);
+  CNFG_DATA_DIR <= not dopin_ts(3) & not dopin_ts(2) & not dopin_ts(1) & not dopin_ts(0);
   
   qspi_io(3 downto 1) <= write_fifo_output(3 downto 1) when rising_edge(CLK);
-  spi_cs_bar <= spi_cs_bar_input when falling_edge(CLK); --update spi_cs_bar on falling edges
+
+  --update spi_cs_bar on falling edges
+  update_chipsel : process(CLK)
+  begin
+    if falling_edge(CLK) then
+      if (PROM_SELECT='0') then
+        spi_cs_bar <= spi_cs_bar_input;
+        PROM_CS2_B <= '1';
+      else
+        spi_cs_bar <= '1';
+        PROM_CS2_B <= spi_cs_bar_input;
+      end if;
+    end if;
+  end process;
   
   mux_mosi : process(CLK)
   begin

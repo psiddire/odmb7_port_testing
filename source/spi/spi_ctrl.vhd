@@ -10,20 +10,25 @@ use unisim.vcomponents.all;
 entity SPI_CTRL is
   port (
     
-    CLK40   : in std_logic; --! 40 MHz clock input
-    CLK2P5  : in std_logic; --! 2.5 MHz clock input
-    RST     : in std_logic; --! Soft reset signal
+    CLK40                 : in std_logic;                      --! 40 MHz clock input
+    CLK2P5                : in std_logic;                      --! 2.5 MHz clock input
+    RST                   : in std_logic;                      --! Soft reset signal
     
-    CMD_FIFO_IN : in std_logic_vector(15 downto 0); --! SPI_CTRL command, clocked on CLK2P5
-    CMD_FIFO_WRITE_EN : in std_logic; --! Enable for SPI_CTRL command, clocked on CLK2P5
+    CMD_FIFO_IN           : in std_logic_vector(15 downto 0);  --! SPI_CTRL command, clocked on CLK2P5
+    CMD_FIFO_WRITE_EN     : in std_logic;                      --! Enable for SPI_CTRL command, clocked on CLK2P5
     
-    READBACK_FIFO_OUT : out std_logic_vector(15 downto 0); --! Read output from readback FIFO, clocked on CLK2P5
-    READBACK_FIFO_READ_EN : in std_logic; --! Read enable for readback FIFO, clocked on CLK2P5
-    READ_BUSY : out std_logic; --! Indicates if a PROM read is in progress
+    READBACK_FIFO_OUT     : out std_logic_vector(15 downto 0); --! Read output from readback FIFO, clocked on CLK2P5
+    READBACK_FIFO_READ_EN : in std_logic;                      --! Read enable for readback FIFO, clocked on CLK2P5
+    READ_BUSY             : out std_logic;                     --! Indicates if a PROM read is in progress
+
+    CNFG_DATA_IN          : in std_logic_vector(7 downto 4);   --! Data in from second EPROM
+    CNFG_DATA_OUT         : out std_logic_vector(7 downto 4);  --! Data out to second EPROM
+    CNFG_DATA_DIR         : out std_logic_vector(7 downto 4);  --! Tristate controller for second EPROM (1=to PROM)
+    PROM_CS2_B            : out std_logic;                     --! Chip select for second EPROM
     
-    NCMDS_SPICTRL : out unsigned(15 downto 0); --! Debug signal that counts the number of commands received by SPI_CTRL
-    NCMDS_SPIINTR : out unsigned(15 downto 0); --! Debug signal that counts the number of commands passed to SPI_INTERFACE
-    DIAGOUT : out std_logic_vector(17 downto 0) --! Debug signals
+    NCMDS_SPICTRL         : out unsigned(15 downto 0);         --! Debug signal that counts the number of commands received by SPI_CTRL
+    NCMDS_SPIINTR         : out unsigned(15 downto 0);         --! Debug signal that counts the number of commands passed to SPI_INTERFACE
+    DIAGOUT               : out std_logic_vector(17 downto 0)  --! Debug signals
 
     );
 end SPI_CTRL;
@@ -58,6 +63,12 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
       ------------------ Read output
       OUT_READ_DATA           : out std_logic_vector(15 downto 0);
       OUT_READ_DATA_VALID     : out std_logic;
+      ------------------ Signals to/from second EPROM
+      PROM_SELECT             : in std_logic;
+      CNFG_DATA_IN            : in std_logic_vector(7 downto 4); 
+      CNFG_DATA_OUT           : out std_logic_vector(7 downto 4); 
+      CNFG_DATA_DIR           : out std_logic_vector(7 downto 4); 
+      PROM_CS2_B              : out std_logic; 
       ------------------ Debug
       DIAGOUT                 : out std_logic_vector(17 downto 0)
      ); 	
@@ -120,6 +131,7 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
     S_READ_CMD, S_READ_LOW, S_READ_WAIT, 
     S_WRITE_CMD, S_WRITE_STALL_1, S_WRITE_STALL_2, S_WRITE_WORD, S_WRITE_START, S_WRITE_WAIT, 
     S_ERASE_CMD, S_ERASE_LOW, S_ERASE_WAIT, 
+    S_SWITCH_PROM_CMD,
     S_UNKNOWN_CMD, S_STALL
   );
   signal cmd_fifo_state     : cmd_fifo_states := S_IDLE;
@@ -155,6 +167,9 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
   signal cmd_fifo_read_en_q     : std_logic := '0';
   signal cmd_fifo_read_en_pulse : std_logic := '0';
   signal ila_probe              : std_logic_vector(511 downto 0) := (others => '0');
+
+  --prom select signals
+  signal prom_select : std_logic := '0';
 
 begin
 
@@ -228,6 +243,9 @@ begin
         when x"17" =>
           --load address
           cmd_fifo_state  <= S_LOAD_ADDR_CMD;
+        when x"1D" =>
+          --switch prom
+          cmd_fifo_state  <= S_SWITCH_PROM_CMD;
         when others =>
           --unknown command
           cmd_fifo_state  <= S_UNKNOWN_CMD;
@@ -244,6 +262,7 @@ begin
       read_nwords         <= read_nwords;
       program_nwords      <= program_nwords;
       prom_addr           <= prom_addr;
+      prom_select         <= prom_select;
       
     when S_READ_CMD =>
       --start read process by sending read enable and number of words to read. Also remove command from FIFO
@@ -257,6 +276,7 @@ begin
       read_nwords         <= "0" & unsigned(cmd_fifo_out(15 downto 5)); 
       program_nwords      <= program_nwords;
       prom_addr           <= prom_addr;
+      prom_select         <= prom_select;
       
     when S_READ_LOW => 
       --needed to wait for read_done to go low
@@ -271,6 +291,7 @@ begin
       program_nwords      <= program_nwords;
       write_word_counter  <= write_word_counter;
       prom_addr           <= prom_addr;
+      prom_select         <= prom_select;
       
     when S_READ_WAIT =>
       --don't process any more commands until read is finished
@@ -288,6 +309,7 @@ begin
       read_nwords         <= read_nwords; 
       program_nwords      <= program_nwords;
       prom_addr           <= prom_addr;
+      prom_select         <= prom_select;
       
     when S_ERASE_CMD =>
       --start erase sector command with erase enable and remove command from FIFO
@@ -301,6 +323,7 @@ begin
       read_nwords         <= read_nwords;
       program_nwords      <= program_nwords;
       prom_addr           <= prom_addr;
+      prom_select         <= prom_select;
       
     when S_ERASE_LOW => 
       --wait for erase_done to go low
@@ -314,6 +337,7 @@ begin
       read_nwords         <= read_nwords;
       program_nwords      <= program_nwords;
       prom_addr           <= prom_addr;
+      prom_select         <= prom_select;
       
     when S_ERASE_WAIT =>
       --don't accept any more commands until done with erase command
@@ -331,6 +355,7 @@ begin
       read_nwords         <= read_nwords;
       program_nwords      <= program_nwords;
       prom_addr           <= prom_addr;
+      prom_select         <= prom_select;
       
     when S_WRITE_CMD =>
       --read number of words to program from command and remove command from FIFO
@@ -345,6 +370,7 @@ begin
       read_nwords         <= read_nwords;      
       program_nwords      <= "0" & unsigned(cmd_fifo_out(15 downto 5));
       prom_addr           <= prom_addr;
+      prom_select         <= prom_select;
 
     when S_WRITE_STALL_1 =>
       --wait an extra cycle for empty to be potentially de-asserted
@@ -358,6 +384,7 @@ begin
       read_nwords         <= read_nwords;
       program_nwords      <= program_nwords;
       prom_addr           <= prom_addr;
+      prom_select         <= prom_select;
      
     when S_WRITE_STALL_2 =>
       --continue when next word to write ready in command FIFO
@@ -375,6 +402,7 @@ begin
       read_nwords         <= read_nwords;
       program_nwords      <= program_nwords;
       prom_addr           <= prom_addr;
+      prom_select         <= prom_select;
       
     when S_WRITE_WORD =>
       --write this word to the spi_interface write buffer FIFO (goes directly from command FIFO to spi_interface buffer)
@@ -393,6 +421,7 @@ begin
       read_nwords         <= read_nwords;
       program_nwords      <= program_nwords;
       prom_addr           <= prom_addr;
+      prom_select         <= prom_select;
       
     when S_WRITE_START =>
       --start write command
@@ -406,6 +435,7 @@ begin
       read_nwords         <= read_nwords;
       program_nwords      <= program_nwords;
       prom_addr           <= prom_addr;
+      prom_select         <= prom_select;
       
     when S_WRITE_WAIT => 
       --wait until write_done is 1
@@ -423,6 +453,7 @@ begin
       read_nwords         <= read_nwords;
       program_nwords      <= program_nwords;
       prom_addr           <= prom_addr;
+      prom_select         <= prom_select;
       
     when S_LOAD_ADDR_CMD =>
       --set the upper part of address and remove command from FIFO
@@ -436,6 +467,7 @@ begin
       read_nwords         <= read_nwords;
       program_nwords      <= program_nwords;
       prom_addr           <= "00000" & cmd_fifo_out(15 downto 5) & prom_addr(15 downto 0);
+      prom_select         <= prom_select;
 
     when S_LOAD_ADDR_STALL_1 => 
       --need to wait because empty takes an extra cycle to go low
@@ -449,6 +481,7 @@ begin
       read_nwords         <= read_nwords;
       program_nwords      <= program_nwords;
       prom_addr           <= prom_addr;
+      prom_select         <= prom_select;
       
     when S_LOAD_ADDR_STALL_2 => 
       --continue when lower part of address is ready in command FIFO
@@ -466,6 +499,7 @@ begin
       read_nwords         <= read_nwords;
       program_nwords      <= program_nwords;
       prom_addr           <= prom_addr;
+      prom_select         <= prom_select;
             
     when S_LOAD_ADDR_LOWER =>
       --set lower part of address, remove command from FIFO, and pass address onto spi_interface
@@ -479,6 +513,21 @@ begin
       read_nwords         <= read_nwords;
       program_nwords      <= program_nwords;
       prom_addr           <= prom_addr(31 downto 16) & cmd_fifo_out;
+      prom_select         <= prom_select;
+
+    when S_SWITCH_PROM_CMD =>
+      --switch selected PROM and remove command from FIFO
+      cmd_fifo_state      <= S_STALL;
+      prom_read_en        <= '0';
+      prom_write_en       <= '0';
+      prom_erase_en       <= '0';
+      write_fifo_write_en <= '0';
+      prom_load_addr      <= '0';
+      cmd_fifo_read_en    <= '1';  
+      read_nwords         <= read_nwords;
+      program_nwords      <= program_nwords;
+      prom_addr           <= prom_addr;
+      prom_select         <= cmd_fifo_out(5);
       
     when S_UNKNOWN_CMD =>
       --do nothing but remove command from FIFO
@@ -492,6 +541,7 @@ begin
       read_nwords         <= read_nwords;
       program_nwords      <= program_nwords;
       prom_addr           <= prom_addr;
+      prom_select         <= prom_select;
 
     when S_STALL =>
       --need to wait because empty takes an extra cycle to go low
@@ -505,6 +555,7 @@ begin
       read_nwords         <= read_nwords;
       program_nwords      <= program_nwords;
       prom_addr           <= prom_addr;
+      prom_select         <= prom_select;
     
     when others =>
       --unimplemented state
@@ -518,6 +569,7 @@ begin
       read_nwords         <= read_nwords;
       program_nwords      <= program_nwords;
       prom_addr           <= prom_addr;
+      prom_select         <= prom_select;
     end case;
   end if;
   end process;
@@ -567,6 +619,12 @@ begin
     ------------------ Read output
     OUT_READ_DATA           => spi_readdata,
     OUT_READ_DATA_VALID     => readback_fifo_wr_en,
+    ------------------ Signals to/from second EPROM
+    PROM_SELECT             => prom_select,
+    CNFG_DATA_IN            => CNFG_DATA_IN,
+    CNFG_DATA_OUT           => CNFG_DATA_OUT,
+    CNFG_DATA_DIR           => CNFG_DATA_DIR,
+    PROM_CS2_B              => PROM_CS2_B,
     ------------------ Debug
     DIAGOUT                 => DIAGOUT
     );

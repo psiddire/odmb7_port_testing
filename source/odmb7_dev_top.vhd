@@ -46,38 +46,38 @@ entity odmb7_ucsb_dev is
     -- Signals controlled by ODMB_VME
     --------------------
     -- From/To VME controller to/from MBV
-    VME_DATA        : inout std_logic_vector(15 downto 0); -- Bank 48
-    VME_GAP_B       : in std_logic;                        -- Bank 48
-    VME_GA_B        : in std_logic_vector(4 downto 0);     -- Bank 48
-    VME_ADDR        : in std_logic_vector(23 downto 1);    -- Bank 46
-    VME_AM          : in std_logic_vector(5 downto 0);     -- Bank 46
-    VME_AS_B        : in std_logic;                        -- Bank 46
-    VME_DS_B        : in std_logic_vector(1 downto 0);     -- Bank 46
-    VME_LWORD_B     : in std_logic;                        -- Bank 48
-    VME_WRITE_B     : in std_logic;                        -- Bank 48
-    VME_IACK_B      : in std_logic;                        -- Bank 48
-    VME_BERR_B      : in std_logic;                        -- Bank 48
-    VME_SYSRST_B    : in std_logic;                        -- Bank 48, not used
-    VME_SYSFAIL_B   : in std_logic;                        -- Bank 48
-    VME_CLK_B       : in std_logic;                        -- Bank 48, not used
-    KUS_VME_OE_B    : out std_logic;                       -- Bank 44
-    KUS_VME_DIR     : out std_logic;                       -- Bank 44
-    VME_DTACK_KUS_B : out std_logic;                       -- Bank 44
+    VME_DATA        : inout std_logic_vector(15 downto 0); --! Data to/from VME backplane. Connected to bank 48
+    VME_GAP_B       : in std_logic;                        --! Geographical address (VME slot) parity. Connected to bank 48
+    VME_GA_B        : in std_logic_vector(4 downto 0);     --! Geographical address (VME slot). Connected to bank 48
+    VME_ADDR        : in std_logic_vector(23 downto 1);    --! VME address (command). Conencted to bank 46
+    VME_AM          : in std_logic_vector(5 downto 0);     --! VME address modified. Connected to cank 46
+    VME_AS_B        : in std_logic;                        --! VME address strobe. Connected to bank 46
+    VME_DS_B        : in std_logic_vector(1 downto 0);     --! VME data strobe. Connected to bank 46
+    VME_LWORD_B     : in std_logic;                        --! Indicates data word length. Connected to bank 48
+    VME_WRITE_B     : in std_logic;                        --! Indicates VME write/read. Connected to bank 48
+    VME_IACK_B      : in std_logic;                        --! VME interrupt acknowledge. Connected to bank 48
+    VME_BERR_B      : in std_logic;                        --! VME bus error indicator. Connected to bank 48
+    VME_SYSRST_B    : in std_logic;                        --! VME system reset. Not used. Connected to bank 48
+    VME_SYSFAIL_B   : in std_logic;                        --! VME system failure indicator. Connected to bank 48
+    VME_CLK_B       : in std_logic;                        --! VME clock. Not used. Connected to bank 48
+    KUS_VME_OE_B    : out std_logic;                       --! VME output enable. Connected to bank 44
+    KUS_VME_DIR     : out std_logic;                       --! ODMB board VME input/output direction. Connected to bank 44
+    VME_DTACK_KUS_B : out std_logic;                       --! VME data acknowledge. Connected to bank 44
 
     -- From/To PPIB (connectors J3 and J4)
-    DCFEB_TCK_P    : out std_logic_vector(7 downto 1);     -- Bank 68
-    DCFEB_TCK_N    : out std_logic_vector(7 downto 1);     -- Bank 68
-    DCFEB_TMS_P    : out std_logic;                        -- Bank 68
-    DCFEB_TMS_N    : out std_logic;                        -- Bank 68
-    DCFEB_TDI_P    : out std_logic;                        -- Bank 68
-    DCFEB_TDI_N    : out std_logic;                        -- Bank 68
-    DCFEB_TDO_P    : in  std_logic_vector(7 downto 1);     -- "C_TDO" in Bank 67-68
-    DCFEB_TDO_N    : in  std_logic_vector(7 downto 1);     -- "C_TDO" in Bank 67-68
-    DCFEB_DONE     : in  std_logic_vector(7 downto 1);     -- "DONE_*" in Bank 68
-    RESYNC_P       : out std_logic;                        -- Bank 66
-    RESYNC_N       : out std_logic;                        -- Bank 66
-    BC0_P          : out std_logic;                        -- Bank 68
-    BC0_N          : out std_logic;                        -- Bank 68
+    DCFEB_TCK_P    : out std_logic_vector(7 downto 1);     --! (x)DCFEB JTAG TCK signal. One per (x)DCFEB. Connected to bank 68
+    DCFEB_TCK_N    : out std_logic_vector(7 downto 1);     --! (x)DCFEB JTAG TCK signal. One per (x)DCFEB. Connected to bank 68
+    DCFEB_TMS_P    : out std_logic;                        --! (x)DCFEB JTAG TMS signal. Connected to bank 68
+    DCFEB_TMS_N    : out std_logic;                        --! (x)DCFEB JTAG TMS signal. Connected to bank 68
+    DCFEB_TDI_P    : out std_logic;                        --! (x)DCFEB JTAG TDI signal. Connected to bank 68
+    DCFEB_TDI_N    : out std_logic;                        --! (x)DCFEB JTAG TDI signal. Connected to bank 68
+    DCFEB_TDO_P    : in  std_logic_vector(7 downto 1);     --! (x)DCFEB JTAG TDO signal. One per (x)DCFEB. Connected to bank 67-68 as "C_TDO"
+    DCFEB_TDO_N    : in  std_logic_vector(7 downto 1);     --! (x)DCFEB JTAG TDO signal. One per (x)DCFEB. Connected to bank 67-68 as "C_TDO"
+    DCFEB_DONE     : in  std_logic_vector(7 downto 1);     --! (x)DCFEB programming done signal. Connected to bank 68 as "DONE_*"
+    RESYNC_P       : out std_logic;                        --! (x)DCFEB resync signal. Connected to bank 66
+    RESYNC_N       : out std_logic;                        --! (x)DCFEB resync signal. Connected to bank 66
+    BC0_P          : out std_logic;                        --! (x)DCFEB bunch crossing 0 synchronization signal. Connected to bank 68
+    BC0_N          : out std_logic;                        --! (x)DCFEB bunch crossing 0 synchronization signal. Connected to bank 68
     INJPLS_P       : out std_logic;                        -- Bank 66, ODMB CTRL
     INJPLS_N       : out std_logic;                        -- Bank 66, ODMB CTRL
     EXTPLS_P       : out std_logic;                        -- Bank 66, ODMB CTRL
@@ -86,7 +86,7 @@ entity odmb7_ucsb_dev is
     L1A_N          : out std_logic;                        -- Bank 66, ODMB CTRL
     L1A_MATCH_P    : out std_logic_vector(7 downto 1);     -- Bank 66, ODMB CTRL
     L1A_MATCH_N    : out std_logic_vector(7 downto 1);     -- Bank 66, ODMB CTRL
-    PPIB_OUT_EN_B  : out std_logic;                        -- Bank 68
+    PPIB_OUT_EN_B  : out std_logic;                        --! PPIB output enable signal. Connected to bank 68
 
     --------------------
     -- CCB Signals
@@ -383,6 +383,14 @@ architecture Behavioral of odmb7_ucsb_dev is
       CHANGE_REG_INDEX : in integer range 0 to NREGS;
 
       --------------------
+      -- PROM signals
+      --------------------
+      CNFG_DATA_IN     : in std_logic_vector(7 downto 4);
+      CNFG_DATA_OUT    : out std_logic_vector(7 downto 4);
+      CNFG_DATA_DIR    : out std_logic_vector(7 downto 4);
+      PROM_CS2_B       : out std_logic;
+
+      --------------------
       -- DDU/SPY/DCFEB/ALCT Optical PRBS test signals
       --------------------
       MGT_PRBS_TYPE        : out std_logic_vector(3 downto 0); -- DDU/SPY/DCFEB/ALCT Common PRBS type
@@ -654,6 +662,7 @@ architecture Behavioral of odmb7_ucsb_dev is
   --------------------------------------
   signal cnfg_data_in    : std_logic_vector(7 downto 4) := (others => '0');
   signal cnfg_data_out   : std_logic_vector(7 downto 4) := (others => '0');
+  signal cnfg_data_dir   : std_logic_vector(7 downto 4) := (others => '0');
 
   --------------------------------------
   -- Reset signals
@@ -884,10 +893,9 @@ begin
   -- PROM signals
   -------------------------------------------------------------------------------------------
   PROM_RST_B <= '1';
-  PROM_CS2_B <= '1';
   GEN_PROM_BUF: for I in 4 to 7 generate
   begin
-    PROM_DATA_BUF : IOBUF port map(O => cnfg_data_in(I), IO => CNFG_DATA(I), I => cnfg_data_out(I), T => '0'); --always input for now
+    PROM_DATA_BUF : IOBUF port map(O => cnfg_data_in(I), IO => CNFG_DATA(I), I => cnfg_data_out(I), T => cnfg_data_dir(I));
   end generate GEN_PROM_BUF;
 
   -------------------------------------------------------------------------------------------
@@ -1231,6 +1239,11 @@ begin
       CRATEID          => open,
       CHANGE_REG_DATA  => change_reg_data,
       CHANGE_REG_INDEX => change_reg_index,
+
+      CNFG_DATA_IN     => cnfg_data_in,
+      CNFG_DATA_OUT    => cnfg_data_out,
+      CNFG_DATA_DIR    => cnfg_data_dir,
+      PROM_CS2_B       => PROM_CS2_B,
 
       MGT_PRBS_TYPE        => mgt_prbs_type,
       DDU_PRBS_TX_EN       => ddu_prbs_tx_en,

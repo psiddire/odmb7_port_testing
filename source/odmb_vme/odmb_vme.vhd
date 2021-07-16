@@ -130,6 +130,14 @@ entity ODMB_VME is
     CHANGE_REG_INDEX     : in integer range 0 to NREGS;
 
     --------------------
+    -- PROM signals
+    --------------------
+    CNFG_DATA_IN         : in std_logic_vector(7 downto 4);
+    CNFG_DATA_OUT        : out std_logic_vector(7 downto 4);
+    CNFG_DATA_DIR        : out std_logic_vector(7 downto 4);
+    PROM_CS2_B           : out std_logic;
+
+    --------------------
     -- DDU/SPY/DCFEB/ALCT Optical PRBS test signals
     --------------------
     MGT_PRBS_TYPE        : out std_logic_vector(3 downto 0); -- DDU/SPY/DCFEB/ALCT Common PRBS type
@@ -471,19 +479,24 @@ architecture Behavioral of ODMB_VME is
   component SPI_CTRL is
     port (
 
-      CLK40   : in std_logic;
-      CLK2P5  : in std_logic;
-      RST     : in std_logic;
+      CLK40                 : in std_logic;
+      CLK2P5                : in std_logic;
+      RST                   : in std_logic;
 
-      CMD_FIFO_IN : in std_logic_vector(15 downto 0);
-      CMD_FIFO_WRITE_EN : in std_logic;
-      READBACK_FIFO_OUT : out std_logic_vector(15 downto 0);
+      CMD_FIFO_IN           : in std_logic_vector(15 downto 0);
+      CMD_FIFO_WRITE_EN     : in std_logic;
+      READBACK_FIFO_OUT     : out std_logic_vector(15 downto 0);
       READBACK_FIFO_READ_EN : in std_logic;
-      READ_BUSY : out std_logic;
+      READ_BUSY             : out std_logic;
 
-      NCMDS_SPICTRL : out unsigned(15 downto 0);
-      NCMDS_SPIINTR : out unsigned(15 downto 0);
-      DIAGOUT : out std_logic_vector(17 downto 0)
+      CNFG_DATA_IN          : in std_logic_vector(7 downto 4);
+      CNFG_DATA_OUT         : out std_logic_vector(7 downto 4);
+      CNFG_DATA_DIR         : out std_logic_vector(7 downto 4);
+      PROM_CS2_B            : out std_logic;
+
+      NCMDS_SPICTRL         : out unsigned(15 downto 0);
+      NCMDS_SPIINTR         : out unsigned(15 downto 0);
+      DIAGOUT               : out std_logic_vector(17 downto 0)
       );
   end component;
 
@@ -883,17 +896,21 @@ begin
 
   SPI_CTRL_I : SPI_CTRL
     port map (
-      CLK40 => CLK40,
-      CLK2P5 => CLK2P5,
-      RST => RST,
-      CMD_FIFO_IN => spi_cmd_fifo_in,
-      CMD_FIFO_WRITE_EN => spi_cmd_fifo_write_en,
-      READBACK_FIFO_OUT => spi_readback_fifo_out,
+      CLK40                 => CLK40,
+      CLK2P5                => CLK2P5,
+      RST                   => RST,
+      CMD_FIFO_IN           => spi_cmd_fifo_in,
+      CMD_FIFO_WRITE_EN     => spi_cmd_fifo_write_en,
+      READBACK_FIFO_OUT     => spi_readback_fifo_out,
       READBACK_FIFO_READ_EN => spi_readback_fifo_read_en,
-      READ_BUSY => spi_read_busy,
-      NCMDS_SPICTRL => spi_ncmds_spictrl,
-      NCMDS_SPIINTR => spi_ncmds_spiintr,
-      DIAGOUT => diagout_buf
+      READ_BUSY             => spi_read_busy,
+      CNFG_DATA_IN          => CNFG_DATA_IN,
+      CNFG_DATA_OUT         => CNFG_DATA_OUT,
+      CNFG_DATA_DIR         => CNFG_DATA_DIR,
+      PROM_CS2_B            => PROM_CS2_B,
+      NCMDS_SPICTRL         => spi_ncmds_spictrl,
+      NCMDS_SPIINTR         => spi_ncmds_spiintr,
+      DIAGOUT               => diagout_buf
       );
 
 
