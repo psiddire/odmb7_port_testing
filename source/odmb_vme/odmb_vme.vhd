@@ -68,6 +68,16 @@ entity ODMB_VME is
     DCFEB_INITJTAG : in std_logic;   -- TODO: where does this fit in
 
     --------------------
+    -- JTAG Signals To/From ODMBs
+    --------------------
+    ODMB_TCK    : out std_logic;
+    ODMB_TMS    : out std_logic;
+    ODMB_TDI    : out std_logic;
+    ODMB_TDO    : in  std_logic;
+    ODMB_SEL    : out std_logic;
+    ODMB_INITJTAG : in std_logic;   -- TODO: where does this fit in
+
+    --------------------
     -- From/To LVMB: ODMB & ODMB7 design, ODMB5 to be seen
     --------------------
     LVMB_PON   : out std_logic_vector(7 downto 0);
@@ -251,6 +261,28 @@ architecture Behavioral of ODMB_VME is
       DIAGOUT   : out std_logic_vector(17 downto 0);
       LED       : out std_logic
       );
+  end component;
+
+  component ODMBJTAG is
+    port (
+      FASTCLK : in std_logic;
+      SLOWCLK : in std_logic;
+      RST     : in std_logic;
+      DEVICE  : in std_logic;
+      STROBE  : in std_logic;
+      COMMAND : in std_logic_vector(9 downto 0);
+      WRITER  : in std_logic;
+      INDATA  : in  std_logic_vector(15 downto 0);
+      OUTDATA : out std_logic_vector(15 downto 0);
+      DTACK : out std_logic;
+      INITJTAGS : in  std_logic;
+      TCK       : out std_logic;
+      TDI       : out std_logic;
+      TMS       : out std_logic;
+      ODMBTDO   : in  std_logic;
+      JTAGSEL : out std_logic;
+      LED : out std_logic
+    );
   end component;
 
   component VMEMON is
@@ -507,6 +539,9 @@ architecture Behavioral of ODMB_VME is
   signal dl_jtag_tck_inner : std_logic_vector(6 downto 0);
   signal dl_jtag_tdi_inner, dl_jtag_tms_inner : std_logic;
 
+  signal odmb_jtag_tck_inner, odmb_jtag_tdi_inner, odmb_jtag_tms_inner : std_logic;
+  signal led_odmbjtag, odmb_jtag_sel_inner : std_logic;
+
   signal cmd_adrs_inner : std_logic_vector(17 downto 2) := (others => '0');
 
   signal odmb_id_inner : std_logic_vector(15 downto 0);
@@ -558,13 +593,20 @@ begin
   DCFEB_TMS <= dl_jtag_tms_inner;
 
   ----------------------------------
+  -- Signal relaying for ODMBJTAG
+  ----------------------------------
+  ODMB_TCK <= odmb_jtag_tck_inner;
+  ODMB_TDI <= odmb_jtag_tdi_inner;
+  ODMB_TMS <= odmb_jtag_tms_inner;
+  ODMB_SEL <= odmb_jtag_sel_inner;
+
+  ----------------------------------
   -- Signal relaying for command module
   ----------------------------------
   VME_OE_B  <= doe_b;
   VME_DIR_B <= tovme_b;
 
   outdata_dev(0) <= (others => '0');
-  outdata_dev(2) <= (others => '0');
   outdata_dev(5) <= (others => '0');
   idx_dev <= to_integer(unsigned(cmd_adrs_inner(15 downto 12)));
   VME_DATA_OUT <= outdata_dev(idx_dev);
@@ -644,6 +686,27 @@ begin
 
       DIAGOUT => open,
       LED     => led_cfebjtag
+      );
+
+  DEV2_ODMBJTAG : ODMBJTAG
+    port map (
+      FASTCLK => clk40,
+      SLOWCLK => clk2p5,
+      RST     => rst,
+      DEVICE  => device(2),
+      STROBE  => strobe,
+      COMMAND => cmd,
+      WRITER  => VME_WRITE_B,
+      INDATA  => VME_DATA_IN,
+      OUTDATA => outdata_dev(2),
+      DTACK   => dtack_dev(2),
+      INITJTAGS => ODMB_INITJTAG,
+      TCK       => odmb_jtag_tck_inner,
+      TDI       => odmb_jtag_tdi_inner,
+      TMS       => odmb_jtag_tms_inner,
+      ODMBTDO   => ODMB_TDO,
+      JTAGSEL   => odmb_jtag_sel_inner,
+      LED       => led_odmbjtag
       );
 
   DEV3_VMEMON : VMEMON
