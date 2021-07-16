@@ -115,9 +115,12 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
   signal temp_cmdindex    : std_logic_vector(3 downto 0) := x"4"; --RDFR24QUAD
   signal read_nwords      : unsigned(11 downto 0) := (others => '0');
   type cmd_fifo_states is (
-    S_IDLE, S_LOAD_ADDR_CMD, S_LOAD_ADDR_STALL, S_LOAD_ADDR_LOWER,
-    S_READ_CMD, S_READ_LOW, S_READ_WAIT, S_WRITE_CMD, S_WRITE_STALL, S_WRITE_WORD,
-    S_WRITE_START, S_WRITE_WAIT, S_ERASE_CMD, S_ERASE_LOW, S_ERASE_WAIT, S_UNKNOWN_CMD, S_STALL
+    S_IDLE, 
+    S_LOAD_ADDR_CMD, S_LOAD_ADDR_STALL_1, S_LOAD_ADDR_STALL_2, S_LOAD_ADDR_LOWER,
+    S_READ_CMD, S_READ_LOW, S_READ_WAIT, 
+    S_WRITE_CMD, S_WRITE_STALL_1, S_WRITE_STALL_2, S_WRITE_WORD, S_WRITE_START, S_WRITE_WAIT, 
+    S_ERASE_CMD, S_ERASE_LOW, S_ERASE_WAIT, 
+    S_UNKNOWN_CMD, S_STALL
   );
   signal cmd_fifo_state     : cmd_fifo_states := S_IDLE;
   signal write_word_counter : unsigned(11 downto 0) := (others => '0');
@@ -176,6 +179,7 @@ begin
   ila_probe(96) <= erase_done;
   ila_probe(112 downto 97) <= spi_readdata;
   ila_probe(113) <= readback_fifo_wr_en;
+  ila_probe(114) <= cmd_fifo_read_en;
 
   ncmds_spictrl_inner <= (ncmds_spictrl_inner + 1) when (rising_edge(CLK2P5) and CMD_FIFO_WRITE_EN='1') else
                          ncmds_spictrl_inner;
@@ -199,11 +203,38 @@ begin
   cmd_fifo_read_en_q <= cmd_fifo_read_en when rising_edge(CLK40) else cmd_fifo_read_en_q;
   cmd_fifo_read_en_pulse <= (not cmd_fifo_read_en_q) and cmd_fifo_read_en;
 
-  --FSMs to handle command FIFO
-  process_cmd_fifo_out_fsm : process(cmd_fifo_state)
+  --FSM to process command FIFO
+  process_cmd_fifo_fsm : process(CLK40, RST)
   begin
-    case cmd_fifo_state is  
+  if (RST='1') then
+    cmd_fifo_state <= S_IDLE;
+  elsif (rising_edge(CLK40)) then
+    case cmd_fifo_state is
+    
     when S_IDLE =>
+      --do nothing until command to process (command FIFO is not empty)
+      if (cmd_fifo_empty='0') then
+        ncmds_spiintr_inner <= ncmds_spiintr_inner + 1;
+        case "000" & cmd_fifo_out(4 downto 0) is
+        when x"04" =>
+          --read n
+          cmd_fifo_state  <= S_READ_CMD;
+        when x"0A" =>
+          --erase sector (hardcode to 1 sector?)
+          cmd_fifo_state  <= S_ERASE_CMD;
+        when x"0C" =>
+          --buffer program 
+          cmd_fifo_state  <= S_WRITE_CMD;
+        when x"17" =>
+          --load address
+          cmd_fifo_state  <= S_LOAD_ADDR_CMD;
+        when others =>
+          --unknown command
+          cmd_fifo_state  <= S_UNKNOWN_CMD;
+        end case;
+      else
+        cmd_fifo_state    <= S_IDLE;
+      end if;
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
@@ -214,7 +245,9 @@ begin
       program_nwords      <= program_nwords;
       prom_addr           <= prom_addr;
       
-    when S_READ_CMD => 
+    when S_READ_CMD =>
+      --start read process by sending read enable and number of words to read. Also remove command from FIFO
+      cmd_fifo_state      <= S_READ_LOW;
       prom_read_en        <= '1';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
@@ -224,8 +257,10 @@ begin
       read_nwords         <= "0" & unsigned(cmd_fifo_out(15 downto 5)); 
       program_nwords      <= program_nwords;
       prom_addr           <= prom_addr;
-
+      
     when S_READ_LOW => 
+      --needed to wait for read_done to go low
+      cmd_fifo_state      <= S_READ_WAIT;
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
@@ -237,7 +272,13 @@ begin
       write_word_counter  <= write_word_counter;
       prom_addr           <= prom_addr;
       
-    when S_READ_WAIT => 
+    when S_READ_WAIT =>
+      --don't process any more commands until read is finished
+      if (read_done='1') then
+        cmd_fifo_state    <= S_IDLE;
+      else 
+        cmd_fifo_state    <= S_READ_WAIT;
+      end if;
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
@@ -247,8 +288,10 @@ begin
       read_nwords         <= read_nwords; 
       program_nwords      <= program_nwords;
       prom_addr           <= prom_addr;
-     
+      
     when S_ERASE_CMD =>
+      --start erase sector command with erase enable and remove command from FIFO
+      cmd_fifo_state      <= S_ERASE_LOW;
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '1';
@@ -259,7 +302,9 @@ begin
       program_nwords      <= program_nwords;
       prom_addr           <= prom_addr;
       
-    when S_ERASE_LOW =>
+    when S_ERASE_LOW => 
+      --wait for erase_done to go low
+      cmd_fifo_state      <= S_ERASE_WAIT;
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
@@ -271,6 +316,12 @@ begin
       prom_addr           <= prom_addr;
       
     when S_ERASE_WAIT =>
+      --don't accept any more commands until done with erase command
+      if (erase_done='1') then
+        cmd_fifo_state    <= S_IDLE;
+      else 
+        cmd_fifo_state    <= S_ERASE_WAIT;
+      end if;
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
@@ -282,6 +333,9 @@ begin
       prom_addr           <= prom_addr;
       
     when S_WRITE_CMD =>
+      --read number of words to program from command and remove command from FIFO
+      write_word_counter  <= x"000";
+      cmd_fifo_state      <= S_WRITE_STALL_1; 
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
@@ -291,8 +345,10 @@ begin
       read_nwords         <= read_nwords;      
       program_nwords      <= "0" & unsigned(cmd_fifo_out(15 downto 5));
       prom_addr           <= prom_addr;
-      
-    when S_WRITE_STALL =>
+
+    when S_WRITE_STALL_1 =>
+      --wait an extra cycle for empty to be potentially de-asserted
+      cmd_fifo_state      <= S_WRITE_STALL_2;
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
@@ -302,8 +358,32 @@ begin
       read_nwords         <= read_nwords;
       program_nwords      <= program_nwords;
       prom_addr           <= prom_addr;
-
+     
+    when S_WRITE_STALL_2 =>
+      --continue when next word to write ready in command FIFO
+      if (cmd_fifo_empty='0') then
+        cmd_fifo_state    <= S_WRITE_WORD;
+      else
+        cmd_fifo_state    <= S_WRITE_STALL_2;
+      end if;
+      prom_read_en        <= '0';
+      prom_write_en       <= '0';
+      prom_erase_en       <= '0';
+      write_fifo_write_en <= '0';
+      prom_load_addr      <= '0';
+      cmd_fifo_read_en    <= '0';
+      read_nwords         <= read_nwords;
+      program_nwords      <= program_nwords;
+      prom_addr           <= prom_addr;
+      
     when S_WRITE_WORD =>
+      --write this word to the spi_interface write buffer FIFO (goes directly from command FIFO to spi_interface buffer)
+      write_word_counter  <= write_word_counter + 1;
+      if (write_word_counter = program_nwords) then
+        cmd_fifo_state    <= S_WRITE_START;
+      else
+        cmd_fifo_state    <= S_WRITE_STALL_1;
+      end if;
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
@@ -315,6 +395,8 @@ begin
       prom_addr           <= prom_addr;
       
     when S_WRITE_START =>
+      --start write command
+      cmd_fifo_state      <= S_WRITE_WAIT;
       prom_read_en        <= '0';
       prom_write_en       <= '1';
       prom_erase_en       <= '0';
@@ -324,8 +406,14 @@ begin
       read_nwords         <= read_nwords;
       program_nwords      <= program_nwords;
       prom_addr           <= prom_addr;
-
-    when S_WRITE_WAIT =>
+      
+    when S_WRITE_WAIT => 
+      --wait until write_done is 1
+      if (write_done='1') then
+        cmd_fifo_state    <= S_IDLE;
+      else 
+        cmd_fifo_state    <= S_WRITE_WAIT;
+      end if;
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
@@ -335,8 +423,10 @@ begin
       read_nwords         <= read_nwords;
       program_nwords      <= program_nwords;
       prom_addr           <= prom_addr;
-
+      
     when S_LOAD_ADDR_CMD =>
+      --set the upper part of address and remove command from FIFO
+      cmd_fifo_state      <= S_LOAD_ADDR_STALL_1;
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
@@ -347,7 +437,9 @@ begin
       program_nwords      <= program_nwords;
       prom_addr           <= "00000" & cmd_fifo_out(15 downto 5) & prom_addr(15 downto 0);
 
-    when S_LOAD_ADDR_STALL =>
+    when S_LOAD_ADDR_STALL_1 => 
+      --need to wait because empty takes an extra cycle to go low
+      cmd_fifo_state      <= S_LOAD_ADDR_STALL_2;
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
@@ -358,7 +450,26 @@ begin
       program_nwords      <= program_nwords;
       prom_addr           <= prom_addr;
       
+    when S_LOAD_ADDR_STALL_2 => 
+      --continue when lower part of address is ready in command FIFO
+      if (cmd_fifo_empty='0') then
+        cmd_fifo_state    <= S_LOAD_ADDR_LOWER;
+      else
+        cmd_fifo_state    <= S_LOAD_ADDR_STALL_2;
+      end if;
+      prom_read_en        <= '0';
+      prom_write_en       <= '0';
+      prom_erase_en       <= '0';
+      write_fifo_write_en <= '0';
+      prom_load_addr      <= '0';
+      cmd_fifo_read_en    <= '0';  
+      read_nwords         <= read_nwords;
+      program_nwords      <= program_nwords;
+      prom_addr           <= prom_addr;
+            
     when S_LOAD_ADDR_LOWER =>
+      --set lower part of address, remove command from FIFO, and pass address onto spi_interface
+      cmd_fifo_state      <= S_STALL;
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
@@ -368,8 +479,10 @@ begin
       read_nwords         <= read_nwords;
       program_nwords      <= program_nwords;
       prom_addr           <= prom_addr(31 downto 16) & cmd_fifo_out;
-        
+      
     when S_UNKNOWN_CMD =>
+      --do nothing but remove command from FIFO
+      cmd_fifo_state      <= S_STALL;
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
@@ -381,6 +494,8 @@ begin
       prom_addr           <= prom_addr;
 
     when S_STALL =>
+      --need to wait because empty takes an extra cycle to go low
+      cmd_fifo_state      <= S_IDLE;
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
@@ -390,132 +505,19 @@ begin
       read_nwords         <= read_nwords;
       program_nwords      <= program_nwords;
       prom_addr           <= prom_addr;
-      
-    when others =>
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '0';
-      read_nwords         <= read_nwords;
-      program_nwords      <= program_nwords;
-      prom_addr           <= prom_addr;
-    end case;
-  end process;
-  
-  process_cmd_fifo_fsm : process(CLK40, RST)
-  begin
-  if (RST='1') then
-    cmd_fifo_state <= S_IDLE;
-  elsif (rising_edge(CLK40)) then
-    case cmd_fifo_state is
-    
-    when S_IDLE =>
-      if (cmd_fifo_empty='0') then
-        ncmds_spiintr_inner <= ncmds_spiintr_inner + 1;
-        case "000" & cmd_fifo_out(4 downto 0) is
-        when x"04" =>
-          --read n
-          cmd_fifo_state <= S_READ_CMD;
-        when x"0A" =>
-          --erase sector (hardcode to 1 sector?)
-          cmd_fifo_state <= S_ERASE_CMD;
-        when x"0C" =>
-          --buffer program 
-          cmd_fifo_state <= S_WRITE_CMD;
-        when x"17" =>
-          --load address
-          cmd_fifo_state <= S_LOAD_ADDR_CMD;
-        when others =>
-          --unknown command
-          cmd_fifo_state <= S_UNKNOWN_CMD;
-        end case;
-      else
-        cmd_fifo_state <= S_IDLE;
-      end if;
-      
-    when S_READ_CMD =>
-      cmd_fifo_state <= S_READ_LOW;
-      
-    when S_READ_LOW => 
-      --needed to wait for read_done to go low
-      cmd_fifo_state <= S_READ_WAIT;
-      
-    when S_READ_WAIT =>
-      if (read_done='1') then
-        cmd_fifo_state <= S_IDLE;
-      else 
-        cmd_fifo_state <= S_READ_WAIT;
-      end if;
-      
-    when S_ERASE_CMD =>
-      cmd_fifo_state <= S_ERASE_LOW;
-      
-    when S_ERASE_LOW => 
-      cmd_fifo_state <= S_ERASE_WAIT;
-      
-    when S_ERASE_WAIT =>
-      if (erase_done='1') then
-        cmd_fifo_state <= S_IDLE;
-      else 
-        cmd_fifo_state <= S_ERASE_WAIT;
-      end if;
-      
-    when S_WRITE_CMD =>
-      write_word_counter  <= x"000";
-      cmd_fifo_state <= S_WRITE_STALL; 
-     
-    when S_WRITE_STALL =>
-      --need to wait because empty takes an extra cycle to go low?
-      if (cmd_fifo_empty='0') then
-        cmd_fifo_state <= S_WRITE_WORD;
-      else
-        cmd_fifo_state <= S_WRITE_STALL;
-      end if;
-      
-    when S_WRITE_WORD =>
-      write_word_counter  <= write_word_counter + 1;
-      if (write_word_counter = program_nwords) then
-        cmd_fifo_state <= S_WRITE_START;
-      else
-        cmd_fifo_state <= S_WRITE_STALL;
-      end if;
-      
-    when S_WRITE_START =>
-      cmd_fifo_state <= S_WRITE_WAIT;
-      
-    when S_WRITE_WAIT => 
-      if (write_done='1') then
-        cmd_fifo_state <= S_IDLE;
-      else 
-        cmd_fifo_state <= S_WRITE_WAIT;
-      end if;
-      
-    when S_LOAD_ADDR_CMD =>
-      cmd_fifo_state <= S_LOAD_ADDR_STALL;
-      
-    when S_LOAD_ADDR_STALL => 
-      --need to wait because empty takes an extra cycle to go low
-      if (cmd_fifo_empty='0') then
-        cmd_fifo_state <= S_LOAD_ADDR_LOWER;
-      else
-        cmd_fifo_state <= S_LOAD_ADDR_STALL;
-      end if;
-            
-    when S_LOAD_ADDR_LOWER =>
-      cmd_fifo_state <= S_STALL;
-      
-    when S_UNKNOWN_CMD =>
-      cmd_fifo_state <= S_STALL;
-
-    when S_STALL =>
-      --need to wait because empty takes an extra cycle to go low
-      cmd_fifo_state <= S_IDLE;
     
     when others =>
       --unimplemented state
-      cmd_fifo_state <= S_IDLE;
+      cmd_fifo_state      <= S_IDLE;
+      prom_read_en        <= '0';
+      prom_write_en       <= '0';
+      prom_erase_en       <= '0';
+      write_fifo_write_en <= '0';
+      prom_load_addr      <= '0';
+      cmd_fifo_read_en    <= '0';
+      read_nwords         <= read_nwords;
+      program_nwords      <= program_nwords;
+      prom_addr           <= prom_addr;
     end case;
   end if;
   end process;

@@ -655,10 +655,13 @@ begin
       RST_CLKS_B           => open,
       SYSMON_P             => x"0000",
       SYSMON_N             => x"0000",
-      ADC_CS_B           => open,
-      ADC_DIN           => open,
-      ADC_SCK           => open,
-      ADC_DOUT          => '1',
+      ADC_CS_B             => open,
+      ADC_DIN              => open,
+      ADC_SCK              => open,
+      ADC_DOUT             => '1',
+      PROM_RST_B           => open,
+      PROM_CS2_B           => open,
+      CNFG_DATA            => open,
       LEDS_CFV             => open
      --VME_DATA_IN          => vme_data_io_in,        --unused/open in real ODMB
      --VME_DATA_OUT         => vme_data_io_out,       --unused/open in real ODMB

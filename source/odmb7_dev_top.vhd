@@ -1,3 +1,8 @@
+-------------------------------------------------------
+--! @file
+--! @brief top level file for ODMB7 prototype firmware
+-------------------------------------------------------
+
 library IEEE;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -8,31 +13,34 @@ use unisim.vcomponents.all;
 
 use work.ucsb_types.all;
 
+--! @brief ODMB7 prototype firmware
+--! @details ODMB7 firmware. Currently capable of testing virtually all hardware interfaces, however
+--! data acquisition firmware has not yet been developed
 entity odmb7_ucsb_dev is
   port (
     --------------------
     -- Input clocks
     --------------------
-    CMS_CLK_FPGA_P : in std_logic;      -- system clock: 40.07897 MHz
-    CMS_CLK_FPGA_N : in std_logic;      -- system clock: 40.07897 MHz
-    GP_CLK_6_P : in std_logic;          -- clock synthesizer ODIV6: 80 MHz
-    GP_CLK_6_N : in std_logic;          -- clock synthesizer ODIV6: 80 MHz
-    GP_CLK_7_P : in std_logic;          -- clock synthesizer ODIV7: 80 MHz
-    GP_CLK_7_N : in std_logic;          -- clock synthesizer ODIV7: 80 MHz
-    REF_CLK_1_P : in std_logic;         -- refclk0 to 224
-    REF_CLK_1_N : in std_logic;         -- refclk0 to 224
-    REF_CLK_2_P : in std_logic;         -- refclk0 to 227
-    REF_CLK_2_N : in std_logic;         -- refclk0 to 227
-    REF_CLK_3_P : in std_logic;         -- refclk0 to 226
-    REF_CLK_3_N : in std_logic;         -- refclk0 to 226
-    REF_CLK_4_P : in std_logic;         -- refclk0 to 225
-    REF_CLK_4_N : in std_logic;         -- refclk0 to 225
-    REF_CLK_5_P : in std_logic;         -- refclk1 to 227
-    REF_CLK_5_N : in std_logic;         -- refclk1 to 227
-    CLK_125_REF_P : in std_logic;       -- refclk1 to 226
-    CLK_125_REF_N : in std_logic;       -- refclk1 to 226
-    EMCCLK : in std_logic;              -- Low frequency, 133 MHz for SPI programing clock
-    LF_CLK : in std_logic;              -- Low frequency, 10 kHz
+    CMS_CLK_FPGA_P : in std_logic; --! CMS/system clock: 40.07897 MHz. Can be from local oscillator or CCB. Connected to bank 45.
+    CMS_CLK_FPGA_N : in std_logic; --! CMS/system clock: 40.07897 MHz. Can be from local oscillator or CCB. Connected to bank 45.
+    GP_CLK_6_P     : in std_logic; --! From clock synthesizer ODIV6: 80 MHz. Connected to bank 44.
+    GP_CLK_6_N     : in std_logic; --! From clock synthesizer ODIV6: 80 MHz. Connected to bank 44.
+    GP_CLK_7_P     : in std_logic; --! From clock synthesizer ODIV7: 80 MHz. Connected to bank 68.
+    GP_CLK_7_N     : in std_logic; --! From clock synthesizer ODIV7: 80 MHz. Connected to bank 68.
+    REF_CLK_1_P    : in std_logic; --! From clock synthesizer, refclk0 to GTH quad 224
+    REF_CLK_1_N    : in std_logic; --! From clock synthesizer, refclk0 to GTH quad 224
+    REF_CLK_2_P    : in std_logic; --! From clock synthesizer, refclk0 to GTH quad 227
+    REF_CLK_2_N    : in std_logic; --! From clock synthesizer, refclk0 to GTH quad 227
+    REF_CLK_3_P    : in std_logic; --! From clock synthesizer, refclk0 to GTH quad 226
+    REF_CLK_3_N    : in std_logic; --! From clock synthesizer, refclk0 to GTH quad 226
+    REF_CLK_4_P    : in std_logic; --! From clock synthesizer, refclk0 to GTH quad 225
+    REF_CLK_4_N    : in std_logic; --! From clock synthesizer, refclk0 to GTH quad 225
+    REF_CLK_5_P    : in std_logic; --! From clock synthesizer, refclk1 to GTH quad 227
+    REF_CLK_5_N    : in std_logic; --! From clock synthesizer, refclk1 to GTH quad 227
+    CLK_125_REF_P  : in std_logic; --! From clock synthesizer, refclk1 to GTH quad 226
+    CLK_125_REF_N  : in std_logic; --! From clock synthesizer, refclk1 to GTH quad 226
+    EMCCLK         : in std_logic; --! From clock synthesizer, 133 MHz low frequency clock for programming FPGA from PROM. Connected to bank 65.
+    LF_CLK         : in std_logic; --! From clock synthesizer, general purpose low frequency clock, 10 kHz. Connected to bank 45.
 
     --------------------
     -- Signals controlled by ODMB_VME
@@ -197,6 +205,13 @@ entity odmb7_ucsb_dev is
     ADC_DIN       : out std_logic;                         -- Bank 46
     ADC_SCK       : out std_logic;                         -- Bank 46
     ADC_DOUT      : in std_logic;                          -- Bank 46
+
+    --------------------------------
+    -- PROM pins
+    --------------------------------
+    PROM_RST_B    : out std_logic; --bank 65
+    PROM_CS2_B    : out std_logic; --bank 65
+    CNFG_DATA     : inout std_logic_vector(7 downto 4); --bank 65
 
     --------------------------------
     -- Others
@@ -635,6 +650,12 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal l1a_match_cnt       : t_twobyte_arr(NCFEB+2 downto 1);
 
   --------------------------------------
+  -- PROM signals
+  --------------------------------------
+  signal cnfg_data_in    : std_logic_vector(7 downto 4) := (others => '0');
+  signal cnfg_data_out   : std_logic_vector(7 downto 4) := (others => '0');
+
+  --------------------------------------
   -- Reset signals
   --------------------------------------
   signal fw_reset        : std_logic := '0';
@@ -791,7 +812,7 @@ begin
   -- Constant driver for selector/reset pins for board to work
   -------------------------------------------------------------------------------------------
   KUS_DL_SEL <= '1';
-  FPGA_SEL <= '0';
+  FPGA_SEL   <= '0';
   RST_CLKS_B <= '1';
 
   -------------------------------------------------------------------------------------------
@@ -858,6 +879,16 @@ begin
   begin
     VME_BUF : IOBUF port map(O => vme_data_in_buf(I), IO => VME_DATA(I), I => vme_data_out_buf(I), T => vme_dir_b);
   end generate GEN_VMEOUT_16;
+
+  -------------------------------------------------------------------------------------------
+  -- PROM signals
+  -------------------------------------------------------------------------------------------
+  PROM_RST_B <= '1';
+  PROM_CS2_B <= '1';
+  GEN_PROM_BUF: for I in 4 to 7 generate
+  begin
+    PROM_DATA_BUF : IOBUF port map(O => cnfg_data_in(I), IO => CNFG_DATA(I), I => cnfg_data_out(I), T => '0'); --always input for now
+  end generate GEN_PROM_BUF;
 
   -------------------------------------------------------------------------------------------
   -- Handle PPIB/DCFEB signals
