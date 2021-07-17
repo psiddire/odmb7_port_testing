@@ -113,7 +113,7 @@ entity odmb7_ucsb_dev is
     LVMB_SCLK    : out std_logic;                          -- Bank 68
     LVMB_SDIN    : out std_logic;                          -- Bank 68
     LVMB_SDOUT_P : in std_logic;                           -- C_LVMB_SDOUT_P in Bank 67
-    LVMB_SDOUT_N : in std_logic;                           -- C_LVMB_SDOUT_N in Bank 67 --meta:uncomment_for_odmb
+    LVMB_SDOUT_N : in std_logic;                           -- C_LVMB_SDOUT_N in Bank 67
 
     --------------------------------
     -- OTMB communication signals
@@ -125,6 +125,15 @@ entity odmb7_ucsb_dev is
     RSVTD_IN    : in  std_logic_vector(7 downto 3);       -- "RSVTD[7:3]" in Bank 44-45  <-- To be updated
     RSVTD_OUT   : out std_logic_vector(2 downto 0);       -- "RSVTD[2:0]" in Bank 44-45  <-- To be updated
     LCT_RQST    : out std_logic_vector(2 downto 1);       -- Bank 45
+
+    --------------------------------
+    -- ODMB JTAG
+    --------------------------------
+    KUS_TMS       : out std_logic;                         -- Bank 47
+    KUS_TCK       : out std_logic;                         -- Bank 47
+    KUS_TDI       : out std_logic;                         -- Bank 47
+    KUS_TDO       : in std_logic;                          -- "TDO" in Bank 47, connected to pin U9
+    KUS_DL_SEL    : out std_logic;                         -- Bank 47, ODMB JTAG path select
 
     --------------------------------
     -- ODMB optical ports
@@ -182,11 +191,6 @@ entity odmb7_ucsb_dev is
     --------------------------------
     -- Essential selector/reset signals not classified yet
     --------------------------------
-    KUS_TMS       : out std_logic;                         -- Bank 47
-    KUS_TCK       : out std_logic;                         -- Bank 47
-    KUS_TDI       : out std_logic;                         -- Bank 47
-    TDO           : in std_logic;                          -- Bank 47
-    KUS_DL_SEL    : out std_logic;                         -- Bank 47, ODMB JTAG path select
     FPGA_SEL      : out std_logic;                         -- Bank 47, clock synthesizaer control input select
     RST_CLKS_B    : out std_logic;                         -- Bank 47, clock synthesizaer reset
     ODMB_DONE     : in std_logic;                          -- "DONE" in bank 66 (pin L9), monitor DONE_0 from Bank 0 (pin N7)
@@ -530,13 +534,8 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal dcfeb_tdo    : std_logic_vector (NCFEB downto 1) := (others => '0');
 
   --------------------------------------
-  -- ODMB signals
+  -- ODMB JTAG signals
   --------------------------------------
-  signal odmb_tck    : std_logic := '0';
-  signal odmb_tms    : std_logic := '0';
-  signal odmb_tdi    : std_logic := '0';
-  signal odmb_tdo    : std_logic := '0';
-  signal odmb_sel    : std_logic := '0';
   signal odmb_initjtag     : std_logic := '0';
 
   --------------------------------------
@@ -1178,7 +1177,7 @@ begin
       ODMB_TCK      => KUS_TCK,
       ODMB_TMS      => KUS_TMS,
       ODMB_TDI      => KUS_TDI,
-      ODMB_TDO      => TDO,
+      ODMB_TDO      => KUS_TDO,
       ODMB_SEL      => KUS_DL_SEL,
       ODMB_INITJTAG => odmb_initjtag,
 

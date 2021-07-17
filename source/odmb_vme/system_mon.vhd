@@ -57,39 +57,39 @@ architecture SYSTEM_MON_ARCH of SYSTEM_MON is
       );
   end component;
 
-  component ila_volMon is
-    port (
-      clk : in std_logic := '0';
-      probe0 : in std_logic_vector(7 downto 0) := (others=> '0');
-      probe1 : in std_logic_vector(15 downto 0) := (others=> '0');
-      probe2 : in std_logic_vector(11 downto 0) := (others=> '0');
-      probe3 : in std_logic_vector(11 downto 0) := (others=> '0');
-      probe4 : in std_logic_vector(7 downto 0) := (others=> '0');
-      probe5 : in std_logic_vector(11 downto 0) := (others=> '0');
-      probe6 : in std_logic_vector(11 downto 0) := (others=> '0');
-      probe7 : in std_logic_vector(11 downto 0) := (others=> '0');
-      probe8 : in std_logic_vector(11 downto 0) := (others=> '0');
-      probe9 : in std_logic_vector(11 downto 0) := (others=> '0');
-      probe10 : in std_logic_vector(11 downto 0) := (others=> '0');
-      probe11 : in std_logic_vector(11 downto 0) := (others=> '0');
-      probe12 : in std_logic_vector(11 downto 0) := (others=> '0');
-      probe13 : in std_logic_vector(7 downto 0) := (others=> '0');
-      probe14 : in std_logic_vector(2 downto 0) := (others=> '0')
-      );
-  end component;
-
-  component ila_sysMon is
-    port (
-      clk : in std_logic := '0';
-      probe0 : in std_logic_vector(15 downto 0) := (others=> '0');
-      probe1 : in std_logic_vector(15 downto 0) := (others=> '0');
-      probe2 : in std_logic_vector(15 downto 0) := (others=> '0');
-      probe3 : in std_logic_vector(15 downto 0) := (others=> '0');
-      probe4 : in std_logic_vector(7 downto 0) := (others=> '0');
-      probe5 : in std_logic_vector(7 downto 0) := (others=> '0');
-      probe6 : in std_logic_vector(1 downto 0) := (others=> '0')
-      );
-  end component;
+  -- ILA instantiations to help debugging
+  -- component ila_volMon is
+  --   port (
+  --     clk : in std_logic := '0';
+  --     probe0 : in std_logic_vector(7 downto 0) := (others=> '0');
+  --     probe1 : in std_logic_vector(15 downto 0) := (others=> '0');
+  --     probe2 : in std_logic_vector(11 downto 0) := (others=> '0');
+  --     probe3 : in std_logic_vector(11 downto 0) := (others=> '0');
+  --     probe4 : in std_logic_vector(7 downto 0) := (others=> '0');
+  --     probe5 : in std_logic_vector(11 downto 0) := (others=> '0');
+  --     probe6 : in std_logic_vector(11 downto 0) := (others=> '0');
+  --     probe7 : in std_logic_vector(11 downto 0) := (others=> '0');
+  --     probe8 : in std_logic_vector(11 downto 0) := (others=> '0');
+  --     probe9 : in std_logic_vector(11 downto 0) := (others=> '0');
+  --     probe10 : in std_logic_vector(11 downto 0) := (others=> '0');
+  --     probe11 : in std_logic_vector(11 downto 0) := (others=> '0');
+  --     probe12 : in std_logic_vector(11 downto 0) := (others=> '0');
+  --     probe13 : in std_logic_vector(7 downto 0) := (others=> '0');
+  --     probe14 : in std_logic_vector(2 downto 0) := (others=> '0')
+  --     );
+  -- end component;
+  -- component ila_sysMon is
+  --   port (
+  --     clk : in std_logic := '0';
+  --     probe0 : in std_logic_vector(15 downto 0) := (others=> '0');
+  --     probe1 : in std_logic_vector(15 downto 0) := (others=> '0');
+  --     probe2 : in std_logic_vector(15 downto 0) := (others=> '0');
+  --     probe3 : in std_logic_vector(15 downto 0) := (others=> '0');
+  --     probe4 : in std_logic_vector(7 downto 0) := (others=> '0');
+  --     probe5 : in std_logic_vector(7 downto 0) := (others=> '0');
+  --     probe6 : in std_logic_vector(1 downto 0) := (others=> '0')
+  --     );
+  -- end component;
 
   -- SYSMON module signals
   signal sysmon_daddr : std_logic_vector(7 downto 0) := (others => '0');
@@ -283,10 +283,7 @@ begin
       I2C_SDA => '0'
       );
 
-  OUTDATA <= x"0" & vmon_dout_chan(vmon_chanidx) when (r_vol_mon = '1') else
-             x"0" & sysmon_dout(15 downto 4)     when (r_sys_mon = '1') else -- Discarding the 4 LSB
-             (others => 'L');
-
+  OUTDATA <= outdata_inner;
   outdata_inner <= x"0" & vmon_dout_chan(vmon_chanidx) when (r_vol_mon = '1') else
                    x"0" & sysmon_dout(15 downto 4)     when (r_sys_mon = '1') else -- Discarding the 4 LSB
                    (others => 'L');
@@ -306,39 +303,39 @@ begin
   variousflags <= "00" & ctrlseqdone & which_chan & which_chan_inner & STROBE & DEVICE & vmon_dout_valid & data_done & cs_inner;
   ila_adc <= clk_inner & "0" & adc_cs_inner & adc_din_inner;
 
-  -- ILA for voltageMon debug
-  i_ila : ila_volMon
-    port map(
-      clk => FASTCLK,
-      probe0 => ila_trigger,
-      probe1 => variousflags,
-      probe2 => vmon_dout,
-      probe3 => x"000",
-      probe4 => ila_adc,
-      probe5 => vmon_dout_chan(0),
-      probe6 => vmon_dout_chan(1),
-      probe7 => vmon_dout_chan(2),
-      probe8 => vmon_dout_chan(3),
-      probe9 => vmon_dout_chan(4),
-      probe10 => vmon_dout_chan(5),
-      probe11 => vmon_dout_chan(6),
-      probe12 => vmon_dout_chan(7),
-      probe13 => data_valid_cntr,
-      probe14 => current_channel
-      );
+  -- -- ILA for voltageMon debug
+  -- i_ila : ila_volMon
+  --   port map(
+  --     clk => FASTCLK,
+  --     probe0 => ila_trigger,
+  --     probe1 => variousflags,
+  --     probe2 => vmon_dout,
+  --     probe3 => x"000",
+  --     probe4 => ila_adc,
+  --     probe5 => vmon_dout_chan(0),
+  --     probe6 => vmon_dout_chan(1),
+  --     probe7 => vmon_dout_chan(2),
+  --     probe8 => vmon_dout_chan(3),
+  --     probe9 => vmon_dout_chan(4),
+  --     probe10 => vmon_dout_chan(5),
+  --     probe11 => vmon_dout_chan(6),
+  --     probe12 => vmon_dout_chan(7),
+  --     probe13 => data_valid_cntr,
+  --     probe14 => current_channel
+  --     );
 
-  -- ILA for sysMon debug
-  j_ila : ila_sysMon
-    port map(
-      clk => FASTCLK,
-      probe0 => cmddev,
-      probe1 => sysmon_alm,
-      probe2 => sysmon_dout,
-      probe3 => outdata_inner,
-      probe4 => sysmon_daddr,
-      probe5 => sysmon_trigger,
-      probe6 => sysmon_data
-      );
+  -- -- ILA for sysMon debug
+  -- j_ila : ila_sysMon
+  --   port map(
+  --     clk => FASTCLK,
+  --     probe0 => cmddev,
+  --     probe1 => sysmon_alm,
+  --     probe2 => sysmon_dout,
+  --     probe3 => outdata_inner,
+  --     probe4 => sysmon_daddr,
+  --     probe5 => sysmon_trigger,
+  --     probe6 => sysmon_data
+  --     );
 
   sysmon_trigger(0) <= SLOWCLK;
   sysmon_trigger(1) <= DEVICE;

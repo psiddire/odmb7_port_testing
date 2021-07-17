@@ -576,7 +576,7 @@ begin
       KUS_TMS              => open,
       KUS_TCK              => open,
       KUS_TDI              => open,
-      TDO                  => '0',
+      KUS_TDO              => '0',
       KUS_DL_SEL           => open,
       ODMB_DONE            => '1',
       FPGA_SEL             => open,
