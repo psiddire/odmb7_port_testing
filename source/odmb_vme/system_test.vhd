@@ -35,8 +35,8 @@ entity SYSTEM_TEST is
     DDU_PRBS_ERR_CNT : in  std_logic_vector(15 downto 0);
 
     -- PC PRBS signals
-    PC_PRBS_TX_EN   : out std_logic;
-    PC_PRBS_RX_EN   : out std_logic;
+    PC_PRBS_TX_EN   : out std_logic_vector(0 downto 0);
+    PC_PRBS_RX_EN   : out std_logic_vector(0 downto 0);
     PC_PRBS_TST_CNT : out std_logic_vector(15 downto 0);
     PC_PRBS_ERR_CNT : in  std_logic_vector(15 downto 0);
 
@@ -66,7 +66,15 @@ architecture SYSTEM_TEST_Arch of SYSTEM_TEST is
       );
   end component;
 
-  signal ila_data : std_logic_vector(255 downto 0) := (others => '0');
+  -- Instantiate to help debugging
+  -- component ila_2 is
+  --   port (
+  --     clk : in std_logic := '0';
+  --     probe0 : in std_logic_vector(383 downto 0) := (others=> '0')
+  --     );
+  -- end component;
+
+  signal ila_data : std_logic_vector(383 downto 0) := (others => '0');
   signal outdata_inner : std_logic_vector(15 downto 0);
   signal dtack_inner : std_logic;
 
@@ -159,10 +167,10 @@ begin
   STROBE_PE : PULSE_EDGE port map (DOUT => strobe_pulse, PULSE1 => open, CLK => SLOWCLK, RST => RST, NPULSE => 1, DIN => STROBE);
 
   DDU_PRBS_RX_EN <= w_ddu_prbs_rx_en;
-  PC_PRBS_RX_EN  <= w_pc_prbs_rx_en;
+  PC_PRBS_RX_EN(0)  <= w_pc_prbs_rx_en;
 
   FDC_DDU_TX_PRBS : FDC port map(Q => DDU_PRBS_TX_EN, C => w_ddu_prbs_tx_en, CLR => RST, D => or_reduce(INDATA));
-  FDC_PC_TX_PRBS  : FDC port map(Q => PC_PRBS_TX_EN, C => w_pc_prbs_tx_en, CLR => RST, D => or_reduce(INDATA));
+  FDC_PC_TX_PRBS  : FDC port map(Q => PC_PRBS_TX_EN(0), C => w_pc_prbs_tx_en, CLR => RST, D => or_reduce(INDATA));
 
   GEN_PRBS : for i in 15 downto 0 generate
   begin
@@ -279,6 +287,38 @@ begin
       otmb_tx_err_cntr      <= otmb_tx_err_cntr;
     end if;
   end process;
+
+  -- OTMB TX test signals
+  ila_data(48 downto 0)    <= otmb_tx;
+  ila_data(64 downto 49)   <= otmb_prbs_tx_en_cnt;
+  ila_data(80 downto 65)   <= otmb_tx_good_cnt;
+  ila_data(96 downto 81)   <= otmb_tx_err_cnt;
+  ila_data(97)             <= w_otmb_prbs_en;       -- VME command
+  ila_data(98)             <= r_otmb_prbs_en_cnt;   -- VME command
+  ila_data(99)             <= r_otmb_prbs_good_cnt; -- VME command
+  ila_data(100)            <= r_otmb_prbs_err_cnt;  -- VME command
+  ila_data(101)            <= w_otmb_prbs_cnt_rst;  -- VME command
+  ila_data(102)            <= otmb_prbs_tx_en;      -- from delayed otmb_tx
+  ila_data(103)            <= otmb_prbs_tx_rst;
+  ila_data(104)            <= q_otmb_prbs_tx_en;
+  ila_data(105)            <= qq_otmb_prbs_tx_en;
+  ila_data(106)            <= otmb_prbs_tx;
+  ila_data(107)            <= otmb_prbs_tx_err;
+  ila_data(156 downto 108) <= mux_otmb_tx;
+  -- Output results
+  ila_data(172 downto 157) <= outdata_inner;
+  ila_data(173)            <= dtack_inner;
+  -- OTMB RX test signals
+  ila_data(174)            <= start_otmb_prbs_rx;
+  ila_data(175)            <= otmb_prbs_rx_en;
+  ila_data(176)            <= otmb_prbs_rx;
+  ila_data(177)            <= CLK;
+
+  -- ila_systest_inst : ila_2
+  --   port map (
+  --     clk    => CLK160,
+  --     probe0 => ila_data
+  --     );
 
 
 end SYSTEM_TEST_Arch;

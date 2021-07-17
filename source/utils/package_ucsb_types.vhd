@@ -6,7 +6,28 @@ use ieee.numeric_std.all;
 
 package ucsb_types is
   
+  constant NDEVICE : integer range 1 to 10 := 9;
+  constant NREGS : integer := 16;       -- Number of registers
+  constant NCONST : integer := 16;      -- Number of Protected registers
+
   type cfg_regs_array is array (0 to 15) of std_logic_vector(15 downto 0);
+
+  type t_done_cnt_arr is array (integer range <>) of integer range 0 to 3;
+  type t_done_state is (DONE_IDLE, DONE_LOW, DONE_COUNTING);
+  type t_done_state_arr is array (integer range <>) of t_done_state;
+
+  -- For various counter
+  type t_twobyte_arr is array (integer range <>) of std_logic_vector(15 downto 0);
+  type t_fourbyte_arr is array (integer range <>) of std_logic_vector(31 downto 0);
+
+  ---- Flag for synthesis/simulation
+  -- For simulation
+  constant in_simulation : BOOLEAN := false
+                                      -- synthesis translate_off
+                                      or true
+                                      -- synthesis translate_on
+                                      ;
+  constant in_synthesis : BOOLEAN := not in_simulation;
 
   component RESET_FIFO is
     generic (

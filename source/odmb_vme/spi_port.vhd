@@ -8,9 +8,6 @@ use ieee.numeric_std.all;
 use work.ucsb_types.all;
 
 entity SPI_PORT is
-  generic (
-    NREGS  : integer := 16
-    );
   port (
     SLOWCLK              : in std_logic;
     CLK                  : in std_logic;

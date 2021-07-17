@@ -8,8 +8,6 @@ use ieee.std_logic_1164.all;
 library unisim;
 use unisim.vcomponents.all;
 
-use work.Firmware_pkg.all;     -- for switch between sim and synthesis
-
 entity LVMB is
   generic (
     NFEB : integer range 1 to 7 := 7    -- Number of DCFEBS
@@ -78,13 +76,6 @@ begin
                       sim_lvmb_sdo(7) when LVMB_CSB = "0111111" else
                       '0';
 
-  lvmb_sdout_kcu_i : if in_synthesis generate
-    LVMB_SDOUT_P <= lvmb_sdout;    
-    LVMB_SDOUT_N <= '0';
-  end generate lvmb_sdout_kcu_i;
-  lvmb_sdout_simu_i : if in_simulation generate
-    IB_LVMB_SDOUT: OBUFDS port map (I => lvmb_sdout, O => LVMB_SDOUT_P, OB => LVMB_SDOUT_N);
-  end generate lvmb_sdout_simu_i;
-
+  IB_LVMB_SDOUT: OBUFDS port map (I => lvmb_sdout, O => LVMB_SDOUT_P, OB => LVMB_SDOUT_N);
   
 end LVMB_ARCH;

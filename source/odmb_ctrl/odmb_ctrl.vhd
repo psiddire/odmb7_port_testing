@@ -11,8 +11,6 @@ library unisim;
 use unisim.vcomponents.all;
 use work.ucsb_types.all;
 
-use work.Firmware_pkg.all;     -- for switch between sim and synthesis
-
 entity ODMB_CTRL is
   generic (
     NCFEB       : integer range 1 to 7 := 7  -- Number of DCFEBS, 7 for ME1/1, 5

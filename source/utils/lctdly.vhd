@@ -10,11 +10,10 @@ use unisim.vcomponents.all;
 entity LCTDLY is
   
   port (
-    DIN     : in  std_logic;
+    DOUT    : out std_logic;
     CLK     : in  std_logic;
     DELAY   : in  std_logic_vector(5 downto 0);
-    
-    DOUT    : out std_logic
+    DIN     : in  std_logic
 );
 end LCTDLY;
 
