@@ -39,6 +39,10 @@ entity spi_interface is
     OUT_READ_DONE           : out std_logic;            --! '1' unless read in progress
     START_ERASE             : in std_logic;             --! Signal to begin erase (1 sector)
     OUT_ERASE_DONE          : out std_logic;            --! '1' unless erase in progress
+    START_UNLOCK            : in std_logic;             --! Signal to erase lock bits on all sectors
+    OUT_UNLOCK_DONE         : out std_logic;            --! '1' unless erase lock bits in progress
+    START_LOCK              : in std_logic;             --! Signal to write lock bit
+    OUT_LOCK_DONE           : out std_logic;            --! '1' unless write lock bits in progress
     ------------------ Read output
     OUT_READ_DATA           : out std_logic_vector(15 downto 0); --! Data read out from PROM
     OUT_READ_DATA_VALID     : out std_logic;                     --! Indicates when data from PROM is valid
@@ -120,6 +124,8 @@ END COMPONENT;
   constant  CmdPP32Quad      : std_logic_vector(7 downto 0)  := X"34"; 
   constant  Cmd4BMode        : std_logic_vector(7 downto 0)  := X"B7";
   constant  CmdExit4BMode    : std_logic_vector(7 downto 0)  := X"E9";
+  constant  CmdEraseNonvLock : std_logic_vector(7 downto 0)  := X"E4";
+  constant  CmdWriteNonvLock : std_logic_vector(7 downto 0)  := X"E3";
 
   ------------- STARTUPE3/SPI signals -------------------- 
   signal spi_miso         : std_logic;
@@ -166,6 +172,21 @@ END COMPONENT;
   signal write_data_counter     : unsigned(1 downto 0) := "00";
   signal write_word_counter     : unsigned(31 downto 0) := x"00000000";
   signal write_status_bit_index : std_logic_vector(7 downto 0) := x"00";
+
+  ------------- Erase lock signals -------------------- 
+  signal erase_lock_spi_cs_bar       : std_logic := '1';
+  signal erase_lock_done             : std_logic := '1';
+  signal erase_lock_cmdcounter       : unsigned(5 downto 0) := "111111";
+  signal erase_lock_cmdreg           : std_logic_vector(39 downto 0) := x"1111111111";
+  signal erase_lock_status_bit_index : std_logic_vector(7 downto 0) := x"00";
+
+  ------------- Write lock signals -------------------- 
+  signal write_lock_spi_cs_bar       : std_logic := '1';
+  signal write_lock_address          : std_logic_vector(31 downto 0) := x"00000000";
+  signal write_lock_done             : std_logic := '1';
+  signal write_lock_cmdcounter       : unsigned(5 downto 0) := "111111";
+  signal write_lock_cmdreg           : std_logic_vector(39 downto 0) := x"1111111111";
+  signal write_lock_status_bit_index : std_logic_vector(7 downto 0) := x"00";
 
   --------------- select read command and address -------------------- 
   --signal CmdIndex    : std_logic_vector(3 downto 0) := "0001";  
@@ -233,6 +254,21 @@ END COMPONENT;
   );
   signal erase_state  : erase_states := S_ERASE_IDLE;
 
+  type erase_lock_states is
+  (
+    S_ERASE_LOCK_IDLE, S_ERASE_LOCK_ASSERT_CS_WRITE_ENABLE, S_ERASE_LOCK_SHIFT_WRITE_ENABLE, S_ERASE_LOCK_ASSERT_CS_ERASE_LOCK,
+    S_ERASE_LOCK_SHIFT_ERASE_LOCK, S_ERASE_LOCK_ASSERT_CS_READ_STATUS, S_ERASE_LOCK_SHIFT_READ_STATUS
+  );
+  signal erase_lock_state  : erase_lock_states := S_ERASE_LOCK_IDLE;
+
+  type write_lock_states is
+  (
+    S_WRITE_LOCK_IDLE, S_WRITE_LOCK_ASSERT_CS_WRITE_ENABLE, S_WRITE_LOCK_SHIFT_WRITE_ENABLE, S_WRITE_LOCK_ASSERT_CS_WRITE_LOCK,
+    S_WRITE_LOCK_SHIFT_WRITE_LOCK, S_WRITE_LOCK_ASSERT_CS_READ_STATUS, S_WRITE_LOCK_SHIFT_READ_STATUS,
+    S_WRITE_LOCK_ASSERT_CS_READ_STATUS_2, S_WRITE_LOCK_SHIFT_READ_STATUS_2
+  );
+  signal write_lock_state  : write_lock_states := S_WRITE_LOCK_IDLE;
+
  begin
    
   ----------------------------------------------------------------------------
@@ -290,6 +326,8 @@ END COMPONENT;
     if rising_edge(CLK) then
       if (read_done = '0') then spi_mosi <= read_cmdreg(39);
       elsif (erase_done = '0') then spi_mosi <= erase_cmdreg(39);
+      elsif (erase_lock_done = '0') then spi_mosi <= erase_lock_cmdreg(39);
+      elsif (write_lock_done = '0') then spi_mosi <= write_lock_cmdreg(39);
       else 
         case write_state is
           when S_WRITE_SHIFT_DATA =>
@@ -300,13 +338,14 @@ END COMPONENT;
       end if;
     end if; --CLK
   end process mux_mosi;
-
   
   mux_cs_bar: process (CLK)
   begin
     if rising_edge(CLK) then
       if (read_done = '0') then spi_cs_bar_input <= read_spi_cs_bar;
       elsif (erase_done = '0') then spi_cs_bar_input <= erase_spi_cs_bar;
+      elsif (erase_lock_done = '0') then spi_cs_bar_input <= erase_lock_spi_cs_bar;
+      elsif (write_lock_done = '0') then spi_cs_bar_input <= write_lock_spi_cs_bar;
       else spi_cs_bar_input <= write_spi_cs_bar;
       end if;
     end if; --CLK
@@ -354,6 +393,8 @@ OUT_READ_DATA_VALID <= read_data_valid;
 OUT_READ_DONE <= read_done;
 OUT_ERASE_DONE <= erase_done;
 OUT_WRITE_DONE <= write_done;
+OUT_UNLOCK_DONE <= erase_lock_done;
+OUT_LOCK_DONE <= write_lock_done;
 
 ---------------------------------  PROM READ FSM  ----------------------------------------------
 --CmdSelect <= CmdStatus when CmdIndex = x"1" else
@@ -609,6 +650,7 @@ process_write : process (CLK)
         -- assert CS and prep read status command
         write_spi_cs_bar <= '0';
         write_cmdcounter <= "011111"; --16 bits: 8 command + 8 to skip the first cycle
+        write_status_bit_index <= x"00";
         write_cmdreg <=  CmdStatus & X"00000000";
         write_state <= S_WRITE_SHIFT_READ_STATUS_2;
 
@@ -675,6 +717,179 @@ process_write : process (CLK)
     end case;
    end if;  -- CLK
 end process process_write;
+
+-------------------------------  ERASE LOCK FSM  --------------------------------------------------
+process_erase_lock : process (CLK)
+  begin
+  if rising_edge(CLK) then
+  case erase_lock_state is 
+   when S_ERASE_LOCK_IDLE =>
+        --when START_ERASE received, initiate erase process
+        erase_lock_spi_cs_bar <= '1';
+        if (START_UNLOCK = '1') then
+          erase_lock_done <= '0';
+          erase_lock_state <= S_ERASE_LOCK_ASSERT_CS_WRITE_ENABLE;
+         end if;
+                       
+   when S_ERASE_LOCK_ASSERT_CS_WRITE_ENABLE =>
+        --assert CS and prep write enable commmand
+        erase_lock_cmdcounter <= "000111"; --8 bits of command
+        erase_lock_cmdreg <=  CmdWE & X"00000000";
+        erase_lock_spi_cs_bar <= '0';
+        erase_lock_state <= S_ERASE_LOCK_SHIFT_WRITE_ENABLE;
+                  
+   when S_ERASE_LOCK_SHIFT_WRITE_ENABLE =>
+         --shift write enable
+         if (erase_lock_cmdcounter /= 0) then 
+           erase_lock_cmdcounter <= erase_lock_cmdcounter - 1;  
+           erase_lock_cmdreg <= erase_lock_cmdreg(38 downto 0) & '0';
+         else 
+           erase_lock_spi_cs_bar <= '1';
+           erase_lock_state <= S_ERASE_LOCK_ASSERT_CS_ERASE_LOCK;        
+         end if;
+                   
+   when S_ERASE_LOCK_ASSERT_CS_ERASE_LOCK =>
+        --assert CS and prepare for erase nonvolatile lock bits
+        erase_lock_spi_cs_bar <= '0';   
+        erase_lock_cmdreg <=  CmdEraseNonvLock & x"00000000"; 
+        erase_lock_cmdcounter <= "000111"; --8 bits
+        erase_lock_state <= S_ERASE_LOCK_SHIFT_ERASE_LOCK;
+                      
+   when S_ERASE_LOCK_SHIFT_ERASE_LOCK =>     
+        --shift erase nonvolatile lock bits command
+        if (erase_lock_cmdcounter /= 0) then 
+          erase_lock_cmdcounter <= erase_lock_cmdcounter - 1;
+          erase_lock_cmdreg <= erase_lock_cmdreg(38 downto 0) & '0';
+        else
+          erase_lock_spi_cs_bar <= '1';
+          erase_lock_state <= S_ERASE_LOCK_ASSERT_CS_READ_STATUS;
+        end if;
+                                      
+   when S_ERASE_LOCK_ASSERT_CS_READ_STATUS =>
+        --assert cs and prepare for read status
+        erase_lock_spi_cs_bar <= '0';   
+        erase_lock_status_bit_index <= x"00";
+        erase_lock_cmdcounter <= "001111"; --16 bits = 8 command + 8 to skip first read cycle
+        erase_lock_cmdreg <=  CmdStatus & X"00000000";  -- Read Status register
+        erase_lock_state <= S_ERASE_LOCK_SHIFT_READ_STATUS;
+                  
+   when S_ERASE_LOCK_SHIFT_READ_STATUS =>
+        --shift read status command and read back status register
+        if (erase_lock_cmdcounter /= 0) then 
+          erase_lock_cmdcounter <= erase_lock_cmdcounter - 1;
+          erase_lock_cmdreg <= erase_lock_cmdreg(38 downto 0) & '0';
+        else
+          --once command is shifted and first read cycle skipped, check bit 0 on each cycle to see if done
+          erase_lock_status_bit_index <= erase_lock_status_bit_index + 1;
+          if (erase_lock_status_bit_index = 0) then 
+            --status(0) is write in progress flag bit
+            --note: Hualin's firmware only checks this on bit 0 of the next cycle. Not sure if necessary
+            if (spi_miso = '0' or in_simulation) then
+              erase_lock_state <= S_ERASE_LOCK_IDLE;
+              erase_lock_done <= '1';
+            end if;
+            --erase_lock_in_progress_bit <= spi_miso;
+          end if;
+        end if;
+   end case;  
+ end if;  -- Clk
+end process process_erase_lock;
+
+-------------------------------  WRITE LOCK FSM  --------------------------------------------------
+process_write_lock : process (CLK)
+  begin
+  if rising_edge(CLK) then
+  case write_lock_state is 
+   when S_WRITE_LOCK_IDLE =>
+        --when START_WRITE received, initiate write process
+        if (START_ADDRESS_VALID = '1') then write_lock_address <= START_ADDRESS; end if; --4-byte addressing??
+        write_lock_spi_cs_bar <= '1';
+        if (START_LOCK = '1') then
+          write_lock_done <= '0';
+          write_lock_state <= S_WRITE_LOCK_ASSERT_CS_WRITE_ENABLE;
+         end if;
+                       
+   when S_WRITE_LOCK_ASSERT_CS_WRITE_ENABLE =>
+        --assert CS and prep write enable commmand
+        write_lock_cmdcounter <= "000111"; --8 bits of command
+        write_lock_cmdreg <=  CmdWE & X"00000000";
+        write_lock_spi_cs_bar <= '0';
+        write_lock_state <= S_WRITE_LOCK_SHIFT_WRITE_ENABLE;
+                  
+   when S_WRITE_LOCK_SHIFT_WRITE_ENABLE =>
+         --shift write enable
+         if (write_lock_cmdcounter /= 0) then 
+           write_lock_cmdcounter <= write_lock_cmdcounter - 1;  
+           write_lock_cmdreg <= write_lock_cmdreg(38 downto 0) & '0';
+         else 
+           write_lock_spi_cs_bar <= '1';
+           write_lock_state <= S_WRITE_LOCK_ASSERT_CS_WRITE_LOCK;        
+         end if;
+                   
+   when S_WRITE_LOCK_ASSERT_CS_WRITE_LOCK =>
+        --assert CS and prepare for write nonvolatile lock bits
+        write_lock_spi_cs_bar <= '0';   
+        write_lock_cmdreg <= CmdWriteNonvLock & write_lock_address; 
+        write_lock_cmdcounter <= "100111"; --40 bits: 8 command + 32 for address
+        write_lock_state <= S_WRITE_LOCK_SHIFT_WRITE_LOCK;
+                      
+   when S_WRITE_LOCK_SHIFT_WRITE_LOCK =>     
+        --shift write nonvolatile lock bits command
+        if (write_lock_cmdcounter /= 0) then 
+          write_lock_cmdcounter <= write_lock_cmdcounter - 1;
+          write_lock_cmdreg <= write_lock_cmdreg(38 downto 0) & '0';
+        else
+          write_lock_spi_cs_bar <= '1';
+          write_lock_state <= S_WRITE_LOCK_ASSERT_CS_READ_STATUS;
+        end if;
+
+   when S_WRITE_LOCK_ASSERT_CS_READ_STATUS =>
+        -- assert CS and prep read status command
+        -- this part is strange, if only do read status once, will get 11111111 always from miso
+        write_lock_spi_cs_bar <= '0';
+        write_lock_cmdcounter <= "011111"; --16 bits: 8 command + 8 to skip the first cycle
+        write_lock_cmdreg <=  CmdStatus & X"00000000";
+        write_lock_state <= S_WRITE_LOCK_SHIFT_READ_STATUS;
+        
+   when S_WRITE_LOCK_SHIFT_READ_STATUS =>
+        --shift read status command and read back status register
+        if (write_lock_cmdcounter /= 0) then 
+          write_lock_cmdcounter <= write_lock_cmdcounter - 1;
+          write_lock_cmdreg <= write_lock_cmdreg(38 downto 0) & '0';
+        else
+          write_lock_spi_cs_bar <= '1';
+          write_lock_state <= S_WRITE_LOCK_ASSERT_CS_READ_STATUS_2;
+        end if; --write_lock_cmdcounter = 
+
+   when S_WRITE_LOCK_ASSERT_CS_READ_STATUS_2 =>
+        -- assert CS and prep read status command
+        write_lock_spi_cs_bar <= '0';
+        write_lock_cmdcounter <= "011111"; --16 bits: 8 command + 8 to skip the first cycle
+        write_lock_status_bit_index <= x"00";
+        write_lock_cmdreg <=  CmdStatus & X"00000000";
+        write_lock_state <= S_WRITE_LOCK_SHIFT_READ_STATUS_2;
+
+   when S_WRITE_LOCK_SHIFT_READ_STATUS_2 =>
+        --shift read status command and read back status register
+        if (write_lock_cmdcounter /= 0) then 
+          write_lock_cmdcounter <= write_lock_cmdcounter - 1;
+          write_lock_cmdreg <= write_lock_cmdreg(38 downto 0) & '0';
+        else
+          --once command is shifted and first read cycle skipped, check bit 0 on each cycle to see if done
+          write_lock_status_bit_index <= write_lock_status_bit_index + 1;
+          if (write_lock_status_bit_index = 0) then 
+            --status(0) is write_lock in progress flag bit
+            --note: Hualin's firmware only checks this on bit 0 of the next cycle. Not sure if necessary
+            if (spi_miso = '0' or in_simulation) then
+              write_lock_done <= '1';
+              write_lock_state <= S_WRITE_LOCK_IDLE;
+            end if; --spi_miso = '0' or in_simulation
+          end if; --write_lock_status_bit_index = 0
+        end if; --write_lock_cmdcounter = 0
+
+   end case;  
+ end if;  -- Clk
+end process process_write_lock;
 
 --------------********* misc **************---------------------
 --fifo_unconned(15 downto 0) <= data_to_fifo;

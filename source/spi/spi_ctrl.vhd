@@ -60,6 +60,10 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
       OUT_READ_DONE           : out std_logic;
       START_ERASE             : in std_logic;
       OUT_ERASE_DONE          : out std_logic;
+      START_UNLOCK            : in std_logic;
+      OUT_UNLOCK_DONE         : out std_logic;
+      START_LOCK              : in std_logic;
+      OUT_LOCK_DONE           : out std_logic;
       ------------------ Read output
       OUT_READ_DATA           : out std_logic_vector(15 downto 0);
       OUT_READ_DATA_VALID     : out std_logic;
@@ -131,6 +135,8 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
     S_READ_CMD, S_READ_LOW, S_READ_WAIT, 
     S_WRITE_CMD, S_WRITE_STALL_1, S_WRITE_STALL_2, S_WRITE_WORD, S_WRITE_START, S_WRITE_WAIT, 
     S_ERASE_CMD, S_ERASE_LOW, S_ERASE_WAIT, 
+    S_LOCK_CMD, S_LOCK_LOW, S_LOCK_WAIT,
+    S_UNLOCK_CMD, S_UNLOCK_LOW, S_UNLOCK_WAIT,
     S_SWITCH_PROM_CMD,
     S_UNKNOWN_CMD, S_STALL
   );
@@ -142,9 +148,13 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
   signal prom_read_en        : std_logic := '0';
   signal prom_erase_en       : std_logic := '0';
   signal prom_write_en       : std_logic := '0';
+  signal prom_unlock_en      : std_logic := '0';
+  signal prom_lock_en        : std_logic := '0';
   signal read_done           : std_logic := '0';
   signal erase_done          : std_logic := '0';
   signal write_done          : std_logic := '0';
+  signal lock_done           : std_logic := '0';
+  signal unlock_done         : std_logic := '0';
   
   --READ signals
   type rd_fifo_states is (S_FIFOIDLE, S_FIFOWRITE_PRE, S_FIFOWRITE);
@@ -255,6 +265,12 @@ begin
         when x"0C" =>
           --buffer program 
           cmd_fifo_state  <= S_WRITE_CMD;
+        when x"13" =>
+          --lock block
+          cmd_fifo_state  <= S_LOCK_CMD;
+        when x"14" =>
+          --unlock
+          cmd_fifo_state  <= S_UNLOCK_CMD;
         when x"17" =>
           --load address
           cmd_fifo_state  <= S_LOAD_ADDR_CMD;
@@ -271,6 +287,8 @@ begin
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
+      prom_lock_en        <= '0';
+      prom_unlock_en      <= '0';
       write_fifo_write_en <= '0';
       prom_load_addr      <= '0';
       cmd_fifo_read_en    <= '0';
@@ -286,6 +304,8 @@ begin
       prom_read_en        <= '1';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
+      prom_lock_en        <= '0';
+      prom_unlock_en      <= '0';
       write_fifo_write_en <= '0';
       prom_load_addr      <= '0';
       cmd_fifo_read_en    <= '1';
@@ -300,6 +320,8 @@ begin
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
+      prom_lock_en        <= '0';
+      prom_unlock_en      <= '0';
       write_fifo_write_en <= '0';
       prom_load_addr      <= '0';
       cmd_fifo_read_en    <= '0';
@@ -319,6 +341,8 @@ begin
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
+      prom_lock_en        <= '0';
+      prom_unlock_en      <= '0';
       write_fifo_write_en <= '0';
       prom_load_addr      <= '0';
       cmd_fifo_read_en    <= '0';
@@ -334,6 +358,8 @@ begin
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '1';
+      prom_lock_en        <= '0';
+      prom_unlock_en      <= '0';
       write_fifo_write_en <= '0';
       prom_load_addr      <= '0';
       cmd_fifo_read_en    <= '1';  
@@ -348,6 +374,8 @@ begin
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
+      prom_lock_en        <= '0';
+      prom_unlock_en      <= '0';
       write_fifo_write_en <= '0';
       prom_load_addr      <= '0';
       cmd_fifo_read_en    <= '0';
@@ -366,6 +394,8 @@ begin
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
+      prom_lock_en        <= '0';
+      prom_unlock_en      <= '0';
       write_fifo_write_en <= '0';
       prom_load_addr      <= '0';
       cmd_fifo_read_en    <= '0';
@@ -382,6 +412,8 @@ begin
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
+      prom_lock_en        <= '0';
+      prom_unlock_en      <= '0';
       write_fifo_write_en <= '0';
       prom_load_addr      <= '0';
       cmd_fifo_read_en    <= '1';
@@ -396,6 +428,8 @@ begin
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
+      prom_lock_en        <= '0';
+      prom_unlock_en      <= '0';
       write_fifo_write_en <= '0';
       prom_load_addr      <= '0';
       cmd_fifo_read_en    <= '0';
@@ -414,6 +448,8 @@ begin
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
+      prom_lock_en        <= '0';
+      prom_unlock_en      <= '0';
       write_fifo_write_en <= '0';
       prom_load_addr      <= '0';
       cmd_fifo_read_en    <= '0';
@@ -434,6 +470,8 @@ begin
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
+      prom_lock_en        <= '0';
+      prom_unlock_en      <= '0';
       write_fifo_write_en <= '1';
       prom_load_addr      <= '0';
       cmd_fifo_read_en    <= '1';
@@ -448,6 +486,8 @@ begin
       prom_read_en        <= '0';
       prom_write_en       <= '1';
       prom_erase_en       <= '0';
+      prom_lock_en        <= '0';
+      prom_unlock_en      <= '0';
       write_fifo_write_en <= '0';
       prom_load_addr      <= '0';
       cmd_fifo_read_en    <= '0';
@@ -466,6 +506,114 @@ begin
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
+      prom_lock_en        <= '0';
+      prom_unlock_en      <= '0';
+      write_fifo_write_en <= '0';
+      prom_load_addr      <= '0';
+      cmd_fifo_read_en    <= '0';
+      read_nwords         <= read_nwords;
+      program_nwords      <= program_nwords;
+      prom_addr           <= prom_addr;
+      prom_select         <= prom_select;
+
+    when S_LOCK_CMD =>
+      --start lock sector command with lock enable and remove command from FIFO
+      ncmds_spiintr_inner <= ncmds_spiintr_inner + 1;
+      cmd_fifo_state      <= S_LOCK_LOW;
+      prom_read_en        <= '0';
+      prom_write_en       <= '0';
+      prom_erase_en       <= '0';
+      prom_lock_en        <= '1';
+      prom_unlock_en      <= '0';
+      write_fifo_write_en <= '0';
+      prom_load_addr      <= '0';
+      cmd_fifo_read_en    <= '1';  
+      read_nwords         <= read_nwords;
+      program_nwords      <= program_nwords;
+      prom_addr           <= prom_addr;
+      prom_select         <= prom_select;
+      
+    when S_LOCK_LOW => 
+      --wait for lock_done to go low
+      cmd_fifo_state      <= S_LOCK_WAIT;
+      prom_read_en        <= '0';
+      prom_write_en       <= '0';
+      prom_erase_en       <= '0';
+      prom_lock_en        <= '0';
+      prom_unlock_en      <= '0';
+      write_fifo_write_en <= '0';
+      prom_load_addr      <= '0';
+      cmd_fifo_read_en    <= '0';
+      read_nwords         <= read_nwords;
+      program_nwords      <= program_nwords;
+      prom_addr           <= prom_addr;
+      prom_select         <= prom_select;
+      
+    when S_LOCK_WAIT =>
+      --don't accept any more commands until done with erase command
+      if (lock_done='1') then
+        cmd_fifo_state    <= S_IDLE;
+      else 
+        cmd_fifo_state    <= S_LOCK_WAIT;
+      end if;
+      prom_read_en        <= '0';
+      prom_write_en       <= '0';
+      prom_erase_en       <= '0';
+      prom_lock_en        <= '0';
+      prom_unlock_en      <= '0';
+      write_fifo_write_en <= '0';
+      prom_load_addr      <= '0';
+      cmd_fifo_read_en    <= '0';
+      read_nwords         <= read_nwords;
+      program_nwords      <= program_nwords;
+      prom_addr           <= prom_addr;
+      prom_select         <= prom_select;
+
+    when S_UNLOCK_CMD =>
+      --start erase sector command with erase enable and remove command from FIFO
+      ncmds_spiintr_inner <= ncmds_spiintr_inner + 1;
+      cmd_fifo_state      <= S_UNLOCK_LOW;
+      prom_read_en        <= '0';
+      prom_write_en       <= '0';
+      prom_erase_en       <= '0';
+      prom_lock_en        <= '0';
+      prom_unlock_en      <= '1';
+      write_fifo_write_en <= '0';
+      prom_load_addr      <= '0';
+      cmd_fifo_read_en    <= '1';  
+      read_nwords         <= read_nwords;
+      program_nwords      <= program_nwords;
+      prom_addr           <= prom_addr;
+      prom_select         <= prom_select;
+      
+    when S_UNLOCK_LOW => 
+      --wait for erase_done to go low
+      cmd_fifo_state      <= S_UNLOCK_WAIT;
+      prom_read_en        <= '0';
+      prom_write_en       <= '0';
+      prom_erase_en       <= '0';
+      prom_lock_en        <= '0';
+      prom_unlock_en      <= '0';
+      write_fifo_write_en <= '0';
+      prom_load_addr      <= '0';
+      cmd_fifo_read_en    <= '0';
+      read_nwords         <= read_nwords;
+      program_nwords      <= program_nwords;
+      prom_addr           <= prom_addr;
+      prom_select         <= prom_select;
+      
+    when S_UNLOCK_WAIT =>
+      --don't accept any more commands until done with erase command
+      if (erase_done='1') then
+        cmd_fifo_state    <= S_IDLE;
+      else 
+        cmd_fifo_state    <= S_UNLOCK_WAIT;
+      end if;
+      prom_read_en        <= '0';
+      prom_write_en       <= '0';
+      prom_erase_en       <= '0';
+      prom_lock_en        <= '0';
+      prom_unlock_en      <= '0';
       write_fifo_write_en <= '0';
       prom_load_addr      <= '0';
       cmd_fifo_read_en    <= '0';
@@ -481,6 +629,8 @@ begin
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
+      prom_lock_en        <= '0';
+      prom_unlock_en      <= '0';
       write_fifo_write_en <= '0';
       prom_load_addr      <= '0';
       cmd_fifo_read_en    <= '1';  
@@ -495,6 +645,8 @@ begin
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
+      prom_lock_en        <= '0';
+      prom_unlock_en      <= '0';
       write_fifo_write_en <= '0';
       prom_load_addr      <= '0';
       cmd_fifo_read_en    <= '0';  
@@ -513,6 +665,8 @@ begin
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
+      prom_lock_en        <= '0';
+      prom_unlock_en      <= '0';
       write_fifo_write_en <= '0';
       prom_load_addr      <= '0';
       cmd_fifo_read_en    <= '0';  
@@ -528,6 +682,8 @@ begin
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
+      prom_lock_en        <= '0';
+      prom_unlock_en      <= '0';
       write_fifo_write_en <= '0';
       prom_load_addr      <= '1';
       cmd_fifo_read_en    <= '1';  
@@ -543,6 +699,8 @@ begin
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
+      prom_lock_en        <= '0';
+      prom_unlock_en      <= '0';
       write_fifo_write_en <= '0';
       prom_load_addr      <= '0';
       cmd_fifo_read_en    <= '1';  
@@ -558,6 +716,8 @@ begin
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
+      prom_lock_en        <= '0';
+      prom_unlock_en      <= '0';
       write_fifo_write_en <= '0';
       prom_load_addr      <= '0';
       cmd_fifo_read_en    <= '1';
@@ -572,6 +732,8 @@ begin
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
+      prom_lock_en        <= '0';
+      prom_unlock_en      <= '0';
       write_fifo_write_en <= '0';
       prom_load_addr      <= '0';
       cmd_fifo_read_en    <= '0';
@@ -586,6 +748,8 @@ begin
       prom_read_en        <= '0';
       prom_write_en       <= '0';
       prom_erase_en       <= '0';
+      prom_lock_en        <= '0';
+      prom_unlock_en      <= '0';
       write_fifo_write_en <= '0';
       prom_load_addr      <= '0';
       cmd_fifo_read_en    <= '0';
@@ -639,6 +803,10 @@ begin
     OUT_READ_DONE           => read_done,
     START_ERASE             => prom_erase_en,
     OUT_ERASE_DONE          => erase_done,
+    START_UNLOCK            => prom_unlock_en,
+    OUT_UNLOCK_DONE         => unlock_done,
+    START_LOCK              => prom_lock_en,
+    OUT_LOCK_DONE           => lock_done,
     ------------------ Read output
     OUT_READ_DATA           => spi_readdata,
     OUT_READ_DATA_VALID     => readback_fifo_wr_en,
