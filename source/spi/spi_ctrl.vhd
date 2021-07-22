@@ -167,6 +167,11 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
   signal cmd_fifo_read_en_q     : std_logic := '0';
   signal cmd_fifo_read_en_pulse : std_logic := '0';
   signal ila_probe              : std_logic_vector(511 downto 0) := (others => '0');
+  
+  signal prom_cs2_b_inner       : std_logic := '0';
+  signal cnfg_data_in_inner     : std_logic_vector(7 downto 4) := (others => '0');
+  signal cnfg_data_out_inner     : std_logic_vector(7 downto 4) := (others => '0');
+  signal cnfg_data_dir_inner     : std_logic_vector(7 downto 4) := (others => '0');
 
   --prom select signals
   signal prom_select : std_logic := '0';
@@ -195,6 +200,17 @@ begin
   ila_probe(112 downto 97) <= spi_readdata;
   ila_probe(113) <= readback_fifo_wr_en;
   ila_probe(114) <= cmd_fifo_read_en;
+  ila_probe(115) <= prom_select;
+  ila_probe(116) <= prom_cs2_b_inner;
+  ila_probe(120 downto 117) <= cnfg_data_dir_inner;
+  ila_probe(124 downto 121) <= cnfg_data_out_inner;
+  ila_probe(128 downto 125) <= cnfg_data_in_inner;
+  
+  
+  PROM_CS2_B <= prom_cs2_b_inner;
+  cnfg_data_in_inner <= CNFG_DATA_IN;
+  CNFG_DATA_OUT <= cnfg_data_out_inner;
+  CNFG_DATA_DIR <= cnfg_data_dir_inner;
 
   ncmds_spictrl_inner <= (ncmds_spictrl_inner + 1) when (rising_edge(CLK2P5) and CMD_FIFO_WRITE_EN='1') else
                          ncmds_spictrl_inner;
@@ -229,7 +245,6 @@ begin
     when S_IDLE =>
       --do nothing until command to process (command FIFO is not empty)
       if (cmd_fifo_empty='0') then
-        ncmds_spiintr_inner <= ncmds_spiintr_inner + 1;
         case "000" & cmd_fifo_out(4 downto 0) is
         when x"04" =>
           --read n
@@ -266,6 +281,7 @@ begin
       
     when S_READ_CMD =>
       --start read process by sending read enable and number of words to read. Also remove command from FIFO
+      ncmds_spiintr_inner <= ncmds_spiintr_inner + 1;
       cmd_fifo_state      <= S_READ_LOW;
       prom_read_en        <= '1';
       prom_write_en       <= '0';
@@ -313,6 +329,7 @@ begin
       
     when S_ERASE_CMD =>
       --start erase sector command with erase enable and remove command from FIFO
+      ncmds_spiintr_inner <= ncmds_spiintr_inner + 1;
       cmd_fifo_state      <= S_ERASE_LOW;
       prom_read_en        <= '0';
       prom_write_en       <= '0';
@@ -359,6 +376,7 @@ begin
       
     when S_WRITE_CMD =>
       --read number of words to program from command and remove command from FIFO
+      ncmds_spiintr_inner <= ncmds_spiintr_inner + 1;
       write_word_counter  <= x"000";
       cmd_fifo_state      <= S_WRITE_STALL_1; 
       prom_read_en        <= '0';
@@ -407,6 +425,7 @@ begin
     when S_WRITE_WORD =>
       --write this word to the spi_interface write buffer FIFO (goes directly from command FIFO to spi_interface buffer)
       write_word_counter  <= write_word_counter + 1;
+      ncmds_spiintr_inner <= ncmds_spiintr_inner + 1;
       if (write_word_counter = program_nwords) then
         cmd_fifo_state    <= S_WRITE_START;
       else
@@ -457,6 +476,7 @@ begin
       
     when S_LOAD_ADDR_CMD =>
       --set the upper part of address and remove command from FIFO
+      ncmds_spiintr_inner <= ncmds_spiintr_inner + 1;
       cmd_fifo_state      <= S_LOAD_ADDR_STALL_1;
       prom_read_en        <= '0';
       prom_write_en       <= '0';
@@ -503,6 +523,7 @@ begin
             
     when S_LOAD_ADDR_LOWER =>
       --set lower part of address, remove command from FIFO, and pass address onto spi_interface
+      ncmds_spiintr_inner <= ncmds_spiintr_inner + 1;
       cmd_fifo_state      <= S_STALL;
       prom_read_en        <= '0';
       prom_write_en       <= '0';
@@ -517,6 +538,7 @@ begin
 
     when S_SWITCH_PROM_CMD =>
       --switch selected PROM and remove command from FIFO
+      ncmds_spiintr_inner <= ncmds_spiintr_inner + 1;
       cmd_fifo_state      <= S_STALL;
       prom_read_en        <= '0';
       prom_write_en       <= '0';
@@ -531,6 +553,7 @@ begin
       
     when S_UNKNOWN_CMD =>
       --do nothing but remove command from FIFO
+      ncmds_spiintr_inner <= ncmds_spiintr_inner + 1;
       cmd_fifo_state      <= S_STALL;
       prom_read_en        <= '0';
       prom_write_en       <= '0';
@@ -621,10 +644,10 @@ begin
     OUT_READ_DATA_VALID     => readback_fifo_wr_en,
     ------------------ Signals to/from second EPROM
     PROM_SELECT             => prom_select,
-    CNFG_DATA_IN            => CNFG_DATA_IN,
-    CNFG_DATA_OUT           => CNFG_DATA_OUT,
-    CNFG_DATA_DIR           => CNFG_DATA_DIR,
-    PROM_CS2_B              => PROM_CS2_B,
+    CNFG_DATA_IN            => CNFG_DATA_IN_inner,
+    CNFG_DATA_OUT           => CNFG_DATA_OUT_inner,
+    CNFG_DATA_DIR           => CNFG_DATA_DIR_inner,
+    PROM_CS2_B              => PROM_CS2_B_inner,
     ------------------ Debug
     DIAGOUT                 => DIAGOUT
     );

@@ -14,119 +14,120 @@ use unisim.vcomponents.all;
 use work.ucsb_types.all;
 
 --! @brief ODMB7 prototype firmware
---! @details ODMB7 firmware. Currently capable of testing virtually all hardware interfaces, however
+--! @details ODMB7 firmware. Currently capable of testing virtually all 
+--! hardware interfaces and performing most slow control functionality, however
 --! data acquisition firmware has not yet been developed
 entity odmb7_ucsb_dev is
   port (
     --------------------
     -- Input clocks
     --------------------
-    CMS_CLK_FPGA_P : in std_logic; --! CMS/system clock: 40.07897 MHz. Can be from local oscillator or CCB. Connected to bank 45.
-    CMS_CLK_FPGA_N : in std_logic; --! CMS/system clock: 40.07897 MHz. Can be from local oscillator or CCB. Connected to bank 45.
-    GP_CLK_6_P     : in std_logic; --! From clock synthesizer ODIV6: 80 MHz. Connected to bank 44.
-    GP_CLK_6_N     : in std_logic; --! From clock synthesizer ODIV6: 80 MHz. Connected to bank 44.
-    GP_CLK_7_P     : in std_logic; --! From clock synthesizer ODIV7: 80 MHz. Connected to bank 68.
-    GP_CLK_7_N     : in std_logic; --! From clock synthesizer ODIV7: 80 MHz. Connected to bank 68.
-    REF_CLK_1_P    : in std_logic; --! From clock synthesizer, refclk0 to GTH quad 224
-    REF_CLK_1_N    : in std_logic; --! From clock synthesizer, refclk0 to GTH quad 224
-    REF_CLK_2_P    : in std_logic; --! From clock synthesizer, refclk0 to GTH quad 227
-    REF_CLK_2_N    : in std_logic; --! From clock synthesizer, refclk0 to GTH quad 227
-    REF_CLK_3_P    : in std_logic; --! From clock synthesizer, refclk0 to GTH quad 226
-    REF_CLK_3_N    : in std_logic; --! From clock synthesizer, refclk0 to GTH quad 226
-    REF_CLK_4_P    : in std_logic; --! From clock synthesizer, refclk0 to GTH quad 225
-    REF_CLK_4_N    : in std_logic; --! From clock synthesizer, refclk0 to GTH quad 225
-    REF_CLK_5_P    : in std_logic; --! From clock synthesizer, refclk1 to GTH quad 227
-    REF_CLK_5_N    : in std_logic; --! From clock synthesizer, refclk1 to GTH quad 227
-    CLK_125_REF_P  : in std_logic; --! From clock synthesizer, refclk1 to GTH quad 226
-    CLK_125_REF_N  : in std_logic; --! From clock synthesizer, refclk1 to GTH quad 226
-    EMCCLK         : in std_logic; --! From clock synthesizer, 133 MHz low frequency clock for programming FPGA from PROM. Connected to bank 65.
-    LF_CLK         : in std_logic; --! From clock synthesizer, general purpose low frequency clock, 10 kHz. Connected to bank 45.
+    CMS_CLK_FPGA_P : in std_logic; --! CMS/system clock: 40.07897 MHz. Can be from local oscillator or CCB. Used to generate most clocks used in firmware. Connected to bank 45.
+    CMS_CLK_FPGA_N : in std_logic; --! CMS/system clock: 40.07897 MHz. Can be from local oscillator or CCB. Used to generate most clocks used in firmware. Connected to bank 45.
+    GP_CLK_6_P     : in std_logic; --! From clock synthesizer ODIV6: 80 MHz. Currently unused. Connected to bank 44.
+    GP_CLK_6_N     : in std_logic; --! From clock synthesizer ODIV6: 80 MHz. Currently unused. Connected to bank 44.
+    GP_CLK_7_P     : in std_logic; --! From clock synthesizer ODIV7: 80 MHz. Currently unused. Connected to bank 68.
+    GP_CLK_7_N     : in std_logic; --! From clock synthesizer ODIV7: 80 MHz. Currently unused. Connected to bank 68.
+    REF_CLK_1_P    : in std_logic; --! From clock synthesizer, refclk0 to GTH quad 224.
+    REF_CLK_1_N    : in std_logic; --! From clock synthesizer, refclk0 to GTH quad 224.
+    REF_CLK_2_P    : in std_logic; --! From clock synthesizer, refclk0 to GTH quad 227.
+    REF_CLK_2_N    : in std_logic; --! From clock synthesizer, refclk0 to GTH quad 227.
+    REF_CLK_3_P    : in std_logic; --! From clock synthesizer, refclk0 to GTH quad 226.
+    REF_CLK_3_N    : in std_logic; --! From clock synthesizer, refclk0 to GTH quad 226.
+    REF_CLK_4_P    : in std_logic; --! From clock synthesizer, refclk0 to GTH quad 225.
+    REF_CLK_4_N    : in std_logic; --! From clock synthesizer, refclk0 to GTH quad 225.
+    REF_CLK_5_P    : in std_logic; --! From clock synthesizer, refclk1 to GTH quad 227.
+    REF_CLK_5_N    : in std_logic; --! From clock synthesizer, refclk1 to GTH quad 227.
+    CLK_125_REF_P  : in std_logic; --! From clock synthesizer, refclk1 to GTH quad 226.
+    CLK_125_REF_N  : in std_logic; --! From clock synthesizer, refclk1 to GTH quad 226.
+    EMCCLK         : in std_logic; --! From clock synthesizer, 133 MHz. Clock for programming FPGA from PROM. Connected to bank 65.
+    LF_CLK         : in std_logic; --! From clock synthesizer, 10 kHz. General purpose low frequency clock, currently unused. Connected to bank 45.
 
     --------------------
     -- Signals controlled by ODMB_VME
     --------------------
     -- From/To VME controller to/from MBV
-    VME_DATA        : inout std_logic_vector(15 downto 0); --! Data to/from VME backplane. Connected to bank 48
-    VME_GAP_B       : in std_logic;                        --! Geographical address (VME slot) parity. Connected to bank 48
-    VME_GA_B        : in std_logic_vector(4 downto 0);     --! Geographical address (VME slot). Connected to bank 48
-    VME_ADDR        : in std_logic_vector(23 downto 1);    --! VME address (command). Conencted to bank 46
-    VME_AM          : in std_logic_vector(5 downto 0);     --! VME address modified. Connected to cank 46
-    VME_AS_B        : in std_logic;                        --! VME address strobe. Connected to bank 46
-    VME_DS_B        : in std_logic_vector(1 downto 0);     --! VME data strobe. Connected to bank 46
-    VME_LWORD_B     : in std_logic;                        --! Indicates data word length. Connected to bank 48
-    VME_WRITE_B     : in std_logic;                        --! Indicates VME write/read. Connected to bank 48
-    VME_IACK_B      : in std_logic;                        --! VME interrupt acknowledge. Connected to bank 48
-    VME_BERR_B      : in std_logic;                        --! VME bus error indicator. Connected to bank 48
-    VME_SYSRST_B    : in std_logic;                        --! VME system reset. Not used. Connected to bank 48
-    VME_SYSFAIL_B   : in std_logic;                        --! VME system failure indicator. Connected to bank 48
-    VME_CLK_B       : in std_logic;                        --! VME clock. Not used. Connected to bank 48
-    KUS_VME_OE_B    : out std_logic;                       --! VME output enable. Connected to bank 44
-    KUS_VME_DIR     : out std_logic;                       --! ODMB board VME input/output direction. Connected to bank 44
-    VME_DTACK_KUS_B : out std_logic;                       --! VME data acknowledge. Connected to bank 44
+    VME_DATA        : inout std_logic_vector(15 downto 0); --! Data to/from VME backplane. Used by ODMB VME module. Connected to bank 48.
+    VME_GAP_B       : in std_logic;                        --! Geographical address (VME slot) parity. Used by ODMB VME module. Connected to bank 48.
+    VME_GA_B        : in std_logic_vector(4 downto 0);     --! Geographical address (VME slot). Used by ODMB VME and ODMB CTRL module. Connected to bank 48.
+    VME_ADDR        : in std_logic_vector(23 downto 1);    --! VME address (command). Used by ODMB VME module. Conencted to bank 46.
+    VME_AM          : in std_logic_vector(5 downto 0);     --! VME address modifier. Used by ODMB VME module. Connected to cank 46.
+    VME_AS_B        : in std_logic;                        --! VME address strobe. Used by ODMB VME module. Connected to bank 46.
+    VME_DS_B        : in std_logic_vector(1 downto 0);     --! VME data strobe. Used by ODMB VME module. Connected to bank 46.
+    VME_LWORD_B     : in std_logic;                        --! Indicates data word length. Used by ODMB VME module. Connected to bank 48.
+    VME_WRITE_B     : in std_logic;                        --! Indicates VME write/read. Used by ODMB VME module. Connected to bank 48.
+    VME_IACK_B      : in std_logic;                        --! VME interrupt acknowledge. Used by ODMB VME module. Connected to bank 48.
+    VME_BERR_B      : in std_logic;                        --! VME bus error indicator. Used by ODMB VME module. Connected to bank 48.
+    VME_SYSRST_B    : in std_logic;                        --! VME system reset. Not used. Connected to bank 48.
+    VME_SYSFAIL_B   : in std_logic;                        --! VME system failure indicator. Used by ODMB VME module. Connected to bank 48.
+    VME_CLK_B       : in std_logic;                        --! VME clock. Not used. Connected to bank 48.
+    KUS_VME_OE_B    : out std_logic;                       --! VME output enable. Controlled by ODMB VME module. Connected to bank 44.
+    KUS_VME_DIR     : out std_logic;                       --! ODMB board VME input/output direction. Controlled by ODMB VME module. Connected to bank 44.
+    VME_DTACK_KUS_B : out std_logic;                       --! VME data acknowledge. Controlled by ODMB VME module. Connected to bank 44.
 
     -- From/To PPIB (connectors J3 and J4)
-    DCFEB_TCK_P    : out std_logic_vector(7 downto 1);     --! (x)DCFEB JTAG TCK signal. One per (x)DCFEB. Connected to bank 68
-    DCFEB_TCK_N    : out std_logic_vector(7 downto 1);     --! (x)DCFEB JTAG TCK signal. One per (x)DCFEB. Connected to bank 68
-    DCFEB_TMS_P    : out std_logic;                        --! (x)DCFEB JTAG TMS signal. Connected to bank 68
-    DCFEB_TMS_N    : out std_logic;                        --! (x)DCFEB JTAG TMS signal. Connected to bank 68
-    DCFEB_TDI_P    : out std_logic;                        --! (x)DCFEB JTAG TDI signal. Connected to bank 68
-    DCFEB_TDI_N    : out std_logic;                        --! (x)DCFEB JTAG TDI signal. Connected to bank 68
-    DCFEB_TDO_P    : in  std_logic_vector(7 downto 1);     --! (x)DCFEB JTAG TDO signal. One per (x)DCFEB. Connected to bank 67-68 as "C_TDO"
-    DCFEB_TDO_N    : in  std_logic_vector(7 downto 1);     --! (x)DCFEB JTAG TDO signal. One per (x)DCFEB. Connected to bank 67-68 as "C_TDO"
-    DCFEB_DONE     : in  std_logic_vector(7 downto 1);     --! (x)DCFEB programming done signal. Connected to bank 68 as "DONE_*"
-    RESYNC_P       : out std_logic;                        --! (x)DCFEB resync signal. Connected to bank 66
-    RESYNC_N       : out std_logic;                        --! (x)DCFEB resync signal. Connected to bank 66
-    BC0_P          : out std_logic;                        --! (x)DCFEB bunch crossing 0 synchronization signal. Connected to bank 68
-    BC0_N          : out std_logic;                        --! (x)DCFEB bunch crossing 0 synchronization signal. Connected to bank 68
-    INJPLS_P       : out std_logic;                        -- Bank 66, ODMB CTRL
-    INJPLS_N       : out std_logic;                        -- Bank 66, ODMB CTRL
-    EXTPLS_P       : out std_logic;                        -- Bank 66, ODMB CTRL
-    EXTPLS_N       : out std_logic;                        -- Bank 66, ODMB CTRL
-    L1A_P          : out std_logic;                        -- Bank 66, ODMB CTRL
-    L1A_N          : out std_logic;                        -- Bank 66, ODMB CTRL
-    L1A_MATCH_P    : out std_logic_vector(7 downto 1);     -- Bank 66, ODMB CTRL
-    L1A_MATCH_N    : out std_logic_vector(7 downto 1);     -- Bank 66, ODMB CTRL
-    PPIB_OUT_EN_B  : out std_logic;                        --! PPIB output enable signal. Connected to bank 68
+    DCFEB_TCK_P    : out std_logic_vector(7 downto 1);     --! (x)DCFEB JTAG TCK signal. One per (x)DCFEB. Used by ODMB VME module. Connected to bank 68.
+    DCFEB_TCK_N    : out std_logic_vector(7 downto 1);     --! (x)DCFEB JTAG TCK signal. One per (x)DCFEB. Used by ODMB VME module. Connected to bank 68. 
+    DCFEB_TMS_P    : out std_logic;                        --! (x)DCFEB JTAG TMS signal. Used by ODMB VME module. Connected to bank 68.
+    DCFEB_TMS_N    : out std_logic;                        --! (x)DCFEB JTAG TMS signal. Used by ODMB VME module. Connected to bank 68.
+    DCFEB_TDI_P    : out std_logic;                        --! (x)DCFEB JTAG TDI signal. Used by ODMB VME module. Connected to bank 68.
+    DCFEB_TDI_N    : out std_logic;                        --! (x)DCFEB JTAG TDI signal. Used by ODMB VME module. Connected to bank 68.
+    DCFEB_TDO_P    : in  std_logic_vector(7 downto 1);     --! (x)DCFEB JTAG TDO signal. One per (x)DCFEB. Used by ODMB VME module. Connected to bank 67-68 as "C_TDO".
+    DCFEB_TDO_N    : in  std_logic_vector(7 downto 1);     --! (x)DCFEB JTAG TDO signal. One per (x)DCFEB. Used by ODMB VME module. Connected to bank 67-68 as "C_TDO". 
+    DCFEB_DONE     : in  std_logic_vector(7 downto 1);     --! (x)DCFEB programming done signal. Used only by top level DCFEB startup process. Connected to bank 68 as "DONE_*".
+    RESYNC_P       : out std_logic;                        --! (x)DCFEB resync signal. Used by ODMB VME module. Connected to bank 66.
+    RESYNC_N       : out std_logic;                        --! (x)DCFEB resync signal. Used by ODMB VME module. Connected to bank 66.
+    BC0_P          : out std_logic;                        --! (x)DCFEB bunch crossing 0 synchronization signal. Initiated by CCB_BX0 signal or from ODMB VME. Connected to bank 68.
+    BC0_N          : out std_logic;                        --! (x)DCFEB bunch crossing 0 synchronization signal. Initiated by CCB_BX0 signal or from ODMB VME. Connected to bank 68.
+    INJPLS_P       : out std_logic;                        --! Calibration INJPLS signal for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
+    INJPLS_N       : out std_logic;                        --! Calibration INJPLS signal for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
+    EXTPLS_P       : out std_logic;                        --! Calibration EXTPLS signal for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
+    EXTPLS_N       : out std_logic;                        --! Calibration EXTPLS signal for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
+    L1A_P          : out std_logic;                        --! Trigger L1A signal for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
+    L1A_N          : out std_logic;                        --! Trigger L1A signal for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
+    L1A_MATCH_P    : out std_logic_vector(7 downto 1);     --! L1A match for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
+    L1A_MATCH_N    : out std_logic_vector(7 downto 1);     --! L1A match for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
+    PPIB_OUT_EN_B  : out std_logic;                        --! PPIB output enable signal. Fixed to '0'. Connected to bank 68.
 
     --------------------
     -- CCB Signals
     --------------------
-    CCB_CMD        : in  std_logic_vector(5 downto 0);     -- Bank 44
-    CCB_CMD_S      : in  std_logic;                        -- Bank 46
-    CCB_DATA       : in  std_logic_vector(7 downto 0);     -- Bank 44
-    CCB_DATA_S     : in  std_logic;                        -- Bank 46
-    CCB_CAL        : in  std_logic_vector(2 downto 0);     -- Bank 44
-    CCB_CRSV       : in  std_logic_vector(3 downto 0);     -- Bank 44
-    CCB_DRSV       : in  std_logic_vector(1 downto 0);     -- Bank 45
-    CCB_RSVO       : in  std_logic_vector(4 downto 0);     -- Bank 45
-    CCB_RSVI       : out std_logic_vector(2 downto 0);     -- Bank 45
-    CCB_BX0_B      : in  std_logic;                        -- "CCB_BX0" in Bank 46
-    CCB_BX_RST_B   : in  std_logic;                        -- "CCB_BX_RST" in Bank 46
-    CCB_L1A_RST_B  : in  std_logic;                        -- "CCB_L1A_RST" in Bank 46
-    CCB_L1A_B      : in  std_logic;                        -- "CCB_L1A" in Bank 46
-    CCB_L1A_RLS    : out std_logic;                        -- Bank 45
-    CCB_CLKEN      : in  std_logic;                        -- Bank 46
-    CCB_EVCNTRES_B : in  std_logic;                        -- "CCB_EVCNTRES" in Bank 46
-    CCB_HARDRST_B  : in  std_logic;                        -- Bank 45 <-- should not be connected
-    CCB_SOFT_RST_B : in  std_logic;                        -- "CCB_SOFT_RST" in Bank 45
+    CCB_CMD        : in  std_logic_vector(5 downto 0);     --! Command from CCB, generates BC0, L1ARST, etc. for ODMB. Used by ODMB CTRL module. Connected to bank 44.
+    CCB_CMD_S      : in  std_logic;                        --! CCB command strobe. Used by ODMB CTRL module. Connected to bank 46.
+    CCB_DATA       : in  std_logic_vector(7 downto 0);     --! CCB data. Only used in CCB communication test. Connected to bank 44.
+    CCB_DATA_S     : in  std_logic;                        --! CCB data strobe. Only used in CCB communication test. Connected to bank 46.
+    CCB_CAL        : in  std_logic_vector(2 downto 0);     --! CCB calibration signals. Only used in CCB communication test. In ODMB2014 fw, connected to ODMB CTRL but unused. Connected to bank 44.
+    CCB_CRSV       : in  std_logic_vector(3 downto 0);     --! CCB CCB-reserved signals. Only used in CCB communication test. In ODMB2014 fw, connected to ODMB CTRL but unused. Connected to bank 44.
+    CCB_DRSV       : in  std_logic_vector(1 downto 0);     --! CCB DMB-reserved signals. Only used in CCB communication test. In ODMB2014 fw, connected to ODMB CTRL but unused. Connected to bank 45.
+    CCB_RSVO       : in  std_logic_vector(4 downto 0);     --! CCB DMB-reserved output. Only used in CCB communication test. In ODMB2014 fw, connected to ODMB CTRL but unused. Connected to bank 45.
+    CCB_RSVI       : out std_logic_vector(2 downto 0);     --! CCB DMB-reserved input. Only used in CCB communication test. In ODMB2014 fw, connected to ODMB CTRL but unused. Connected to bank 45.
+    CCB_BX0_B      : in  std_logic;                        --! CCB bunch-crossing 0 synchronization signal. Used to generate BC0 pulse to (x)DCFEBs. Connected to Bank 46 as "CCB_BX0".
+    CCB_BX_RST_B   : in  std_logic;                        --! CCB bunch-crossing reset signal. Used by ODMB CTRL. Connected to bank 46 as "CCB_BX_RST".
+    CCB_L1A_RST_B  : in  std_logic;                        --! CCB L1A reset signal. Used by simulated FE boards but not ODMB CTRL in ODMB2014 fw. Connected to bank 46 as "CCB_L1A_RST".
+    CCB_L1A_B      : in  std_logic;                        --! CCB L1A signal. Used to generate raw_l1a to ODMB CTRL in ODMB2014 fw. Connected to bank 46 as "CCB_L1A".
+    CCB_L1A_RLS    : out std_logic;                        --! CCB L1A release. Fixed to '0' in ODMB2014 fw. Connected to bank 45.
+    CCB_CLKEN      : in  std_logic;                        --! CCB clock enable signal. Connected to ODMB CTRL in ODMB2014 fw but unused. Connected to bank 46.
+    CCB_EVCNTRES_B : in  std_logic;                        --! CCB event counter reset. Used by simulated FE boards. Connected to bank 64 as "CCB_EVCNTRES".
+    CCB_HARDRST_B  : in  std_logic;                        --! CCB hard reset. Unusable since hard reset resets the FPGA but must be input to avoid self-reset. Connected to bank 45 in error.
+    CCB_SOFT_RST_B : in  std_logic;                        --! CCB soft reset. Triggers reset of elements throughout firmware. Connected to bank 45 as "CCB_SOFT_RST".
 
     --------------------
     -- LVMB Signals
     --------------------
-    LVMB_PON     : out std_logic_vector(7 downto 0);       -- Bank 67
-    PON_LOAD_B   : out std_logic;                          -- Bank 67
-    PON_OE       : out std_logic;                          -- Bank 67
-    MON_LVMB_PON : in  std_logic_vector(7 downto 0);       -- Bank 67
-    LVMB_CSB     : out std_logic_vector(6 downto 0);       -- Bank 67
-    LVMB_SCLK    : out std_logic;                          -- Bank 68
-    LVMB_SDIN    : out std_logic;                          -- Bank 68
-    LVMB_SDOUT_P : in std_logic;                           -- C_LVMB_SDOUT_P in Bank 67
-    LVMB_SDOUT_N : in std_logic;                           -- C_LVMB_SDOUT_N in Bank 67 --meta:uncomment_for_odmb
+    LVMB_PON     : out std_logic_vector(7 downto 0);       --! Signal to LVMB to power on (x)DCFEBs and ALCT. Mapping of bits to boards is chamber dependent. Used by ODMB VME. Connected to bank 67.
+    PON_LOAD_B   : out std_logic;                          --! Signal to write LVMB_PON to LVMB. Used by ODMB VME. Connected to bank 67.
+    PON_OE       : out std_logic;                          --! Output enable for LVMB_PON. Fixed to '1'. Used by ODMB VME. Connected to bank 67.
+    MON_LVMB_PON : in  std_logic_vector(7 downto 0);       --! Signal to check (x)DCFEBs and ALCT power status from LVMB. Mapping of bits to boards is chamber dependent. Used by ODMB VME. Connected to bank 67.
+    LVMB_CSB     : out std_logic_vector(6 downto 0);       --! LVMB ADC SPI chip select. Used by ODMB VME. Connected to bank 67.
+    LVMB_SCLK    : out std_logic;                          --! LVMB ADC SPI clock. Used by ODMB VME. Connected to bank 68.
+    LVMB_SDIN    : out std_logic;                          --! LVMB ADC SPI input. Used by ODMB VME. Connected to bank 68.
+    LVMB_SDOUT_P : in std_logic;                           --! LVMB ADC SPI output. Used by ODMB VME. Connected to bank 67 as C_LVMB_SDOUT_P.
+    LVMB_SDOUT_N : in std_logic;                           --! LVMB ADC SPI output. Used by ODMB VME. Connected to bank 67 as C_LVMB_SDOUT_N.
 
     --------------------------------
     -- OTMB communication signals
     --------------------------------
-    OTMB        : in  std_logic_vector(35 downto 0);      -- "TMB[35:0]" in Bank 44-45
+    OTMB        : in  std_logic_vector(35 downto 0);      --! OTMB data. Used for packet building and PRBS test. Connected to bank 44-45 as "TMB[35:0]".
     RAWLCT      : in  std_logic_vector(6 downto 0);       -- Bank 45 <-- To be updated
     OTMB_DAV    : in  std_logic;                          -- "TMB_DAV" in Bank 45
     OTMB_FF_CLK : in  std_logic;                          -- "TMB_FF_CLK" in Bank 45
@@ -1047,6 +1048,9 @@ begin
   -------------------------------------------------------------------------------------------
   -- Handle CCB production test
   -------------------------------------------------------------------------------------------
+
+  -- Unused
+  CCB_L1A_RLS <= '0';
 
   -- From CCB - for production tests
   ccb_cmd_bxev <= CCB_CMD & CCB_EVCNTRES_B & CCB_BX_RST_B;

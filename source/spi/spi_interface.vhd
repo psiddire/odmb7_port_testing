@@ -266,7 +266,8 @@ END COMPONENT;
   do_in <= qspi_io(3 downto 1) & spi_mosi;
   spi_miso <= di_out(1) when PROM_SELECT='0' else
               CNFG_DATA_IN(5);
-  CNFG_DATA_DIR <= not dopin_ts(3) & not dopin_ts(2) & not dopin_ts(1) & not dopin_ts(0);
+  --CNFG_DATA_DIR <= not dopin_ts(3) & not dopin_ts(2) & not dopin_ts(1) & not dopin_ts(0);
+  CNFG_DATA_DIR <= dopin_ts(3 downto 0);
   
   qspi_io(3 downto 1) <= write_fifo_output(3 downto 1) when rising_edge(CLK);
 
