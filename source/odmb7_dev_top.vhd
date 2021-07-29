@@ -261,7 +261,7 @@ architecture Behavioral of odmb7_ucsb_dev is
       clk_lfclk      : out std_logic;   -- buffed LF clock
       clk_gp6        : out std_logic;
       clk_gp7        : out std_logic;
-      clk_mgtclk1    : out std_logic;   -- buffed ODIV2 port of the refclks, 160 MHz
+      clk_mgtclk1    : out std_logic;   -- buffed ODIV2 port of the refclks, CC160 MHz
       clk_mgtclk2    : out std_logic;   -- buffed ODIV2 port of the refclks, 160 MHz
       clk_mgtclk3    : out std_logic;   -- buffed ODIV2 port of the refclks, 160 MHz
       clk_mgtclk4    : out std_logic;   -- buffed ODIV2 port of the refclks, 160 MHz
@@ -493,7 +493,14 @@ architecture Behavioral of odmb7_ucsb_dev is
       DIAGOUT     : out std_logic_vector (17 downto 0); -- for debugging
       KILL        : in std_logic_vector(NCFEB+2 downto 1);
       LCT_ERR     : out std_logic;            -- To an LED in the original design
-      RST         : in std_logic
+      RST         : in std_logic;
+      L1ACNT_RST  : in std_logic;
+      BXCNT_RST   : in  std_logic;
+
+      --------------------
+      -- Data related 
+      --------------------
+      EOF_DATA     : in std_logic_vector(NFEB+2 downto 1);
       );
   end component;
 
@@ -624,7 +631,6 @@ architecture Behavioral of odmb7_ucsb_dev is
   --------------------------------------
   signal reset_pulse        : std_logic := '0';
   signal reset_pulse_q      : std_logic := '0';
-  signal l1acnt_rst         : std_logic := '0';
   signal l1acnt_rst_meta    : std_logic := '0';
   signal l1acnt_rst_sync    : std_logic := '0';
   signal l1a_reset_pulse    : std_logic := '0';
@@ -882,10 +888,13 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal diagout_inner : std_logic_vector(17 downto 0) := (others => '0');
 
   --------------------------------------
-  -- Data readout signals
+  -- DAQ related signals
   --------------------------------------
   signal odmb_data : std_logic_vector(15 downto 0) := (others => '0');
   signal odmb_data_sel : std_logic_vector(7 downto 0) := (others => '0');
+  signal bxcnt_rst          : std_logic := '0';
+  signal l1acnt_rst         : std_logic := '0';
+  signal ccb_l1acnt_rst, ccb_l1acnt_rst_q, ccb_bxrst_b_q : std_logic := '0';
 
   -- for TRGCNTRL
   constant push_dly    : integer := 63;  -- It needs to be > alct/otmb_push_dly
@@ -993,8 +1002,11 @@ begin
   dcfeb_extpls <= '0' when mask_pls = '1' else premask_extpls;
 
   --generate RESYNC, BC0, L1A, and L1A match signals to DCFEBs
+  --synchronization of CCB signals and push button
   ccb_bx0   <= not CCB_BX0_B;
   FD_CCBBX0 : FD port map(Q => ccb_bx0_q, C => cmsclk, D => ccb_bx0);
+  FD_CCBBX  : FD port map(Q => ccb_bxrst_b_q, C => cmsclk, D => ccb_bx_rst_b);
+  bxcnt_rst <= not ccb_bxrst_b_q;
 
   RESETPULSE      : PULSE2SAME port map(DOUT => reset_pulse, CLK_DOUT => cmsclk, RST => '0', DIN => reset);
   FD_RESETPULSE_Q : FD port map (Q => reset_pulse_q,     C => cmsclk, D => reset_pulse);
@@ -1408,7 +1420,12 @@ begin
       DIAGOUT => open,
       KILL => "000000000",
       LCT_ERR => open,            -- To an LED in the original design
-      RST     => reset
+      RST     => reset,
+      
+      L1ACNT_RST => l1acnt_rst,
+      BXCNT_RST  => bxcnt_rst,
+
+      EOF_DATA     => eof_data,
       );
 
   -------------------------------------------------------------------------------------------

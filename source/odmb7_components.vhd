@@ -38,9 +38,122 @@ PACKAGE odmb7_components is
       );
   end component;
 
-  --
-  --==--
-  --
+  component cafifo is
+    generic (
+      NFEB        : integer range 1 to 7   := 7;  -- Number of DCFEBS, 7 in the final design
+      CAFIFO_SIZE : integer range 1 to 128 := 128  -- Number of CAFIFO words
+      );  
+    port(
+
+      CSP_FREE_AGENT_PORT_LA_CTRL : inout std_logic_vector(35 downto 0);
+      clk                         : in    std_logic;
+      dduclk                      : in    std_logic;
+      l1acnt_rst                  : in    std_logic;
+      bxcnt_rst                   : in    std_logic;
+
+      BC0     : in std_logic;
+      CCB_BX0 : in std_logic;
+      BXRST   : in std_logic;
+      BX_DLY  : in integer range 0 to 4095;
+      PUSH_DLY  : in integer range 0 to 63;
+
+      l1a          : in std_logic;
+      l1a_match_in : in std_logic_vector(NFEB+2 downto 1);
+
+      pop : in std_logic;
+
+      eof_data    : in std_logic_vector(NFEB+2 downto 1);
+      alct_dv     : in std_logic;
+      otmb_dv     : in std_logic;
+      dcfeb0_dv   : in std_logic;
+      dcfeb0_data : in std_logic_vector(15 downto 0);
+      dcfeb1_dv   : in std_logic;
+      dcfeb1_data : in std_logic_vector(15 downto 0);
+      dcfeb2_dv   : in std_logic;
+      dcfeb2_data : in std_logic_vector(15 downto 0);
+      dcfeb3_dv   : in std_logic;
+      dcfeb3_data : in std_logic_vector(15 downto 0);
+      dcfeb4_dv   : in std_logic;
+      dcfeb4_data : in std_logic_vector(15 downto 0);
+      dcfeb5_dv   : in std_logic;
+      dcfeb5_data : in std_logic_vector(15 downto 0);
+      dcfeb6_dv   : in std_logic;
+      dcfeb6_data : in std_logic_vector(15 downto 0);
+
+      cafifo_l1a_match : out std_logic_vector(NFEB+2 downto 1);
+      cafifo_l1a_cnt   : out std_logic_vector(23 downto 0);
+      cafifo_l1a_dav   : out std_logic_vector(NFEB+2 downto 1);
+      cafifo_bx_cnt    : out std_logic_vector(11 downto 0);
+      cafifo_lost_pckt : out std_logic_vector(NFEB+2 downto 1);
+      cafifo_lone      : out std_logic;
+
+      ext_dcfeb_l1a_cnt7 : out std_logic_vector(23 downto 0);
+      dcfeb_l1a_dav7     : out std_logic;
+
+      cafifo_prev_next_l1a_match : out std_logic_vector(15 downto 0);
+      cafifo_prev_next_l1a       : out std_logic_vector(15 downto 0);
+      control_debug              : in  std_logic_vector(143 downto 0);
+      cafifo_debug               : out std_logic_vector(15 downto 0);
+      cafifo_wr_addr             : out std_logic_vector(7 downto 0);
+      cafifo_rd_addr             : out std_logic_vector(7 downto 0)
+      );
+
+  end component;
+
+  CONTROL_FSM_PM : CONTROL_FSM
+    generic map(NFEB => NFEB)
+    port map(
+      CSP_CONTROL_FSM_PORT_LA_CTRL => CSP_CONTROL_FSM_PORT_LA_CTRL,
+      CLK                          => dduclk,
+      CLKCMS                       => clk40,
+      RST                          => l1acnt_rst,
+      STATUS                       => status,
+
+-- From DMB_VME
+      RDFFNXT => rdffnxt,  -- from MBV (currently assigned as a signal to '0')
+      KILL => KILL,
+      
+-- to GigaBit Link
+      DOUT => ddu_data_inner,
+      DAV  => ddu_data_valid_inner,
+
+-- to Data FIFOs
+      OEFIFO_B  => data_fifo_oe,
+      RENFIFO_B => data_fifo_re,
+
+-- from Data FIFOs
+      FIFO_HALF_FULL => fifo_half_full,
+      FFOR_B         => fifo_empty_b,
+      DATAIN         => fifo_out(15 downto 0),
+      DATAIN_LAST    => fifo_eof,
+
+-- From JTAGCOM
+      JOEF => joef,                     -- from LOADFIFO
+
+-- From CONFREG and GA
+      DAQMBID => daqmbid,
+      AUTOKILLED_DCFEBS => AUTOKILLED_DCFEBS,
+
+-- FROM SW1
+      GIGAEN => LOGICH,
+
+-- TO CAFIFO
+      FIFO_POP => cafifo_pop,
+
+-- TO PCFIFO
+      EOF => eof,
+
+-- DEBUG
+      control_debug => control_debug_full,
+
+-- FROM CAFIFO
+      cafifo_l1a_dav   => cafifo_l1a_dav_out,
+      cafifo_l1a_match => cafifo_l1a_match_out_inner,
+      cafifo_l1a_cnt   => cafifo_l1a_cnt_out,
+      cafifo_bx_cnt    => cafifo_bx_cnt_out,
+      cafifo_lost_pckt => cafifo_lost_pckt_out,
+      cafifo_lone      => cafifo_lone
+      );
 
   -- GTH wizard wrapper for DCFEBs
   component gtwizard_ultrascale_0_example_wrapper

@@ -76,7 +76,42 @@ entity ODMB_CTRL is
     DIAGOUT     : out std_logic_vector (17 downto 0); -- for debugging
     KILL        : in std_logic_vector(NCFEB+2 downto 1);
     LCT_ERR     : out std_logic;            -- To an LED in the original design
-    RST         : in std_logic
+
+    BC0         : in std_logic;
+    CCB_BX0     : in std_logic;
+    BXRST       : in std_logic;
+    L1ACNT_RST  : in std_logic;
+    BXCNT_RST   : in std_logic;
+    RST         : in std_logic;
+
+    EOF_DATA     : in std_logic_vector(NFEB+2 downto 1);
+
+-- From ALCT,OTMB,DCFEBs to CAFIFO
+    ALCT_DV     : in std_logic;
+    OTMB_DV     : in std_logic;
+    DCFEB0_DV   : in std_logic;
+    DCFEB0_DATA : in std_logic_vector(15 downto 0);
+    DCFEB1_DV   : in std_logic;
+    DCFEB1_DATA : in std_logic_vector(15 downto 0);
+    DCFEB2_DV   : in std_logic;
+    DCFEB2_DATA : in std_logic_vector(15 downto 0);
+    DCFEB3_DV   : in std_logic;
+    DCFEB3_DATA : in std_logic_vector(15 downto 0);
+    DCFEB4_DV   : in std_logic;
+    DCFEB4_DATA : in std_logic_vector(15 downto 0);
+    DCFEB5_DV   : in std_logic;
+    DCFEB5_DATA : in std_logic_vector(15 downto 0);
+    DCFEB6_DV   : in std_logic;
+    DCFEB6_DATA : in std_logic_vector(15 downto 0);
+
+    EXT_DCFEB_L1A_CNT7 : out std_logic_vector(23 downto 0);
+    DCFEB_L1A_DAV7     : out std_logic;
+    CAFIFO_PREV_NEXT_L1A_MATCH : out std_logic_vector(15 downto 0);
+    CAFIFO_PREV_NEXT_L1A       : out std_logic_vector(15 downto 0);
+    CONTROL_DEBUG              : out std_logic_vector(15 downto 0);
+    CAFIFO_DEBUG               : out std_logic_vector(15 downto 0);
+    CAFIFO_WR_ADDR             : out std_logic_vector(7 downto 0);
+    CAFIFO_RD_ADDR             : out std_logic_vector(7 downto 0);
     );
 end ODMB_CTRL;
 
@@ -132,9 +167,16 @@ architecture Behavioral of ODMB_CTRL is
   signal CAL_LCT       : std_logic;
   signal cal_gtrg     : std_logic;
 
--- TRGCNTRL outputs
+-- internal signals
   signal cafifo_l1a_match_in_inner : std_logic_vector(NCFEB+2 downto 0);
   signal cafifo_push               : std_logic;  -- PUSH from TRGCNTRL to CAFIFO
+  signal cafifo_pop           : std_logic := '0';
+  signal cafifo_l1a_match_out_inner : std_logic_vector(NFEB+2 downto 1);
+  signal cafifo_l1a_cnt_out         : std_logic_vector(23 downto 0);
+  signal cafifo_l1a_dav_out         : std_logic_vector(NFEB+2 downto 1);
+  signal cafifo_bx_cnt_out          : std_logic_vector(11 downto 0);
+  signal cafifo_lost_pckt_out       : std_logic_vector(NFEB+2 downto 1);
+  signal cafifo_lone                : std_logic;
 
 begin
 
@@ -221,5 +263,123 @@ begin
       FIFO_L1A_MATCH  => cafifo_l1a_match_in_inner,
       LCT_ERR         => lct_err
       );
+
+  CAFIFO_PM : CAFIFO
+    generic map (NFEB => NFEB, CAFIFO_SIZE => CAFIFO_SIZE)
+    port map(
+      --CSP_FREE_AGENT_PORT_LA_CTRL => CSP_FREE_AGENT_PORT_LA_CTRL,
+      clk                         => clk40,
+      dduclk                      => clk80,
+      l1acnt_rst                  => l1acnt_rst,
+      bxcnt_rst                   => bxcnt_rst,
+
+      BC0     => bc0,
+      CCB_BX0 => ccb_bx0,
+      BXRST   => ccb_bxrst,
+      BX_DLY  => BX_DLY,
+      PUSH_DLY      => push_dly,
+
+      pop          => cafifo_pop,
+      l1a          => cafifo_push,
+      l1a_match_in => cafifo_l1a_match_in_inner(NFEB+2 downto 1),
+
+      eof_data => eof_data,
+
+
+      alct_dv     => alct_dv,
+      otmb_dv     => otmb_dv,
+      dcfeb0_dv   => dcfeb0_dv,
+      dcfeb0_data => dcfeb0_data,
+      dcfeb1_dv   => dcfeb1_dv,
+      dcfeb1_data => dcfeb1_data,
+      dcfeb2_dv   => dcfeb2_dv,
+      dcfeb2_data => dcfeb2_data,
+      dcfeb3_dv   => dcfeb3_dv,
+      dcfeb3_data => dcfeb3_data,
+      dcfeb4_dv   => dcfeb4_dv,
+      dcfeb4_data => dcfeb4_data,
+      dcfeb5_dv   => dcfeb5_dv,
+      dcfeb5_data => dcfeb5_data,
+      dcfeb6_dv   => dcfeb6_dv,
+      dcfeb6_data => dcfeb6_data,
+
+      cafifo_l1a_match => cafifo_l1a_match_out_inner,
+      cafifo_l1a_cnt   => cafifo_l1a_cnt_out,
+      cafifo_l1a_dav   => cafifo_l1a_dav_out,
+      cafifo_bx_cnt    => cafifo_bx_cnt_out,
+      cafifo_lost_pckt => cafifo_lost_pckt_out,
+      cafifo_lone      => cafifo_lone,
+
+      ext_dcfeb_l1a_cnt7 => ext_dcfeb_l1a_cnt7,
+      dcfeb_l1a_dav7     => dcfeb_l1a_dav7,
+
+      cafifo_prev_next_l1a_match => cafifo_prev_next_l1a_match,
+      cafifo_prev_next_l1a       => cafifo_prev_next_l1a,
+      control_debug              => control_debug_full,
+      cafifo_debug               => cafifo_debug,
+      cafifo_wr_addr             => cafifo_wr_addr,
+      cafifo_rd_addr             => cafifo_rd_addr
+      );
+
+  CONTROL_FSM_PM : CONTROL_FSM
+    generic map(NFEB => NFEB)
+    port map(
+      CSP_CONTROL_FSM_PORT_LA_CTRL => CSP_CONTROL_FSM_PORT_LA_CTRL,
+      CLK                          => clk80,
+      CLKCMS                       => clk40,
+      RST                          => l1acnt_rst,
+      STATUS                       => status,
+
+-- From DMB_VME
+      RDFFNXT => rdffnxt,  -- from MBV (currently assigned as a signal to '0')
+      KILL => KILL,
+      
+-- to GigaBit Link
+      DOUT => ddu_data_inner,
+      DAV  => ddu_data_valid_inner,
+
+-- to Data FIFOs
+      OEFIFO_B  => data_fifo_oe,
+      RENFIFO_B => data_fifo_re,
+
+-- from Data FIFOs
+      FIFO_HALF_FULL => fifo_half_full,
+      FFOR_B         => fifo_empty_b,
+      DATAIN         => fifo_out(15 downto 0),
+      DATAIN_LAST    => fifo_eof,
+
+-- From JTAGCOM
+      JOEF => joef,                     -- from LOADFIFO
+
+-- From CONFREG and GA
+      DAQMBID => daqmbid,
+      AUTOKILLED_DCFEBS => AUTOKILLED_DCFEBS,
+
+-- FROM SW1
+      GIGAEN => LOGICH,
+
+-- TO CAFIFO
+      FIFO_POP => cafifo_pop,
+
+-- TO PCFIFO
+      EOF => eof,
+
+-- DEBUG
+      control_debug => control_debug_full,
+
+-- FROM CAFIFO
+      cafifo_l1a_dav   => cafifo_l1a_dav_out,
+      cafifo_l1a_match => cafifo_l1a_match_out_inner,
+      cafifo_l1a_cnt   => cafifo_l1a_cnt_out,
+      cafifo_bx_cnt    => cafifo_bx_cnt_out,
+      cafifo_lost_pckt => cafifo_lost_pckt_out,
+      cafifo_lone      => cafifo_lone
+      );
+
+  cafifo_l1a_match_in  <= cafifo_l1a_match_in_inner(NFEB+2 downto 1);
+  cafifo_l1a_match_out <= cafifo_l1a_match_out_inner;
+  cafifo_l1a_dav       <= cafifo_l1a_dav_out;
+  cafifo_l1a_cnt       <= cafifo_l1a_cnt_out;
+  cafifo_bx_cnt        <= cafifo_bx_cnt_out;
 
 end Behavioral;
