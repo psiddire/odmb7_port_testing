@@ -40,7 +40,7 @@ PACKAGE odmb7_components is
 
   component cafifo is
     generic (
-      NFEB        : integer range 1 to 7   := 7;  -- Number of DCFEBS, 7 in the final design
+      NCFEB        : integer range 1 to 7   := 7;  -- Number of DCFEBS, 7 in the final design
       CAFIFO_SIZE : integer range 1 to 128 := 128  -- Number of CAFIFO words
       );  
     port(
@@ -58,11 +58,11 @@ PACKAGE odmb7_components is
       PUSH_DLY  : in integer range 0 to 63;
 
       l1a          : in std_logic;
-      l1a_match_in : in std_logic_vector(NFEB+2 downto 1);
+      l1a_match_in : in std_logic_vector(NCFEB+2 downto 1);
 
       pop : in std_logic;
 
-      eof_data    : in std_logic_vector(NFEB+2 downto 1);
+      eof_data    : in std_logic_vector(NCFEB+2 downto 1);
       alct_dv     : in std_logic;
       otmb_dv     : in std_logic;
       dcfeb0_dv   : in std_logic;
@@ -80,11 +80,11 @@ PACKAGE odmb7_components is
       dcfeb6_dv   : in std_logic;
       dcfeb6_data : in std_logic_vector(15 downto 0);
 
-      cafifo_l1a_match : out std_logic_vector(NFEB+2 downto 1);
+      cafifo_l1a_match : out std_logic_vector(NCFEB+2 downto 1);
       cafifo_l1a_cnt   : out std_logic_vector(23 downto 0);
-      cafifo_l1a_dav   : out std_logic_vector(NFEB+2 downto 1);
+      cafifo_l1a_dav   : out std_logic_vector(NCFEB+2 downto 1);
       cafifo_bx_cnt    : out std_logic_vector(11 downto 0);
-      cafifo_lost_pckt : out std_logic_vector(NFEB+2 downto 1);
+      cafifo_lost_pckt : out std_logic_vector(NCFEB+2 downto 1);
       cafifo_lone      : out std_logic;
 
       ext_dcfeb_l1a_cnt7 : out std_logic_vector(23 downto 0);
@@ -100,60 +100,64 @@ PACKAGE odmb7_components is
 
   end component;
 
-  CONTROL_FSM_PM : CONTROL_FSM
-    generic map(NFEB => NFEB)
-    port map(
-      CSP_CONTROL_FSM_PORT_LA_CTRL => CSP_CONTROL_FSM_PORT_LA_CTRL,
-      CLK                          => dduclk,
-      CLKCMS                       => clk40,
-      RST                          => l1acnt_rst,
-      STATUS                       => status,
+  component CONTROL_FSM is
+    generic (
+      NCFEB : integer range 1 to 7 := 5  -- Number of DCFEBS, 7 in the final design
+      );  
+    port (
+-- Chip Scope Pro Logic Analyzer control
+      CSP_CONTROL_FSM_PORT_LA_CTRL : inout std_logic_vector(35 downto 0);
+      RST                          : in    std_logic;
+      CLKCMS                       : in    std_logic;
+      CLK                          : in    std_logic;
+      STATUS                       : in    std_logic_vector(47 downto 0);
 
 -- From DMB_VME
-      RDFFNXT => rdffnxt,  -- from MBV (currently assigned as a signal to '0')
-      KILL => KILL,
-      
+      RDFFNXT : in std_logic;
+      KILL    : in std_logic_vector(NFEB+2 downto 1);
+
 -- to GigaBit Link
-      DOUT => ddu_data_inner,
-      DAV  => ddu_data_valid_inner,
+      DOUT : out std_logic_vector(15 downto 0);
+      DAV  : out std_logic;
 
--- to Data FIFOs
-      OEFIFO_B  => data_fifo_oe,
-      RENFIFO_B => data_fifo_re,
+-- to FIFOs
+      OEFIFO_B  : out std_logic_vector(NFEB+2 downto 1);
+      RENFIFO_B : out std_logic_vector(NFEB+2 downto 1);
 
--- from Data FIFOs
-      FIFO_HALF_FULL => fifo_half_full,
-      FFOR_B         => fifo_empty_b,
-      DATAIN         => fifo_out(15 downto 0),
-      DATAIN_LAST    => fifo_eof,
+-- from FIFOs
+      FIFO_HALF_FULL : in std_logic_vector(NFEB+2 downto 1);
+      FFOR_B         : in std_logic_vector(NFEB+2 downto 1);
+      DATAIN         : in std_logic_vector(15 downto 0);
+      DATAIN_LAST    : in std_logic;
 
--- From JTAGCOM
-      JOEF => joef,                     -- from LOADFIFO
+-- From LOADFIFO
+      JOEF : in std_logic_vector(NFEB+2 downto 1);
 
--- From CONFREG and GA
-      DAQMBID => daqmbid,
-      AUTOKILLED_DCFEBS => AUTOKILLED_DCFEBS,
+-- For headers/trailers
+      DAQMBID : in std_logic_vector(11 downto 0);  -- From CRATEID in SETFEBDLY, and GA
+      AUTOKILLED_DCFEBS  : in std_logic_vector(NFEB downto 1);
 
 -- FROM SW1
-      GIGAEN => LOGICH,
+      GIGAEN : in std_logic;
 
 -- TO CAFIFO
-      FIFO_POP => cafifo_pop,
+      FIFO_POP : out std_logic;
 
 -- TO PCFIFO
-      EOF => eof,
+      EOF : out std_logic;
 
 -- DEBUG
-      control_debug => control_debug_full,
+      control_debug : out std_logic_vector(143 downto 0);
 
 -- FROM CAFIFO
-      cafifo_l1a_dav   => cafifo_l1a_dav_out,
-      cafifo_l1a_match => cafifo_l1a_match_out_inner,
-      cafifo_l1a_cnt   => cafifo_l1a_cnt_out,
-      cafifo_bx_cnt    => cafifo_bx_cnt_out,
-      cafifo_lost_pckt => cafifo_lost_pckt_out,
-      cafifo_lone      => cafifo_lone
+      cafifo_l1a_dav   : in std_logic_vector(NFEB+2 downto 1);
+      cafifo_l1a_match : in std_logic_vector(NFEB+2 downto 1);
+      cafifo_l1a_cnt   : in std_logic_vector(23 downto 0);
+      cafifo_bx_cnt    : in std_logic_vector(11 downto 0);
+      cafifo_lost_pckt : in std_logic_vector(NFEB+2 downto 1);
+      cafifo_lone      : in std_logic
       );
+  end component;
 
   -- GTH wizard wrapper for DCFEBs
   component gtwizard_ultrascale_0_example_wrapper

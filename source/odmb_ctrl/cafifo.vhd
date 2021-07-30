@@ -15,7 +15,8 @@ use ieee.std_logic_unsigned.all;
 use work.ucsb_types.all;
 use unisim.vcomponents.all;
 use unimacro.vcomponents.all;
-use hdlmacro.hdlmacro.all;
+--use hdlmacro.hdlmacro.all;
+use work.odmb7_ip_components.all;
 
 entity cafifo is
   generic (
@@ -24,7 +25,7 @@ entity cafifo is
     );
   port(
 
-    CSP_FREE_AGENT_PORT_LA_CTRL : inout std_logic_vector(35 downto 0);
+    --CSP_FREE_AGENT_PORT_LA_CTRL : inout std_logic_vector(35 downto 0);
     clk                         : in    std_logic;
     dduclk                      : in    std_logic;
     l1acnt_rst                  : in    std_logic;
@@ -197,8 +198,8 @@ begin
 -- Initial assignments
 
   cafifo_wren_dd <= l1a when (cafifo_full = '0') else '0';
-  FDWREND : FD port map(cafifo_wren_d, CLK, cafifo_wren_dd);
-  FDWREN  : FD port map(cafifo_wren, CLK, cafifo_wren_d);
+  FDWREND : FD port map(Q => cafifo_wren_d, C => CLK, D => cafifo_wren_dd);
+  FDWREN  : FD port map(Q => cafifo_wren, C => CLK, D => cafifo_wren_d);
   --cafifo_wren <= or_reduce(l1a_match_in) when (cafifo_full = '0') else '0';  -- Avoids empty packets
   cafifo_rden    <= pop;
 
@@ -207,24 +208,24 @@ begin
   -- Adding flip-flops to make sure L1A_CNT has updated, and lone_in is synced with L1A_MATCH
   -- Using CROSSCLOCK to cross into the DDU clock domain
   -- Add FDC to LONE and L1A_MATCH to ensure L1A_CNT has been updated in the ODMB header
-  FDLONED      : FD port map(lone_in_reg_d, CLK, lone_in);
-  FDLONE       : FD port map(lone_in_reg, CLK, lone_in_reg_d);
+  FDLONED      : FD port map(Q => lone_in_reg_d, C => CLK, D => lone_in);
+  FDLONE       : FD port map(Q => lone_in_reg, C => CLK, D => lone_in_reg_d);
   GEN_L1AM_REG : for dev in 1 to NFEB+2 generate
-    FDL1AMD       : FD port map(l1a_match_in_reg_d(dev), CLK, l1a_match_in(dev));
-    FDL1AM        : FD port map(l1a_match_in_reg(dev), CLK, l1a_match_in_reg_d(dev));
-    CF_L1AM_FD    : FDC port map(current_l1a_match_d(dev), clk, L1ACNT_RST, current_l1a_match(dev));
-    CF_L1AM_FDD   : FDC port map(current_l1a_match_dd(dev), clk, L1ACNT_RST, current_l1a_match_d(dev));
-    CF_L1AM_CROSS : CROSSCLOCK port map(CAFIFO_L1A_MATCH(dev), dduclk, clk, L1ACNT_RST, current_l1a_match_dd(dev));
-    CF_DAV_CROSS  : CROSSCLOCK port map(CAFIFO_L1A_DAV(dev), dduclk, clk, L1ACNT_RST, current_l1a_dav(dev));
-    CF_LOST_CROSS : CROSSCLOCK port map(CAFIFO_LOST_PCKT(dev), dduclk, clk, L1ACNT_RST, current_lost_pckt(dev));
+    FDL1AMD       : FD port map(Q => l1a_match_in_reg_d(dev), C=> CLK, D => l1a_match_in(dev));
+    FDL1AM        : FD port map(Q => l1a_match_in_reg(dev), C => CLK, D => l1a_match_in_reg_d(dev));
+    CF_L1AM_FD    : FDC port map(Q => current_l1a_match_d(dev), C => clk, CLR => L1ACNT_RST, D => current_l1a_match(dev));
+    CF_L1AM_FDD   : FDC port map(Q => current_l1a_match_dd(dev), C => clk, CLR => L1ACNT_RST, D => current_l1a_match_d(dev));
+    CF_L1AM_CROSS : CROSSCLOCK port map(DOUT => CAFIFO_L1A_MATCH(dev), CLK_DOUT => dduclk, CLK_DIN => clk, RST => L1ACNT_RST, DIN => current_l1a_match_dd(dev));
+    CF_DAV_CROSS  : CROSSCLOCK port map(DOUT => CAFIFO_L1A_DAV(dev), CLK_DOUT => dduclk, CLK_DIN => clk, RST => L1ACNT_RST, DIN => current_l1a_dav(dev));
+    CF_LOST_CROSS : CROSSCLOCK port map(DOUT => CAFIFO_LOST_PCKT(dev), CLK_DOUT => dduclk, CLK_DIN => clk, RST => L1ACNT_RST, DIN => current_lost_pckt(dev));
   end generate GEN_L1AM_REG;
   GEN_BX_REG : for dev in 0 to 11 generate
-    FDL1AMD     : FD port map(bx_cnt_out_reg_d(dev), CLK, bx_cnt_out(dev));
-    FDL1AM      : FD port map(bx_cnt_out_reg(dev), CLK, bx_cnt_out_reg_d(dev));
-    CF_BX_CROSS : CROSSCLOCK port map(CAFIFO_BX_CNT(dev), dduclk, clk, L1ACNT_RST, current_bx_cnt(dev));
+    FDL1AMD     : FD port map(Q => bx_cnt_out_reg_d(dev), C => CLK, D => bx_cnt_out(dev));
+    FDL1AM      : FD port map(Q => bx_cnt_out_reg(dev), C => CLK, D => bx_cnt_out_reg_d(dev));
+    CF_BX_CROSS : CROSSCLOCK port map(DOUT => CAFIFO_BX_CNT(dev), CLK_DOUT => dduclk, CLK_DIN => clk, RST => L1ACNT_RST, DIN => current_bx_cnt(dev));
   end generate GEN_BX_REG;
   GEN_L1A_REG : for dev in 0 to 23 generate
-    CF_L1A_CROSS : CROSSCLOCK port map(CAFIFO_L1A_CNT(dev), dduclk, clk, L1ACNT_RST, current_l1a_cnt(dev));
+    CF_L1A_CROSS : CROSSCLOCK port map(DOUT => CAFIFO_L1A_CNT(dev), CLK_DOUT => dduclk, CLK_DIN => clk, RST => L1ACNT_RST, DIN => current_l1a_cnt(dev));
   end generate GEN_L1A_REG;
 
   current_l1a_match <= l1a_match(rd_addr_out);
@@ -234,9 +235,9 @@ begin
   current_l1a_dav   <= l1a_dav(rd_addr_out);
   current_lost_pckt <= lost_pckt(rd_addr_out);
 
-  CF_LONE_FD    : FDC port map(current_lone_d, clk, L1ACNT_RST, current_lone);
-  CF_LONE_FDD   : FDC port map(current_lone_dd, clk, L1ACNT_RST, current_lone_d);
-  CF_LONE_CROSS : CROSSCLOCK port map(CAFIFO_LONE, dduclk, clk, L1ACNT_RST, current_lone_dd);
+  CF_LONE_FD    : FDC port map(Q => current_lone_d, C => clk, CLR => L1ACNT_RST, D => current_lone);
+  CF_LONE_FDD   : FDC port map(Q => current_lone_dd, C => clk, CLR => L1ACNT_RST, D => current_lone_d);
+  CF_LONE_CROSS : CROSSCLOCK port map(DOUT => CAFIFO_LONE, CLK_DOUT => dduclk, CLK_DIN => clk, RST => L1ACNT_RST, DIN => current_lone_dd);
 
 -------------------- L1A Counter        --------------------
 
@@ -320,38 +321,53 @@ begin
 
 --------------------------- GENERATE DAVS and LOSTS  -------------------------------
 
-  L1ARESETPULSE  : NPULSE2SAME port map(l1acnt_fifo_rst, clk, '0', 5, l1acnt_rst);
+  L1ARESETPULSE  : NPULSE2SAME port map(DOUT => l1acnt_fifo_rst, CLK_DOUT => clk, RST => '0', NPULSE => 5, DIN => l1acnt_rst);
   GEN_L1ACNT_DAV : for dev in 1 to NFEB+2 generate
     l1acnt_dav_fifo_wr_en(dev) <= l1a_match_in_reg(dev);
     l1acnt_dav_fifo_in(dev)    <= l1a_cnt_out;
     --FIFORD       : FD port map(l1acnt_dav_fifo_rd_en(dev), clk, l1acnt_dav_fifo_rd_en_d(dev));
+  L1ACNT_DAV_FIFO_I : L1ACNT_DAV_FIFO
+  PORT MAP (
+      clk => clk,
+      srst => l1acnt_fifo_rst,
+      din => l1acnt_dav_fifo_in(dev),
+      wr_en => l1acnt_dav_fifo_wr_en(dev),
+      rd_en => l1acnt_dav_fifo_rd_en(dev),
+      dout => l1acnt_dav_fifo_out(dev),
+      full => l1acnt_dav_fifo_full(dev),
+      empty => l1acnt_dav_fifo_empty(dev),
+      wr_rst_busy => open,
+      rd_rst_busy => open 
+  );
+    --
+    -- this fifo is not available for ultrascale
+    --
+    --L1ACNT_DAV_FIFO : FIFO_DUALCLOCK_MACRO
+    --  generic map (
+    --    DEVICE                  => "VIRTEX6",  -- Target Device: "VIRTEX5", "VIRTEX6" 
+    --    ALMOST_FULL_OFFSET      => X"0080",  -- Sets almost full threshold
+    --    ALMOST_EMPTY_OFFSET     => X"0080",  -- Sets the almost empty threshold
+    --    DATA_WIDTH              => 24,  -- Valid values are 1-72 (37-72 only valid when FIFO_SIZE="36Kb")
+    --    FIFO_SIZE               => "18Kb",   -- Target BRAM, "18Kb" or "36Kb" 
+    --    FIRST_WORD_FALL_THROUGH => true)  -- Sets the FIFO FWFT to TRUE or FALSE
 
-    L1ACNT_DAV_FIFO : FIFO_DUALCLOCK_MACRO
-      generic map (
-        DEVICE                  => "VIRTEX6",  -- Target Device: "VIRTEX5", "VIRTEX6" 
-        ALMOST_FULL_OFFSET      => X"0080",  -- Sets almost full threshold
-        ALMOST_EMPTY_OFFSET     => X"0080",  -- Sets the almost empty threshold
-        DATA_WIDTH              => 24,  -- Valid values are 1-72 (37-72 only valid when FIFO_SIZE="36Kb")
-        FIFO_SIZE               => "18Kb",   -- Target BRAM, "18Kb" or "36Kb" 
-        FIRST_WORD_FALL_THROUGH => true)  -- Sets the FIFO FWFT to TRUE or FALSE
-
-      port map (
-        RDCOUNT     => l1acnt_dav_fifo_rd_cnt(dev),  -- Output read count
-        WRCOUNT     => l1acnt_dav_fifo_wr_cnt(dev),  -- Output write count
-        EMPTY       => l1acnt_dav_fifo_empty(dev),   -- Output empty
-        FULL        => l1acnt_dav_fifo_full(dev),    -- Output full
-        ALMOSTEMPTY => open,                         -- Output almost empty 
-        ALMOSTFULL  => open,                         -- Output almost full
-        RDERR       => open,                         -- Output read error
-        WRERR       => open,                         -- Output write error
-        WRCLK       => clk,                          -- Input clock
-        RDCLK       => clk,                          -- Input clock
-        RST         => l1acnt_fifo_rst,              -- Input reset
-        WREN        => l1acnt_dav_fifo_wr_en(dev),   -- Input write enable
-        DI          => l1acnt_dav_fifo_in(dev),      -- Input data
-        RDEN        => l1acnt_dav_fifo_rd_en(dev),   -- Input read enable
-        DO          => l1acnt_dav_fifo_out(dev)      -- Output data
-        );
+    --  port map (
+    --    RDCOUNT     => l1acnt_dav_fifo_rd_cnt(dev),  -- Output read count
+    --    WRCOUNT     => l1acnt_dav_fifo_wr_cnt(dev),  -- Output write count
+    --    EMPTY       => l1acnt_dav_fifo_empty(dev),   -- Output empty
+    --    FULL        => l1acnt_dav_fifo_full(dev),    -- Output full
+    --    ALMOSTEMPTY => open,                         -- Output almost empty 
+    --    ALMOSTFULL  => open,                         -- Output almost full
+    --    RDERR       => open,                         -- Output read error
+    --    WRERR       => open,                         -- Output write error
+    --    WRCLK       => clk,                          -- Input clock
+    --    RDCLK       => clk,                          -- Input clock
+    --    RST         => l1acnt_fifo_rst,              -- Input reset
+    --    WREN        => l1acnt_dav_fifo_wr_en(dev),   -- Input write enable
+    --    DI          => l1acnt_dav_fifo_in(dev),      -- Input data
+    --    RDEN        => l1acnt_dav_fifo_rd_en(dev),   -- Input read enable
+    --    DO          => l1acnt_dav_fifo_out(dev)      -- Output data
+    --    );
   end generate GEN_L1ACNT_DAV;
 
   DAV_LOST_PRO : process(L1ACNT_RST, CLK, cafifo_rden, rd_addr_out, l1a_dav_en, lost_pckt_en)
@@ -460,8 +476,8 @@ begin
 
 -- Address Counters
 
-  FD_WREN : FDC port map(cafifo_wren_q, CLK, L1ACNT_RST, cafifo_wren);
-  FD_RDEN : FDC port map(cafifo_rden_q, CLK, L1ACNT_RST, cafifo_rden);
+  FD_WREN : FDC port map(Q => cafifo_wren_q, C => CLK, CLR => L1ACNT_RST, D => cafifo_wren);
+  FD_RDEN : FDC port map(Q => cafifo_rden_q, C => CLK, CLR => L1ACNT_RST, D => cafifo_rden);
 
   addr_counter : process (clk, wr_addr_en, rd_addr_en, l1acnt_rst)
   begin
@@ -577,13 +593,13 @@ begin
   cafifo_prev_next_l1a       <= l1a_cnt(prev_rd_addr)(7 downto 0) & l1a_cnt(next_rd_addr)(7 downto 0);
 
 -- Chip ScopePro ILA core
-  csp_systemtest_la_pm : csp_systemtest_la
-    port map (
-      CONTROL => CSP_FREE_AGENT_PORT_LA_CTRL,
-      CLK     => CLK,                   -- Good ol' 40MHz clock here
-      DATA    => free_agent_la_data,
-      TRIG0   => free_agent_la_trig
-      );
+--  csp_systemtest_la_pm : csp_systemtest_la
+--    port map (
+--      CONTROL => CSP_FREE_AGENT_PORT_LA_CTRL,
+--      CLK     => CLK,                   -- Good ol' 40MHz clock here
+--      DATA    => free_agent_la_data,
+--      TRIG0   => free_agent_la_trig
+--      );
 
   bad_l1a_lone <= not or_reduce(l1a_match_in_reg) and not lone_in_reg and cafifo_wren;
   bad_rdwr_addr <= '1' when (rd_addr_out /= wr_addr_out and or_reduce(l1a_match(rd_addr_out)) = '0'
@@ -630,7 +646,7 @@ begin
   dcfeb_dv <= dcfeb6_dv & dcfeb5_dv & dcfeb4_dv & dcfeb3_dv & dcfeb2_dv & dcfeb1_dv & dcfeb0_dv;
 
   -- Generate BX_CNT
-  DS_BX0_PUSH : DELAY_SIGNAL port map(ccb_bx0_delayed, CLK, PUSH_DLY, CCB_BX0);
+  DS_BX0_PUSH : DELAY_SIGNAL port map(DOUT => ccb_bx0_delayed, CLK => CLK, NCYCLES => PUSH_DLY, DIN => CCB_BX0);
   bx_cnt_clr <= BC0 or BXRST or ccb_bx0_delayed;
   bx_default <= nbx_dmb_odmb + bx_dly when bx_dly < nbx_lhc_orbit-nbx_dmb_odmb else
                 nbx_dmb_odmb + bx_dly - nbx_lhc_orbit when bx_dly < nbx_lhc_orbit else

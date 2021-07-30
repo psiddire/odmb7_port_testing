@@ -37,13 +37,13 @@
     <Option Name="WTVcsLaunchSim" Val="0"/>
     <Option Name="WTRivieraLaunchSim" Val="0"/>
     <Option Name="WTActivehdlLaunchSim" Val="0"/>
-    <Option Name="WTXSimExportSim" Val="100"/>
-    <Option Name="WTModelSimExportSim" Val="100"/>
-    <Option Name="WTQuestaExportSim" Val="100"/>
-    <Option Name="WTIesExportSim" Val="100"/>
-    <Option Name="WTVcsExportSim" Val="100"/>
-    <Option Name="WTRivieraExportSim" Val="100"/>
-    <Option Name="WTActivehdlExportSim" Val="100"/>
+    <Option Name="WTXSimExportSim" Val="105"/>
+    <Option Name="WTModelSimExportSim" Val="105"/>
+    <Option Name="WTQuestaExportSim" Val="105"/>
+    <Option Name="WTIesExportSim" Val="105"/>
+    <Option Name="WTVcsExportSim" Val="105"/>
+    <Option Name="WTRivieraExportSim" Val="105"/>
+    <Option Name="WTActivehdlExportSim" Val="105"/>
     <Option Name="GenerateIPUpgradeLog" Val="TRUE"/>
     <Option Name="XSimRadix" Val="hex"/>
     <Option Name="XSimTimeUnit" Val="ns"/>
@@ -67,6 +67,20 @@
         </FileInfo>
       </File>
       <File Path="$PPRDIR/../ip/gtwiz_cfeb_r7_v2/gtwizard_ultrascale_0.xci">
+        <FileInfo>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PSRCDIR/sources_1/ip/L1ACNT_DAV_FIFO/L1ACNT_DAV_FIFO.xci">
+        <FileInfo>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PPRDIR/../ip/ila_trgcntrl/ila_trgcntrl.xci">
         <FileInfo>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
@@ -163,7 +177,19 @@
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
-      <File Path="$PPRDIR/../source/odmb_ctrl/calibtrg.vhd">
+      <File Path="$PPRDIR/../source/odmb7_ip_components.vhd">
+        <FileInfo>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PPRDIR/../source/odmb_ctrl/cafifo.vhd">
+        <FileInfo>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PPRDIR/../source/odmb_vme/package_latches_flipflops.vhd">
         <FileInfo>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="simulation"/>
@@ -193,7 +219,19 @@
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
+      <File Path="$PPRDIR/../source/odmb_ctrl/control_fsm.vhd">
+        <FileInfo>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
       <File Path="$PPRDIR/../source/utils/count_edges.vhd">
+        <FileInfo>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PPRDIR/../source/utils/crossclock.vhd">
         <FileInfo>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="simulation"/>
@@ -673,6 +711,22 @@
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
+      <File Path="$PSRCDIR/sources_1/ip/datafifo_40mhz/datafifo_40mhz.xci">
+        <FileInfo>
+          <Attr Name="AutoDisabled" Val="1"/>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PSRCDIR/sources_1/ip/datafifo_dcfeb/datafifo_dcfeb.xci">
+        <FileInfo>
+          <Attr Name="AutoDisabled" Val="1"/>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
       <Config>
         <Option Name="DesignMode" Val="RTL"/>
         <Option Name="TopModule" Val="odmb7_ucsb_dev"/>
@@ -718,6 +772,21 @@
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
+      <File Path="$PPRDIR/../simulation/waveforms/Firmware_tb_behav_lvmb.wcfg">
+        <FileInfo>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PPRDIR/../simulation/waveforms/Firmware_tb_behav_voltageMon.wcfg">
+        <FileInfo>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PPRDIR/../simulation/waveforms/Firmware_tb_behav_trgcntrl.wcfg">
+        <FileInfo>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
       <Config>
         <Option Name="DesignMode" Val="RTL"/>
         <Option Name="TopModule" Val="Firmware_tb"/>
@@ -729,7 +798,7 @@
         <Option Name="SrcSet" Val="sources_1"/>
         <Option Name="XSimWcfgFile" Val="$PPRDIR/../simulation/waveforms/Firmware_tb_behav_lvmb.wcfg"/>
         <Option Name="XSimWcfgFile" Val="$PPRDIR/../simulation/waveforms/Firmware_tb_behav_voltageMon.wcfg"/>
-        <Option Name="XSimWcfgFile" Val="$PPRDIR/SysMon.wcfg"/>
+        <Option Name="XSimWcfgFile" Val="$PPRDIR/../simulation/waveforms/Firmware_tb_behav_trgcntrl.wcfg"/>
       </Config>
     </FileSet>
     <FileSet Name="utils_1" Type="Utils" RelSrcDir="$PSRCDIR/utils_1">
@@ -865,7 +934,9 @@
         <Step Id="phys_opt_design" EnableStepBool="1"/>
         <Step Id="route_design"/>
         <Step Id="post_route_phys_opt_design"/>
-        <Step Id="write_bitstream"/>
+        <Step Id="write_bitstream">
+          <Option Id="BinFile">1</Option>
+        </Step>
       </Strategy>
       <GeneratedRun Dir="$PRUNDIR" File="gen_run.xml"/>
       <ReportStrategy Name="Vivado Implementation Default Reports" Flow="Vivado Implementation 2019"/>
