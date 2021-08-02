@@ -4,8 +4,8 @@ library ieee;
 library work;
 library unisim;
 library hdlmacro;
-use hdlmacro.hdlmacro.CB16CE;
-use hdlmacro.hdlmacro.IFD_1;
+--use hdlmacro.hdlmacro.CB16CE;
+--use hdlmacro.hdlmacro.IFD_1;
 use unisim.vcomponents.all;
 use work.ucsb_types.all;
 use ieee.std_logic_1164.all;
@@ -22,7 +22,7 @@ entity CONTROL_FSM is
 
 -- Chip Scope Pro Logic Analyzer control
 
-    CSP_CONTROL_FSM_PORT_LA_CTRL : inout std_logic_vector(35 downto 0);
+    --CSP_CONTROL_FSM_PORT_LA_CTRL : inout std_logic_vector(35 downto 0);
 
     RST    : in std_logic;
     CLKCMS : in std_logic;
@@ -153,13 +153,13 @@ architecture CONTROL_arch of CONTROL_FSM is
 begin
 
   -- csp ILA core
-  csp_control_fsm_la_pm : csp_control_fsm_la
-    port map (
-      CONTROL => CSP_CONTROL_FSM_PORT_LA_CTRL,
-      CLK     => CLK,
-      DATA    => control_fsm_la_data,
-      TRIG0   => control_fsm_la_trig
-      );
+  --csp_control_fsm_la_pm : csp_control_fsm_la
+  --  port map (
+  --    CONTROL => CSP_CONTROL_FSM_PORT_LA_CTRL,
+  --    CLK     => CLK,
+  --    DATA    => control_fsm_la_data,
+  --    TRIG0   => control_fsm_la_trig
+  --    );
 
   expect_pckt         <= or_reduce(cafifo_l1a_match);
   dev_cnt_svl         <= std_logic_vector(to_unsigned(dev_cnt, 5));
@@ -167,10 +167,10 @@ begin
   lone_cnt_svl    <= std_logic_vector(to_unsigned(lone_cnt, 5));
   bad_l1a_lone<= '1' when (or_reduce(cafifo_l1a_match) = '0' and cafifo_lone = '0'
                            and control_current_state /= IDLE and control_current_state /= WAIT_IDLE) else '0';
-  FD_CFL1A : FDVEC generic map(0, 23) port map(cafifo_l1a_cnt_reg, clk, rst, CAFIFO_L1A_CNT);
+  FD_CFL1A : FDVEC generic map(0, 23) port map(DOUT => cafifo_l1a_cnt_reg, CLK => clk, RST => rst, DIN => CAFIFO_L1A_CNT);
   bad_l1a_change <= '1' when (cafifo_l1a_cnt_reg /= CAFIFO_L1A_CNT and control_current_state /= IDLE
                               and control_current_state /= WAIT_IDLE) else '0';
-  FDBADL1A : PULSE2SLOW port map(bad_l1a_change40, CLKCMS, CLK, RST, bad_l1a_change);
+  FDBADL1A : PULSE2SLOW port map(DOUT => bad_l1a_change40, CLK_DOUT => CLKCMS, CLK_DIN => CLK, RST => RST, DIN => bad_l1a_change);
 -- trigger assignments (8 bits)
   control_fsm_la_trig <= expect_pckt & q_datain_last & bad_l1a_lone  & cafifo_lone & CAFIFO_L1A_CNT(3 downto 0);
   control_fsm_la_data <= x"00" & std_logic_vector(to_unsigned(wait_dev_cnt, 4)) --[119:116]
@@ -191,10 +191,10 @@ begin
                    & current_state_svl;
 
 -- Needed because DATAIN_LAST does not arrive during the last word
-  FDLAST : FD port map(q_datain_last, clk, DATAIN_LAST);
+  FDLAST : FD port map(Q => q_datain_last, C => clk, D => DATAIN_LAST);
 
 -- 40 MHz pulse for FIFO_POP
-  FDPOP : PULSE2SLOW port map(fifo_pop_inner, CLKCMS, CLK, RST, fifo_pop_80);
+  FDPOP : PULSE2SLOW port map(DOUT => fifo_pop_inner, CLK_DOUT => CLKCMS, CLK_DIN => CLK, RST => RST, DIN => fifo_pop_80);
 
   control_fsm_regs : process (control_next_state, RST, CLK, dev_cnt, dev_cnt_en, tx_cnt,
                               tx_cnt_en, tx_cnt_rst, hdr_tail_cnt_en, lone_cnt_en, wait_cnt_en, wait_dev_cnt_en)
@@ -405,11 +405,11 @@ begin
     end case;
   end process;
 
-  FD_DAV  : FD port map(dav_inner, CLK, dav_d);
-  EOF_DAV : FD port map(eof_inner, CLK, eof_d);
+  FD_DAV  : FD port map(Q => dav_inner, C => CLK, D => dav_d);
+  EOF_DAV : FD port map(Q => eof_inner, C => CLK, D => eof_d);
 
   GEN_FD_DOUT : for INDEX in 0 to 15 generate
-    FD_DOUT : FD port map (dout_inner(INDEX), CLK, dout_d(INDEX));
+    FD_DOUT : FD port map (Q => dout_inner(INDEX), C => CLK, D => dout_d(INDEX));
   end generate GEN_FD_DOUT;
 
   crc(4 downto 0) <= reg_crc(20 downto 16);
@@ -437,7 +437,7 @@ begin
 
   GEN_REG_CRC : for K in 0 to 23 generate
   begin
-    FDCE_REG_CRC : FDCE port map (REG_CRC(K), CLK, crc_en, crc_clr, CRC(K));
+    FDCE_REG_CRC : FDCE port map (D => REG_CRC(K), C => CLK, CE => crc_en, CLR => crc_clr, Q => CRC(K));
   end generate GEN_REG_CRC;
 
   crc_clr <= '1' when control_current_state = WAIT_IDLE
