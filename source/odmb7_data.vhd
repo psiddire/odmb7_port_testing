@@ -14,8 +14,6 @@ use work.ucsb_types.all;
 entity odmb7_data is
     generic (
       NCFEB       : integer range 1 to 7 := 7  -- Number of DCFEBS, 7 for ME1/1, 5
-      type dcfeb_data_type is array (NCFEB downto 1) of std_logic_vector(15 downto 0);
-      type dcfeb_data_type_ext is array (NCFEB downto 1) of std_logic_vector(15 downto 0);
       );
   port (
 
@@ -44,13 +42,33 @@ entity odmb7_data is
     OTMB_DATA_IN       : in std_logic_vector(17 downto 0);
     ALCT_DATA_IN       : in std_logic_vector(17 downto 0);
 
-    DCFEB_DV_IN        : out std_logic_vector(NCFEB downto 1);
-    DCFEB_DATA_IN      : out dcfeb_data_type(NCFEB downto 1);
+    DCFEB_DV_IN        : in std_logic_vector(NCFEB downto 1);
 
-    OTMB_FIFO_OUT       : out std_logic_vector(17 downto 0);
-    ALCT_FIFO_OUT       : out std_logic_vector(17 downto 0);
-    DCFEB_FIFO_OUT      : out dcfeb_data_type_ext(NCFEB downto 1);
+    DCFEB1_DATA_IN      : in std_logic_vector(15 downto 0);
+    DCFEB2_DATA_IN      : in std_logic_vector(15 downto 0);
+    DCFEB3_DATA_IN      : in std_logic_vector(15 downto 0);
+    DCFEB4_DATA_IN      : in std_logic_vector(15 downto 0);
+    DCFEB5_DATA_IN      : in std_logic_vector(15 downto 0);
+    DCFEB6_DATA_IN      : in std_logic_vector(15 downto 0);
+    DCFEB7_DATA_IN      : in std_logic_vector(15 downto 0);
 
+    OTMB_FIFO_DATA_OUT       : out std_logic_vector(17 downto 0);
+    OTMB_FIFO_DV       : out std_logic;
+
+    ALCT_FIFO_DATA_OUT       : out std_logic_vector(17 downto 0);
+    ALCT_FIFO_DV       : out std_logic;
+
+    DCFEB1_FIFO_OUT      : out std_logic_vector(17 downto 0);
+    DCFEB2_FIFO_OUT      : out std_logic_vector(17 downto 0);
+    DCFEB3_FIFO_OUT      : out std_logic_vector(17 downto 0);
+    DCFEB4_FIFO_OUT      : out std_logic_vector(17 downto 0);
+    DCFEB5_FIFO_OUT      : out std_logic_vector(17 downto 0);
+    DCFEB6_FIFO_OUT      : out std_logic_vector(17 downto 0);
+    DCFEB7_FIFO_OUT      : out std_logic_vector(17 downto 0);
+    DCFEB_DV_OUT         : out std_logic_vector(NCFEB downto 1);
+
+    DATA_FIFO_RE        : in std_logic_vector (NCFEB+2 downto 1);
+    DATA_FIFO_EMPTY     : out std_logic;
     DATA_FIFO_HALF_FULL : out std_logic_vector (NCFEB+2 downto 1)
 
     );
@@ -126,7 +144,6 @@ architecture data_Arch of odmb7_data is
 
   signal alct_fifo_data_valid : std_logic;
   signal alct_fifo_data_in    : std_logic_vector(17 downto 0);
-  signal alct_fifo_data_out   : std_logic_vector (17 downto 0);
   signal alct_fifo_full       : std_logic;
   signal alct_fifo_empty      : std_logic;
 
@@ -141,7 +158,6 @@ architecture data_Arch of odmb7_data is
 
   signal otmb_fifo_data_valid : std_logic;
   signal otmb_fifo_data_in    : std_logic_vector(17 downto 0);
-  signal otmb_fifo_data_out   : std_logic_vector (17 downto 0);
   signal otmb_fifo_full       : std_logic;
   signal otmb_fifo_empty      : std_logic;
 
@@ -174,11 +190,15 @@ architecture data_Arch of odmb7_data is
 
   type dcfeb_fifo_data_type is array (NCFEB downto 1) of std_logic_vector(15 downto 0);
   signal dcfeb_fifo_in : dcfeb_fifo_data_type;
+  signal dcfeb_data : dcfeb_fifo_data_type;
+  signal dcfeb_data_in_inner : dcfeb_fifo_data_type;
 
   type ext_dcfeb_fifo_data_type is array (NCFEB downto 1) of std_logic_vector(17 downto 0);
   signal eofgen_dcfeb_fifo_in    : ext_dcfeb_fifo_data_type;
   signal eofgen_dcfeb_data_valid : std_logic_vector(NCFEB downto 1);
   signal dcfeb_fifo_out          : ext_dcfeb_fifo_data_type;
+
+  signal data_fifo_we            : std_logic_vector (NCFEB+2 downto 1);
   signal pulse_eof40, pulse_eof160  : std_logic_vector(NCFEB downto 1);
 
 begin
@@ -281,6 +301,14 @@ begin
   PULSEEOFALCT : PULSE2SAME port map(DOUT => eof_data(NCFEB+2), CLK_DOUT => cmsclk, RST => reset, DIN => alct_fifo_data_in(17));
   PULSEEOFOTMB : PULSE2SAME port map(DOUT => eof_data(NCFEB+1), CLK_DOUT => cmsclk, RST => reset, DIN => otmb_fifo_data_in(17));
 
+  dcfeb_data_in_inner(1) <= dcfeb1_data_in;
+  dcfeb_data_in_inner(2) <= dcfeb2_data_in;
+  dcfeb_data_in_inner(3) <= dcfeb3_data_in;
+  dcfeb_data_in_inner(4) <= dcfeb4_data_in;
+  dcfeb_data_in_inner(5) <= dcfeb5_data_in;
+  dcfeb_data_in_inner(6) <= dcfeb6_data_in;
+  dcfeb_data_in_inner(7) <= dcfeb7_data_in;
+  
   GEN_DCFEB : for I in NCFEB downto 1 generate
   begin
 
@@ -311,7 +339,7 @@ begin
     dcfeb_data_valid_d(I) <= '0' when kill(I) = '1' else
                              dcfeb_dv_in(I) when (gen_dcfeb_sel = '0') else
                              gen_dcfeb_data_valid(I);
-    dcfeb_data(I) <= dcfeb_data_in(I) when (gen_dcfeb_sel = '0') else gen_dcfeb_data(I);
+    dcfeb_data(I) <= dcfeb_data_in_inner(I) when (gen_dcfeb_sel = '0') else gen_dcfeb_data(I);
 
     FD_DCFEBDV   : FDC port map(Q => dcfeb_data_valid(I), C => sysclk160, CLR => reset, D => dcfeb_data_valid_d(I));
     FD_DCFEBDATA : FDVEC port map(DOUT => dcfeb_fifo_in(I), CLK => sysclk160, RST => reset, DIN => dcfeb_data(I));
@@ -355,10 +383,25 @@ begin
     pulse_eof160(i) <= eofgen_dcfeb_fifo_in(I)(17) and not kill(i);
     PULSEEOFDCFEB : PULSE2SLOW port map(DOUT => pulse_eof40(i), CLK_DOUT => cmsclk, CLK_DIN => sysclk160, RST => reset, DIN => pulse_eof160(i));
     DS_EOF_PUSH   : DELAY_SIGNAL generic map(push_dlyp4) port map(DOUT => eof_data(I), CLK => cmsclk, NCYCLES => push_dlyp4, DIN => pulse_eof40(I));
+
+    data_fifo_we(I) <= eofgen_dcfeb_data_valid(I) and datafifo_mask and not dcfeb_fifo_rst(I);
+    data_fifo_we(NCFEB+2) <= alct_fifo_data_valid and datafifo_mask;
+    data_fifo_we(NCFEB+1) <= otmb_fifo_data_valid and datafifo_mask;
+
   end generate GEN_DCFEB;
 
-  data_fifo_we(I) <= eofgen_dcfeb_data_valid(I) and datafifo_mask and not dcfeb_fifo_rst(I);
-  data_fifo_we(NFEB+2) <= alct_fifo_data_valid and datafifo_mask;
-  data_fifo_we(NFEB+1) <= otmb_fifo_data_valid and datafifo_mask;
+  dcfeb1_fifo_out <= dcfeb_fifo_out(1);
+  dcfeb2_fifo_out <= dcfeb_fifo_out(2);
+  dcfeb3_fifo_out <= dcfeb_fifo_out(3);
+  dcfeb4_fifo_out <= dcfeb_fifo_out(4);
+  dcfeb5_fifo_out <= dcfeb_fifo_out(5);
+  dcfeb6_fifo_out <= dcfeb_fifo_out(6);
+  dcfeb7_fifo_out <= dcfeb_fifo_out(7);
 
+  alct_fifo_dv <= alct_fifo_data_valid;
+  otmb_fifo_dv <= otmb_fifo_data_valid;
+
+  dcfeb_dv_out <= dcfeb_data_valid;
+
+  data_fifo_empty <= alct_fifo_empty & otmb_fifo_empty & dcfeb_fifo_empty;
 end data_Arch;

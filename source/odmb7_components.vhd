@@ -66,19 +66,19 @@ PACKAGE odmb7_components is
       alct_dv     : in std_logic;
       otmb_dv     : in std_logic;
       dcfeb0_dv   : in std_logic;
-      dcfeb0_data : in std_logic_vector(15 downto 0);
+      --dcfeb0_data : in std_logic_vector(15 downto 0);
       dcfeb1_dv   : in std_logic;
-      dcfeb1_data : in std_logic_vector(15 downto 0);
+      --dcfeb1_data : in std_logic_vector(15 downto 0);
       dcfeb2_dv   : in std_logic;
-      dcfeb2_data : in std_logic_vector(15 downto 0);
+      --dcfeb2_data : in std_logic_vector(15 downto 0);
       dcfeb3_dv   : in std_logic;
-      dcfeb3_data : in std_logic_vector(15 downto 0);
+      --dcfeb3_data : in std_logic_vector(15 downto 0);
       dcfeb4_dv   : in std_logic;
-      dcfeb4_data : in std_logic_vector(15 downto 0);
+      --dcfeb4_data : in std_logic_vector(15 downto 0);
       dcfeb5_dv   : in std_logic;
-      dcfeb5_data : in std_logic_vector(15 downto 0);
+      --dcfeb5_data : in std_logic_vector(15 downto 0);
       dcfeb6_dv   : in std_logic;
-      dcfeb6_data : in std_logic_vector(15 downto 0);
+      --dcfeb6_data : in std_logic_vector(15 downto 0);
 
       cafifo_l1a_match : out std_logic_vector(NCFEB+2 downto 1);
       cafifo_l1a_cnt   : out std_logic_vector(23 downto 0);
@@ -114,28 +114,28 @@ PACKAGE odmb7_components is
 
 -- From DMB_VME
       RDFFNXT : in std_logic;
-      KILL    : in std_logic_vector(NFEB+2 downto 1);
+      KILL    : in std_logic_vector(NCFEB+2 downto 1);
 
 -- to GigaBit Link
       DOUT : out std_logic_vector(15 downto 0);
       DAV  : out std_logic;
 
 -- to FIFOs
-      OEFIFO_B  : out std_logic_vector(NFEB+2 downto 1);
-      RENFIFO_B : out std_logic_vector(NFEB+2 downto 1);
+      OEFIFO_B  : out std_logic_vector(NCFEB+2 downto 1);
+      RENFIFO_B : out std_logic_vector(NCFEB+2 downto 1);
 
 -- from FIFOs
-      FIFO_HALF_FULL : in std_logic_vector(NFEB+2 downto 1);
-      FFOR_B         : in std_logic_vector(NFEB+2 downto 1);
+      FIFO_HALF_FULL : in std_logic_vector(NCFEB+2 downto 1);
+      FFOR_B         : in std_logic_vector(NCFEB+2 downto 1);
       DATAIN         : in std_logic_vector(15 downto 0);
       DATAIN_LAST    : in std_logic;
 
 -- From LOADFIFO
-      JOEF : in std_logic_vector(NFEB+2 downto 1);
+      JOEF : in std_logic_vector(NCFEB+2 downto 1);
 
 -- For headers/trailers
       DAQMBID : in std_logic_vector(11 downto 0);  -- From CRATEID in SETFEBDLY, and GA
-      AUTOKILLED_DCFEBS  : in std_logic_vector(NFEB downto 1);
+      AUTOKILLED_DCFEBS  : in std_logic_vector(NCFEB downto 1);
 
 -- FROM SW1
       GIGAEN : in std_logic;
@@ -150,11 +150,11 @@ PACKAGE odmb7_components is
       control_debug : out std_logic_vector(143 downto 0);
 
 -- FROM CAFIFO
-      cafifo_l1a_dav   : in std_logic_vector(NFEB+2 downto 1);
-      cafifo_l1a_match : in std_logic_vector(NFEB+2 downto 1);
+      cafifo_l1a_dav   : in std_logic_vector(NCFEB+2 downto 1);
+      cafifo_l1a_match : in std_logic_vector(NCFEB+2 downto 1);
       cafifo_l1a_cnt   : in std_logic_vector(23 downto 0);
       cafifo_bx_cnt    : in std_logic_vector(11 downto 0);
-      cafifo_lost_pckt : in std_logic_vector(NFEB+2 downto 1);
+      cafifo_lost_pckt : in std_logic_vector(NCFEB+2 downto 1);
       cafifo_lone      : in std_logic
       );
   end component;
@@ -235,6 +235,28 @@ PACKAGE odmb7_components is
       );
   end component;
 
+  component CCBCODE is
+    port (
+      CCB_CMD      : in  std_logic_vector(5 downto 0);
+      CCB_CMD_S    : in  std_logic;
+      CCB_DATA     : in  std_logic_vector(7 downto 0);
+      CCB_DATA_S   : in  std_logic;
+      CMSCLK       : in  std_logic;
+      CCB_BXRST_B  : in  std_logic;
+      CCB_BX0_B    : in  std_logic;
+      CCB_L1ARST_B : in  std_logic;
+      CCB_CLKEN    : in  std_logic;
+      BX0          : out std_logic;
+      BXRST        : out std_logic;
+      L1ARST       : out std_logic;
+      CLKEN        : out std_logic;
+      BC0          : out std_logic;
+      L1ASRST      : out std_logic;
+      TTCCAL       : out std_logic_vector(2 downto 0)
+      );        
+  end component;
+
+ 
   -- somehow this gives error during compilation in simulation, in sythesis is
   -- fine
   --COMPONENT vio_cfeb

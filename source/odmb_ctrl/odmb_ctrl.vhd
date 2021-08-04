@@ -24,6 +24,15 @@ entity ODMB_CTRL is
     CLK80       : in std_logic;
     CLK40       : in std_logic;
 
+    CCB_CMD      : in  std_logic_vector (5 downto 0);  -- ccbcmnd(5 downto 0) - from J3
+    CCB_CMD_S    : in  std_logic;       -- ccbcmnd(6) - from J3
+    CCB_DATA     : in  std_logic_vector (7 downto 0);  -- ccbdata(7 downto 0) - from J3
+    CCB_DATA_S   : in  std_logic;       -- ccbdata(8) - from J3
+    CCB_BX0_B    : in  std_logic;       -- bx0 - from J3
+    CCB_BXRST_B  : in  std_logic;       -- bxrst - from J3
+    RAW_L1A      : in  std_logic;       -- l1acc - from J3
+    CCB_L1ARST_B : in  std_logic;       -- l1rst - from J3
+    CCB_CLKEN    : in  std_logic;       -- clken - from J3
     --------------------
     -- ODMB VME <-> CALIBTRIG
     --------------------
@@ -91,19 +100,19 @@ entity ODMB_CTRL is
     ALCT_DV     : in std_logic;
     OTMB_DV     : in std_logic;
     DCFEB0_DV   : in std_logic;
-    DCFEB0_DATA : in std_logic_vector(15 downto 0);
+    --DCFEB0_DATA : in std_logic_vector(15 downto 0);
     DCFEB1_DV   : in std_logic;
-    DCFEB1_DATA : in std_logic_vector(15 downto 0);
+    --DCFEB1_DATA : in std_logic_vector(15 downto 0);
     DCFEB2_DV   : in std_logic;
-    DCFEB2_DATA : in std_logic_vector(15 downto 0);
+    --DCFEB2_DATA : in std_logic_vector(15 downto 0);
     DCFEB3_DV   : in std_logic;
-    DCFEB3_DATA : in std_logic_vector(15 downto 0);
+    --DCFEB3_DATA : in std_logic_vector(15 downto 0);
     DCFEB4_DV   : in std_logic;
-    DCFEB4_DATA : in std_logic_vector(15 downto 0);
+    --DCFEB4_DATA : in std_logic_vector(15 downto 0);
     DCFEB5_DV   : in std_logic;
-    DCFEB5_DATA : in std_logic_vector(15 downto 0);
+    --DCFEB5_DATA : in std_logic_vector(15 downto 0);
     DCFEB6_DV   : in std_logic;
-    DCFEB6_DATA : in std_logic_vector(15 downto 0);
+    --DCFEB6_DATA : in std_logic_vector(15 downto 0);
 
     EXT_DCFEB_L1A_CNT7 : out std_logic_vector(23 downto 0);
     DCFEB_L1A_DAV7     : out std_logic;
@@ -198,6 +207,16 @@ architecture Behavioral of ODMB_CTRL is
 
   signal CAL_LCT       : std_logic;
   signal cal_gtrg     : std_logic;
+
+-- CCBCODE outputs
+
+  signal bx0                       : std_logic;
+  signal bxrst, ccb_bxrst, ccb_bx0 : std_logic;
+  signal l1arst                    : std_logic;
+  signal clken                     : std_logic;
+  signal bc0                       : std_logic;
+  signal l1asrst                   : std_logic;
+  signal ttccal                    : std_logic_vector(2 downto 0);
 
 -- internal signals
   signal cafifo_l1a_match_in_inner : std_logic_vector(NCFEB+2 downto 0);
@@ -331,19 +350,19 @@ begin
       alct_dv     => alct_dv,
       otmb_dv     => otmb_dv,
       dcfeb0_dv   => dcfeb0_dv,
-      dcfeb0_data => dcfeb0_data,
+      --dcfeb0_data => dcfeb0_data,
       dcfeb1_dv   => dcfeb1_dv,
-      dcfeb1_data => dcfeb1_data,
+      --dcfeb1_data => dcfeb1_data,
       dcfeb2_dv   => dcfeb2_dv,
-      dcfeb2_data => dcfeb2_data,
+      --dcfeb2_data => dcfeb2_data,
       dcfeb3_dv   => dcfeb3_dv,
-      dcfeb3_data => dcfeb3_data,
+      --dcfeb3_data => dcfeb3_data,
       dcfeb4_dv   => dcfeb4_dv,
-      dcfeb4_data => dcfeb4_data,
+      --dcfeb4_data => dcfeb4_data,
       dcfeb5_dv   => dcfeb5_dv,
-      dcfeb5_data => dcfeb5_data,
+      --dcfeb5_data => dcfeb5_data,
       dcfeb6_dv   => dcfeb6_dv,
-      dcfeb6_data => dcfeb6_data,
+      --dcfeb6_data => dcfeb6_data,
 
       cafifo_l1a_match => cafifo_l1a_match_out_inner,
       cafifo_l1a_cnt   => cafifo_l1a_cnt_out,
@@ -417,6 +436,25 @@ begin
       cafifo_lost_pckt => cafifo_lost_pckt_out,
       cafifo_lone      => cafifo_lone
       );
+
+  CCBCODE_PM : CCBCODE
+    port map(
+      CCB_CMD      => ccb_cmd,
+      CCB_CMD_S    => ccb_cmd_s,
+      CCB_DATA     => ccb_data,
+      CCB_DATA_S   => ccb_data_s,
+      CMSCLK       => clk40,
+      CCB_BXRST_B  => ccb_bxrst_b,
+      CCB_BX0_B    => ccb_bx0_b,
+      CCB_L1ARST_B => ccb_l1arst_b,
+      CCB_CLKEN    => ccb_clken,
+      BX0          => bx0,
+      BXRST        => bxrst,
+      L1ARST       => l1arst,
+      CLKEN        => clken,
+      BC0          => bc0,
+      L1ASRST      => l1asrst,
+      TTCCAL       => ttccal);
 
   cafifo_l1a_match_in  <= cafifo_l1a_match_in_inner(NCFEB+2 downto 1);
   cafifo_l1a_match_out <= cafifo_l1a_match_out_inner;
