@@ -30,7 +30,6 @@ entity ODMB_CTRL is
     CCB_DATA_S   : in  std_logic;       -- ccbdata(8) - from J3
     CCB_BX0_B    : in  std_logic;       -- bx0 - from J3
     CCB_BXRST_B  : in  std_logic;       -- bxrst - from J3
-    RAW_L1A      : in  std_logic;       -- l1acc - from J3
     CCB_L1ARST_B : in  std_logic;       -- l1rst - from J3
     CCB_CLKEN    : in  std_logic;       -- clken - from J3
     --------------------
@@ -88,8 +87,6 @@ entity ODMB_CTRL is
     LCT_ERR     : out std_logic;            -- To an LED in the original design
 
     BX_DLY        : in integer range 0 to 4095;
-    BC0         : in std_logic;
-    CCB_BXRST_B : in  std_logic;       -- bxrst - from J3
     L1ACNT_RST  : in std_logic;
     BXCNT_RST   : in std_logic;
     RST         : in std_logic;
@@ -135,10 +132,10 @@ entity ODMB_CTRL is
     DDU_DATA       : out std_logic_vector(15 downto 0);
     DDU_DATA_VALID : out std_logic;
 
--- From LOADFIFO
-    JOEF : in std_logic_vector(NCFEB+2 downto 1);
 -- For headers/trailers
-    DAQMBID : in std_logic_vector(11 downto 0);  -- From CRATEID in SETFEBDLY, and GA
+    --DAQMBID : in std_logic_vector(11 downto 0);  -- From CRATEID in SETFEBDLY, and GA
+    GA : in std_logic_vector(4 downto 0);
+    CRATEID : in std_logic_vector(7 downto 0);  -- From CRATEID in SETFEBDLY, and GA
     AUTOKILLED_DCFEBS  : in std_logic_vector(NCFEB downto 1);
       
 -- From/To Data FIFOs
@@ -148,7 +145,7 @@ entity ODMB_CTRL is
     FIFO_OUT : in std_logic_vector(15 downto 0);
     FIFO_EOF : in std_logic;
 
-    FIFO_EMPTY_B   : in std_logic_vector(NCFEB+2 downto 1);  -- emptyf*(7 DOWNTO 1) - from FIFOs
+    FIFO_EMPTY   : in std_logic_vector(NCFEB+2 downto 1);  -- emptyf*(7 DOWNTO 1) - from FIFOs
     FIFO_HALF_FULL : in std_logic_vector(NCFEB+2 downto 1)  -- 
     );
 end ODMB_CTRL;
@@ -211,7 +208,6 @@ architecture Behavioral of ODMB_CTRL is
 -- CCBCODE outputs
 
   signal bx0                       : std_logic;
-  signal bxrst, ccb_bxrst, ccb_bx0 : std_logic;
   signal l1arst                    : std_logic;
   signal clken                     : std_logic;
   signal bc0                       : std_logic;
@@ -238,6 +234,9 @@ architecture Behavioral of ODMB_CTRL is
   signal eof                  : std_logic := '0';
   signal ddu_data_inner       : std_logic_vector(15 downto 0);
   signal ddu_data_valid_inner : std_logic := 'L';
+
+  signal joef : std_logic_vector(NCFEB+2 downto 1);
+  signal daqmbid : std_logic_vector(11 downto 0);
 
 begin
 
@@ -405,7 +404,7 @@ begin
 
 -- from Data FIFOs
       FIFO_HALF_FULL => fifo_half_full,
-      FFOR_B         => fifo_empty_b,
+      FFOR_B         => fifo_empty,
       DATAIN         => fifo_out(15 downto 0),
       DATAIN_LAST    => fifo_eof,
 
@@ -467,5 +466,8 @@ begin
 
   DDU_DATA       <= ddu_data_inner;
   DDU_DATA_VALID <= ddu_data_valid_inner;
+
+  daqmbid(11 downto 4) <= crateid;
+  daqmbid(3 downto 0)  <= not ga(4 downto 1);  -- GA0 not included so that this is ODMB counter
 
 end Behavioral;

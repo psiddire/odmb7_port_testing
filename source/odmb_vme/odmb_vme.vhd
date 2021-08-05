@@ -93,7 +93,7 @@ entity ODMB_VME is
     --------------------
     -- OTMB connections through backplane
     --------------------
-    OTMB        : in  std_logic_vector(35 downto 0);      -- "TMB[35:0]" in Bank 44-45
+    OTMB        : in  std_logic_vector(17 downto 0);      -- "TMB[35:0]" in Bank 44-45
     RAWLCT      : in  std_logic_vector(NCFEB-1 downto 0); -- Bank 45
     OTMB_DAV    : in  std_logic;                          -- "TMB_DAV" in Bank 45
     OTMB_FF_CLK : in  std_logic;                          -- "TMB_FF_CLK" in Bank 45, not used
@@ -629,16 +629,16 @@ begin
   --                      eof_otmb_data(16 downto 15) & eof_alct_data(14 downto 0) & eof_otmb_data(14 downto 0);
 
   otmb_tx(14 downto 0)  <= OTMB(14 downto 0);    -- tmb_data[14:0]      // fifo data
-  otmb_tx(29 downto 15) <= OTMB(32 downto 18);   -- alct_data[14:0]     // alct data
+  otmb_tx(29 downto 15) <= "000" & x"000";       -- OTMB(32 downto 18)  // -- alct_data[14:0]     // alct data	
   otmb_tx(30)           <= OTMB(15);             -- tmb_ddu_special     // DDU special
   otmb_tx(31)           <= OTMB(16);             -- tmb_last_frame      // DMB last
   otmb_tx(32)           <= OTMB_DAV;             -- tmb_first_frame     // DMB data available
   otmb_tx(33)           <= OTMB(17);             -- tmb_/wr_enable      // DMB /wr
   otmb_tx(34)           <= RAWLCT(0);            -- tmb_active_feb_flag // DMB active cfeb flag
   otmb_tx(39 downto 35) <= RAWLCT(5 downto 1);   -- tmb_active_feb[4:0] // DMB active cfeb list
-  otmb_tx(40)           <= OTMB(35);             -- alct_/wr_enable     // ALCT _wr_fifo
-  otmb_tx(41)           <= OTMB(33);             -- alct_ddu_special    // ALCT ddu_special (alct_data[15])
-  otmb_tx(42)           <= OTMB(34);             -- alct_last_frame     // ALCT last frame  (alct_data[16])
+  otmb_tx(40)           <= '0'; --OTMB(35);             -- alct_/wr_enable     // ALCT _wr_fifo
+  otmb_tx(41)           <= '0'; --OTMB(33);             -- alct_ddu_special    // ALCT ddu_special (alct_data[15])
+  otmb_tx(42)           <= '0'; --OTMB(34);             -- alct_last_frame     // ALCT last frame  (alct_data[16])
   --otmb_tx(43)           <= RSVTD_IN(7);          -- alct_first_frame    // ALCT first frame (ALCT_DAV)
   --otmb_tx(45 downto 44) <= RSVTD_IN(5 downto 4); -- res_to_dmb[2:1]     // DMB active cfeb list
   --otmb_tx(46)           <= RSVTD_IN(6);          -- res_to_dmb[3]       // Not used, ='1' in PRBS test

@@ -16,7 +16,7 @@ use ieee.std_logic_unsigned.all;
 
 entity CONTROL_FSM is
   generic (
-    NFEB : integer range 1 to 7 := 7  -- Number of DCFEBS, 7 in the final design
+    NCFEB : integer range 1 to 7 := 7  -- Number of DCFEBS, 7 in the final design
     );  
   port (
 
@@ -31,28 +31,28 @@ entity CONTROL_FSM is
 
 -- From DMB_VME
     RDFFNXT : in std_logic;
-    KILL    : in std_logic_vector(NFEB+2 downto 1);
+    KILL    : in std_logic_vector(NCFEB+2 downto 1);
 
 -- to GigaBit Link
     DOUT : out std_logic_vector(15 downto 0);
     DAV  : out std_logic;
 
 -- to FIFOs
-    OEFIFO_B  : out std_logic_vector(NFEB+2 downto 1);
-    RENFIFO_B : out std_logic_vector(NFEB+2 downto 1);
+    OEFIFO_B  : out std_logic_vector(NCFEB+2 downto 1);
+    RENFIFO_B : out std_logic_vector(NCFEB+2 downto 1);
 
 -- from FIFOs
-    FIFO_HALF_FULL : in std_logic_vector(NFEB+2 downto 1);
-    FFOR_B         : in std_logic_vector(NFEB+2 downto 1);
+    FIFO_HALF_FULL : in std_logic_vector(NCFEB+2 downto 1);
+    FFOR_B         : in std_logic_vector(NCFEB+2 downto 1);
     DATAIN         : in std_logic_vector(15 downto 0);
     DATAIN_LAST    : in std_logic;
 
 -- From JTAGCOM
-    JOEF : in std_logic_vector(NFEB+2 downto 1);
+    JOEF : in std_logic_vector(NCFEB+2 downto 1);
 
 -- For headers/trailers
     DAQMBID : in std_logic_vector(11 downto 0);
-    AUTOKILLED_DCFEBS  : in std_logic_vector(NFEB downto 1);
+    AUTOKILLED_DCFEBS  : in std_logic_vector(NCFEB downto 1);
 
 -- FROM SW1
     GIGAEN : in std_logic;
@@ -67,11 +67,11 @@ entity CONTROL_FSM is
     control_debug : out std_logic_vector(143 downto 0);
 
 -- FROM CAFIFO
-    cafifo_l1a_dav   : in std_logic_vector(NFEB+2 downto 1);
-    cafifo_l1a_match : in std_logic_vector(NFEB+2 downto 1);
+    cafifo_l1a_dav   : in std_logic_vector(NCFEB+2 downto 1);
+    cafifo_l1a_match : in std_logic_vector(NCFEB+2 downto 1);
     cafifo_l1a_cnt   : in std_logic_vector(23 downto 0);
     cafifo_bx_cnt    : in std_logic_vector(11 downto 0);
-    cafifo_lost_pckt : in std_logic_vector(NFEB+2 downto 1);
+    cafifo_lost_pckt : in std_logic_vector(NCFEB+2 downto 1);
     cafifo_lone      : in std_logic
     );
 end CONTROL_FSM;
@@ -101,8 +101,8 @@ architecture CONTROL_arch of CONTROL_FSM is
   constant sync             : std_logic_vector(3 downto 0)      := "0000";
   constant alct_to_end      : std_logic                         := '0';
   constant otmb_to_end      : std_logic                         := '0';
-  constant data_fifo_full   : std_logic_vector(NFEB+2 downto 1) := (others => '0');
-  -- constant data_fifo_half   : std_logic_vector(NFEB+2 downto 1) := (others => '0');
+  constant data_fifo_full   : std_logic_vector(NCFEB+2 downto 1) := (others => '0');
+  -- constant data_fifo_half   : std_logic_vector(NCFEB+2 downto 1) := (others => '0');
   constant dmb_l1pipe       : std_logic_vector(7 downto 0)      := (others => '0');
   constant wait_max         : integer := 16;
   constant wait_dev_max         : integer := 5;
@@ -139,8 +139,8 @@ architecture CONTROL_arch of CONTROL_FSM is
   signal expect_pckt                      : std_logic                     := '0';
   signal dav_inner, dav_d                 : std_logic                     := '0';
   signal dout_inner, dout_d               : std_logic_vector(15 downto 0) := (others => '0');
-  signal oefifo_b_inner, renfifo_b_inner  : std_logic_vector(NFEB+2 downto 1);
-  signal renfifo_b_d                      : std_logic_vector(NFEB+2 downto 1);
+  signal oefifo_b_inner, renfifo_b_inner  : std_logic_vector(NCFEB+2 downto 1);
+  signal renfifo_b_d                      : std_logic_vector(NCFEB+2 downto 1);
   signal fifo_pop_inner, eof_inner, eof_d : std_logic                     := '0';
   signal d_fifo_pop_inner                 : std_logic                     := '0';
 
@@ -455,13 +455,13 @@ begin
 
   hdr_word(1) <= x"9" & cafifo_l1a_cnt(11 downto 0);
   hdr_word(2) <= x"9" & cafifo_l1a_cnt(23 downto 12);
-  hdr_word(3) <= x"9" & cafifo_l1a_match(NFEB+2 downto NFEB+1) & fmt_vers & l1a_dav_mismatch
-                 & cafifo_l1a_match(NFEB downto 1);
+  hdr_word(3) <= x"9" & cafifo_l1a_match(NCFEB+2 downto NCFEB+1) & fmt_vers & l1a_dav_mismatch
+                 & cafifo_l1a_match(NCFEB downto 1);
   hdr_word(4) <= x"9" & cafifo_bx_cnt;
-  hdr_word(5) <= x"A" & cafifo_l1a_match(NFEB+2 downto NFEB+1) & fmt_vers & l1a_dav_mismatch
-                 & cafifo_l1a_match(NFEB downto 1);
+  hdr_word(5) <= x"A" & cafifo_l1a_match(NCFEB+2 downto NCFEB+1) & fmt_vers & l1a_dav_mismatch
+                 & cafifo_l1a_match(NCFEB downto 1);
   hdr_word(6) <= x"A" & DAQMBID(11 downto 0);
-  hdr_word(7) <= x"A" & cafifo_l1a_match(NFEB+2 downto NFEB+1) & ovlp & cafifo_bx_cnt(4 downto 0);
+  hdr_word(7) <= x"A" & cafifo_l1a_match(NCFEB+2 downto NCFEB+1) & ovlp & cafifo_bx_cnt(4 downto 0);
   hdr_word(8) <= x"A" & sync & fmt_vers & l1a_dav_mismatch & cafifo_l1a_cnt(4 downto 0);
 
   tail_word(1) <= x"F" & alct_to_end & cafifo_bx_cnt(4 downto 0) & cafifo_l1a_cnt(5 downto 0);
@@ -472,8 +472,8 @@ begin
   --                 & data_fifo_full(7 downto 4);
   tail_word(4) <= x"F" & cafifo_lost_pckt(9) & "000" & x"0" -- Set timeout to 0 to avoid DDU errors
                   & data_fifo_full(7 downto 4);
-  tail_word(5) <= x"E" & data_fifo_full(NFEB+2 downto NFEB+1) & not FIFO_HALF_FULL(NFEB+2 downto NFEB+1)
-                  & otmb_to_end & not FIFO_HALF_FULL(NFEB downto 1);
+  tail_word(5) <= x"E" & data_fifo_full(NCFEB+2 downto NCFEB+1) & not FIFO_HALF_FULL(NCFEB+2 downto NCFEB+1)
+                  & otmb_to_end & not FIFO_HALF_FULL(NCFEB downto 1);
   tail_word(6) <= x"E" & DAQMBID(11 downto 0);
   tail_word(7) <= x"E" & REG_CRC(22) & REG_CRC(10 downto 0);
   tail_word(8) <= x"E" & REG_CRC(23) & REG_CRC(21 downto 11);

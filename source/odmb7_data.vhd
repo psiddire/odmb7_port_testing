@@ -52,6 +52,8 @@ entity odmb7_data is
     DCFEB6_DATA_IN      : in std_logic_vector(15 downto 0);
     DCFEB7_DATA_IN      : in std_logic_vector(15 downto 0);
 
+    GEN_DCFEB_SEL       : in std_logic;
+
     OTMB_FIFO_DATA_OUT       : out std_logic_vector(17 downto 0);
     OTMB_FIFO_DV       : out std_logic;
 
@@ -67,8 +69,8 @@ entity odmb7_data is
     DCFEB7_FIFO_OUT      : out std_logic_vector(17 downto 0);
     DCFEB_DV_OUT         : out std_logic_vector(NCFEB downto 1);
 
-    DATA_FIFO_RE        : in std_logic_vector (NCFEB+2 downto 1);
-    DATA_FIFO_EMPTY     : out std_logic;
+    DATA_FIFO_RE        : in std_logic_vector(NCFEB+2 downto 1);
+    DATA_FIFO_EMPTY     : out std_logic_vector(NCFEB+2 downto 1);
     DATA_FIFO_HALF_FULL : out std_logic_vector (NCFEB+2 downto 1)
 
     );
@@ -106,13 +108,17 @@ architecture data_Arch of odmb7_data is
        dcfeb_dv      : out std_logic;
        dcfeb_data    : out std_logic_vector(15 downto 0);
        adc_mask      : out std_logic_vector(11 downto 0);
-       dcfeb_fsel    : out std_logic_vector(32 downto 0);
+       dcfeb_fsel    : out std_logic_vector(63 downto 0);
        dcfeb_jtag_ir : out std_logic_vector(9 downto 0);
        trst          : in  std_logic;
        tck           : in  std_logic;
        tms           : in  std_logic;
        tdi           : in  std_logic;
        rtn_shft_en   : out std_logic;
+       injpls        : in std_logic; 
+       extpls        : in std_logic;
+       bc0           : in std_logic;
+       resync        : in std_logic;
        tdo           : out std_logic);
   end component;
 
@@ -131,7 +137,7 @@ architecture data_Arch of odmb7_data is
       otmb_data : out std_logic_vector(15 downto 0));
   end component;
 
-  signal gen_dcfeb_sel       : std_logic := '0';
+  --signal gen_dcfeb_sel       : std_logic := '0';
 
   signal rx_alct_data_valid  : std_logic;
   signal alct_data_valid     : std_logic;
@@ -180,7 +186,7 @@ architecture data_Arch of odmb7_data is
   type dcfeb_adc_mask_type is array (NCFEB downto 1) of std_logic_vector(11 downto 0);
   signal dcfeb_adc_mask : dcfeb_adc_mask_type;
 
-  type dcfeb_fsel_type is array (NCFEB downto 1) of std_logic_vector(32 downto 0);
+  type dcfeb_fsel_type is array (NCFEB downto 1) of std_logic_vector(63 downto 0);
   signal dcfeb_fsel : dcfeb_fsel_type;
 
   type dcfeb_jtag_ir_type is array (NCFEB downto 1) of std_logic_vector(9 downto 0);
@@ -334,6 +340,10 @@ begin
         tms           => dcfeb_tms,
         tdi           => dcfeb_tdi,
         rtn_shft_en   => open,
+        injpls        => '0', 
+        extpls        => '0',
+        bc0           => '0',
+        resync        => '0',
         tdo           => gen_tdo(I));
 
     dcfeb_data_valid_d(I) <= '0' when kill(I) = '1' else

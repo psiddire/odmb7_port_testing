@@ -45,7 +45,7 @@ PACKAGE odmb7_components is
       );  
     port(
 
-      CSP_FREE_AGENT_PORT_LA_CTRL : inout std_logic_vector(35 downto 0);
+      --CSP_FREE_AGENT_PORT_LA_CTRL : inout std_logic_vector(35 downto 0);
       clk                         : in    std_logic;
       dduclk                      : in    std_logic;
       l1acnt_rst                  : in    std_logic;
@@ -106,7 +106,7 @@ PACKAGE odmb7_components is
       );  
     port (
 -- Chip Scope Pro Logic Analyzer control
-      CSP_CONTROL_FSM_PORT_LA_CTRL : inout std_logic_vector(35 downto 0);
+      --CSP_CONTROL_FSM_PORT_LA_CTRL : inout std_logic_vector(35 downto 0);
       RST                          : in    std_logic;
       CLKCMS                       : in    std_logic;
       CLK                          : in    std_logic;

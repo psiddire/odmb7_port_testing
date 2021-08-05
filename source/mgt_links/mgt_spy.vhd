@@ -37,7 +37,7 @@ entity mgt_spy is
 
     -- Transmitter signals
     txdata      : in std_logic_vector(DATAWIDTH-1 downto 0);  --! Data to be transmitted
-    txd_valid   : in std_logic_vector(NLINK-1 downto 0);      --! Flag for TX data valid
+    txd_valid   : in std_logic;                               --! Flag for TX data valid
     txdiffctrl  : in std_logic_vector(3 downto 0);            --! Controls the TX voltage swing
     loopback    : in std_logic_vector(2 downto 0);            --! For internal loopback tests
 
@@ -228,8 +228,8 @@ begin
   ---------------------------------------------------------------------------------------------------------------------
   -- User data ports
   ---------------------------------------------------------------------------------------------------------------------
-  gtwiz_userdata_tx_int(DATAWIDTH-1 downto 0) <= TXDATA when TXD_VALID(0) = '1' else IDLE;
-  txctrl2_int(0) <= '0' when TXD_VALID(0) = '1' else '1';
+  gtwiz_userdata_tx_int(DATAWIDTH-1 downto 0) <= TXDATA when TXD_VALID = '1' else IDLE;
+  txctrl2_int(0) <= '0' when TXD_VALID = '1' else '1';
   txctrl2_int(7 downto 1) <= (others => '0');
 
   RXDATA <= gtwiz_userdata_rx_int(DATAWIDTH-1 downto 0);
