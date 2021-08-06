@@ -77,7 +77,7 @@ entity odmb7_data is
 end odmb7_data;
 
 architecture data_Arch of odmb7_data is
-
+--
   component EOFGEN is
     port(
       clk : in std_logic;

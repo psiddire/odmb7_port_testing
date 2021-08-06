@@ -437,7 +437,7 @@ begin
 
   GEN_REG_CRC : for K in 0 to 23 generate
   begin
-    FDCE_REG_CRC : FDCE port map (D => REG_CRC(K), C => CLK, CE => crc_en, CLR => crc_clr, Q => CRC(K));
+    FDCE_REG_CRC : FDCE port map (Q => REG_CRC(K), C => CLK, CE => crc_en, CLR => crc_clr, D => CRC(K));
   end generate GEN_REG_CRC;
 
   crc_clr <= '1' when control_current_state = WAIT_IDLE

@@ -49,6 +49,7 @@ entity odmb_clocking is
     clk_sysclk20 : out std_logic;
     clk_sysclk40 : out std_logic;
     clk_sysclk80 : out std_logic;
+    clk_sysclk160 : out std_logic;
     clk_cmsclk : out std_logic;
     clk_emcclk : out std_logic;
     clk_lfclk : out std_logic;
@@ -74,7 +75,8 @@ architecture Clocking_Arch of odmb_clocking is
       clk_out10 : out std_logic;
       clk_out20 : out std_logic;
       clk_out40 : out std_logic;
-      clk_out80 : out std_logic
+      clk_out80 : out std_logic;
+      clk_out160 : out std_logic
       );
   end component;
 
@@ -264,7 +266,8 @@ begin
       clk_out10 => clk_sysclk10,     -- output 10 MHz
       clk_out20 => clk_sysclk20,     -- output 20 MHz
       clk_out40 => clk_sysclk40,     -- output 40 MHz
-      clk_out80 => clk_sysclk80      -- output 80 MHz
+      clk_out80 => clk_sysclk80,      -- output 80 MHz
+      clk_out160 => clk_sysclk160      -- output 80 MHz
       );
 
 

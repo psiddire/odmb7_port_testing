@@ -52,5 +52,21 @@ COMPONENT L1ACNT_DAV_FIFO
   );
 END COMPONENT;
 
+COMPONENT L1A_CNT_FIFO_GEN
+  PORT (
+    srst : IN STD_LOGIC;
+    wr_clk : IN STD_LOGIC;
+    rd_clk : IN STD_LOGIC;
+    din : IN STD_LOGIC_VECTOR(17 DOWNTO 0);
+    wr_en : IN STD_LOGIC;
+    rd_en : IN STD_LOGIC;
+    dout : OUT STD_LOGIC_VECTOR(17 DOWNTO 0);
+    full : OUT STD_LOGIC;
+    empty : OUT STD_LOGIC;
+    wr_rst_busy : OUT STD_LOGIC;
+    rd_rst_busy : OUT STD_LOGIC
+  );
+END COMPONENT;
+
 END odmb7_ip_components;
   

@@ -453,7 +453,8 @@ begin
       CLKEN        => clken,
       BC0          => bc0,
       L1ASRST      => l1asrst,
-      TTCCAL       => ttccal);
+      TTCCAL       => ttccal
+      );
 
   cafifo_l1a_match_in  <= cafifo_l1a_match_in_inner(NCFEB+2 downto 1);
   cafifo_l1a_match_out <= cafifo_l1a_match_out_inner;
