@@ -494,7 +494,8 @@ architecture Behavioral of odmb7_ucsb_dev is
 
   component ODMB_CTRL is
     generic (
-      NCFEB       : integer range 1 to 7 := NCFEB  -- Number of DCFEBS, 7 for ME1/1, 5
+      NCFEB       : integer range 1 to 7 := NCFEB; -- Number of DCFEBS, 7 for ME1/1, 5
+      CAFIFO_SIZE : integer range 1 to 128 := 32   -- Number FIFO words in CAFIFO
       );
     port (
       --------------------
@@ -1680,7 +1681,8 @@ begin
 
   MBC : ODMB_CTRL
     generic map (
-      NCFEB => NCFEB
+      NCFEB => NCFEB,
+      CAFIFO_SIZE => 32
       )
     port map (
       CLK80  => sysclk80,
