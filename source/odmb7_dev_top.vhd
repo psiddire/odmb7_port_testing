@@ -79,6 +79,7 @@ entity odmb7_ucsb_dev is
     L1A_MATCH_P    : out std_logic_vector(7 downto 1);     -- Bank 66, ODMB CTRL
     L1A_MATCH_N    : out std_logic_vector(7 downto 1);     -- Bank 66, ODMB CTRL
     PPIB_OUT_EN_B  : out std_logic;                        -- Bank 68
+    DCFEB_REPROG_B : out std_logic;                        -- Bank 68, not used before
 
     --------------------
     -- CCB Signals
@@ -311,7 +312,8 @@ architecture Behavioral of odmb7_ucsb_dev is
       DCFEB_TDO    : in  std_logic_vector (NCFEB downto 1);
 
       DCFEB_DONE     : in std_logic_vector (NCFEB downto 1);
-      DCFEB_INITJTAG : in std_logic;   -- TODO: where does this fit in
+      DCFEB_INITJTAG : in std_logic;
+      DCFEB_REPROG_B : out std_logic;  -- Hard reset to DCFEBs
 
       --------------------
       -- JTAG Signals To/From ODMBs
@@ -1173,6 +1175,7 @@ begin
       DCFEB_TDO      => dcfeb_tdo,
       DCFEB_DONE     => DCFEB_DONE,
       DCFEB_INITJTAG => dcfeb_initjtag,
+      DCFEB_REPROG_B => DCFEB_REPROG_B,
 
       ODMB_TCK      => KUS_TCK,
       ODMB_TMS      => KUS_TMS,
