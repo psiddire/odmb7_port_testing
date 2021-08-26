@@ -3,7 +3,7 @@
 <!--                                                         -->
 <!-- Copyright 1986-2019 Xilinx, Inc. All Rights Reserved.   -->
 
-<Project Version="7" Minor="44" Path="/net/top/homes/oshiro/odmb/firmware/odmb7_ucsb_dev/project/odmb7_ucsb_dev.xpr">
+<Project Version="7" Minor="44" Path="project/odmb7_ucsb_dev.xpr">
   <DefaultLaunch Dir="$PRUNDIR"/>
   <Configuration>
     <Option Name="Id" Val="34987868ce874aabb5b38a22396ce0db"/>
@@ -192,6 +192,12 @@
         </FileInfo>
       </File>
       <File Path="$PPRDIR/../source/odmb_vme/odmb_vme.vhd">
+        <FileInfo>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PPRDIR/../source/odmb_vme/odmbjtag.vhd">
         <FileInfo>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="simulation"/>
@@ -477,6 +483,7 @@
         <Option Name="SrcSet" Val="sources_1"/>
         <Option Name="XSimWcfgFile" Val="$PPRDIR/../simulation/waveforms/Firmware_tb_behav_lvmb.wcfg"/>
         <Option Name="XSimWcfgFile" Val="$PPRDIR/../simulation/waveforms/Firmware_tb_behav_voltageMon.wcfg"/>
+        <Option Name="XSimWcfgFile" Val="$PPRDIR/SysMon.wcfg"/>
       </Config>
     </FileSet>
     <FileSet Name="utils_1" Type="Utils" RelSrcDir="$PSRCDIR/utils_1">

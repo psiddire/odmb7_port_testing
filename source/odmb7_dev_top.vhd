@@ -136,6 +136,15 @@ entity odmb7_ucsb_dev is
     LCT_RQST    : out std_logic_vector(2 downto 1);       -- Bank 45
 
     --------------------------------
+    -- ODMB JTAG
+    --------------------------------
+    KUS_TMS       : out std_logic;                         -- Bank 47
+    KUS_TCK       : out std_logic;                         -- Bank 47
+    KUS_TDI       : out std_logic;                         -- Bank 47
+    KUS_TDO       : in std_logic;                          -- "TDO" in Bank 47, connected to pin U9
+    KUS_DL_SEL    : out std_logic;                         -- Bank 47, ODMB JTAG path select
+
+    --------------------------------
     -- ODMB optical ports
     --------------------------------
     -- Acutally connected optical TX/RX signals
@@ -191,7 +200,6 @@ entity odmb7_ucsb_dev is
     --------------------------------
     -- Essential selector/reset signals not classified yet
     --------------------------------
-    KUS_DL_SEL    : out std_logic;                         -- Bank 47, ODMB JTAG path select
     FPGA_SEL      : out std_logic;                         -- Bank 47, clock synthesizaer control input select
     RST_CLKS_B    : out std_logic;                         -- Bank 47, clock synthesizaer reset
     ODMB_DONE     : in std_logic;                          -- "DONE" in bank 66 (pin L9), monitor DONE_0 from Bank 0 (pin N7)
@@ -320,6 +328,16 @@ architecture Behavioral of odmb7_ucsb_dev is
 
       DCFEB_DONE     : in std_logic_vector (NCFEB downto 1);
       DCFEB_INITJTAG : in std_logic;   -- TODO: where does this fit in
+
+      --------------------
+      -- JTAG Signals To/From ODMBs
+      --------------------
+      ODMB_TCK    : out std_logic;
+      ODMB_TMS    : out std_logic;
+      ODMB_TDI    : out std_logic;
+      ODMB_TDO    : in  std_logic;
+      ODMB_SEL    : out std_logic;
+      ODMB_INITJTAG : in std_logic;   -- TODO: where does this fit in
 
       --------------------
       -- From/To LVMB: ODMB & ODMB7 design, ODMB5 to be seen
@@ -538,6 +556,11 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal dcfeb_tms    : std_logic := '0';
   signal dcfeb_tdi    : std_logic := '0';
   signal dcfeb_tdo    : std_logic_vector (NCFEB downto 1) := (others => '0');
+
+  --------------------------------------
+  -- ODMB JTAG signals
+  --------------------------------------
+  signal odmb_initjtag     : std_logic := '0';
 
   --------------------------------------
   -- Certain reset signals
@@ -821,8 +844,7 @@ begin
   -------------------------------------------------------------------------------------------
   -- Constant driver for selector/reset pins for board to work
   -------------------------------------------------------------------------------------------
-  KUS_DL_SEL <= '1';
-  FPGA_SEL   <= '0';
+  FPGA_SEL <= '0';
   RST_CLKS_B <= '1';
 
   -------------------------------------------------------------------------------------------
@@ -1193,6 +1215,13 @@ begin
       DCFEB_TDO      => dcfeb_tdo,
       DCFEB_DONE     => DCFEB_DONE,
       DCFEB_INITJTAG => dcfeb_initjtag,
+
+      ODMB_TCK      => KUS_TCK,
+      ODMB_TMS      => KUS_TMS,
+      ODMB_TDI      => KUS_TDI,
+      ODMB_TDO      => KUS_TDO,
+      ODMB_SEL      => KUS_DL_SEL,
+      ODMB_INITJTAG => odmb_initjtag,
 
       LVMB_PON    => LVMB_PON,
       PON_LOAD_B  => PON_LOAD_B,

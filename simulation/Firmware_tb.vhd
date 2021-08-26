@@ -498,7 +498,7 @@ begin
 
   --aVME signal management
   rstn <= not rst_global;
-  vc_cmd <= '1' when (cmddev(15 downto 12) = x"1" or cmddev(15 downto 12) = x"4" or cmddev(15 downto 12) = x"3" or cmddev(15 downto 12) = x"6" or cmddev(15 downto 12) = x"7" or cmddev(15 downto 12) = x"8") else '0';
+  vc_cmd <= '1' when (cmddev(15 downto 12) = x"1" or cmddev(15 downto 12) = x"2" or cmddev(15 downto 12) = x"4" or cmddev(15 downto 12) = x"3" or cmddev(15 downto 12) = x"6" or cmddev(15 downto 12) = x"7" or cmddev(15 downto 12) = x"8") else '0';
   vc_addr <= x"A8" & cmddev(15 downto 1);
   vc_rd <=  '1' when vme_data_in = x"2EAD" else '0';
 
@@ -573,6 +573,10 @@ begin
       L1A_MATCH_P          => l1a_match_p,
       L1A_MATCH_N          => l1a_match_n,
       PPIB_OUT_EN_B        => open,
+      KUS_TMS              => open,
+      KUS_TCK              => open,
+      KUS_TDI              => open,
+      KUS_TDO              => '0',
       KUS_DL_SEL           => open,
       ODMB_DONE            => '1',
       FPGA_SEL             => open,

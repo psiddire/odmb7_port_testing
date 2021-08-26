@@ -56,6 +56,15 @@ set_property package_pin     T5         [get_ports CLK_125_REF_N]
 # ----------------------------------------------------------------------------------------------------------------------
 # Selector/monitor pins unclassified yet
 # ----------------------------------------------------------------------------------------------------------------------
+set_property PACKAGE_PIN     U22        [get_ports KUS_TMS]
+set_property IOSTANDARD      LVCMOS18   [get_ports KUS_TMS]
+set_property PACKAGE_PIN     W25        [get_ports KUS_TCK]
+set_property IOSTANDARD      LVCMOS18   [get_ports KUS_TCK]
+set_property PACKAGE_PIN     Y25        [get_ports KUS_TDI]
+set_property IOSTANDARD      LVCMOS18   [get_ports KUS_TDI]
+set_property PACKAGE_PIN     Y21        [get_ports KUS_TDO]
+set_property IOSTANDARD      LVCMOS18   [get_ports KUS_TDO]
+
 set_property PACKAGE_PIN     U21        [get_ports KUS_DL_SEL]
 set_property IOSTANDARD      LVCMOS18   [get_ports KUS_DL_SEL]
 set_property PACKAGE_PIN     T23        [get_ports FPGA_SEL]
