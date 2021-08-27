@@ -328,6 +328,8 @@ set_property PACKAGE_PIN     A10        [get_ports EXTPLS_N]
 set_property IOSTANDARD      LVDS       [get_ports EXTPLS_N]
 set_property PACKAGE_PIN     C16        [get_ports PPIB_OUT_EN_B]
 set_property IOSTANDARD      LVCMOS18   [get_ports PPIB_OUT_EN_B]
+set_property PACKAGE_PIN     A17        [get_ports DCFEB_REPROG_B]
+set_property IOSTANDARD      LVCMOS18   [get_ports DCFEB_REPROG_B]
 
 # L1A pins
 set_property PACKAGE_PIN     B9         [get_ports L1A_P]

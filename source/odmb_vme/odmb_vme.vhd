@@ -66,6 +66,7 @@ entity ODMB_VME is
 
     DCFEB_DONE     : in std_logic_vector (NCFEB downto 1);
     DCFEB_INITJTAG : in std_logic;   -- TODO: where does this fit in
+    DCFEB_REPROG_B : out std_logic;
 
     --------------------
     -- JTAG Signals To/From ODMBs
@@ -745,7 +746,7 @@ begin
       OPT_RESET_PULSE => OPT_RESET_PULSE,
       L1A_RESET_PULSE => L1A_RESET_PULSE,
       FW_RESET        => FW_RESET,
-      REPROG_B        => open,
+      REPROG_B        => DCFEB_REPROG_B,
       TEST_INJ        => TEST_INJ,
       TEST_PLS        => TEST_PLS,
       TEST_PED        => TEST_PED,
