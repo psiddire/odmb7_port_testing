@@ -88,6 +88,7 @@ entity odmb7_ucsb_dev is
     L1A_MATCH_P    : out std_logic_vector(7 downto 1);     --! L1A match for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
     L1A_MATCH_N    : out std_logic_vector(7 downto 1);     --! L1A match for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
     PPIB_OUT_EN_B  : out std_logic;                        --! PPIB output enable signal. Fixed to '0'. Connected to bank 68.
+    DCFEB_REPROG_B : out std_logic;                        --! (x)DCFEB reprogram signal. From ODMBCTRL in ODMB VME module. Connected to bank 68.
 
     --------------------
     -- CCB Signals
@@ -320,6 +321,7 @@ architecture Behavioral of odmb7_ucsb_dev is
 
       DCFEB_DONE     : in std_logic_vector (NCFEB downto 1);
       DCFEB_INITJTAG : in std_logic;   -- TODO: where does this fit in
+      DCFEB_REPROG_B : out std_logic;
 
       --------------------
       -- From/To LVMB: ODMB & ODMB7 design, ODMB5 to be seen
@@ -1193,6 +1195,7 @@ begin
       DCFEB_TDO      => dcfeb_tdo,
       DCFEB_DONE     => DCFEB_DONE,
       DCFEB_INITJTAG => dcfeb_initjtag,
+      DCFEB_REPROG_B => DCFEB_REPROG_B,
 
       LVMB_PON    => LVMB_PON,
       PON_LOAD_B  => PON_LOAD_B,

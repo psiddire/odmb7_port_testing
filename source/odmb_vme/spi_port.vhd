@@ -14,33 +14,33 @@ entity SPI_PORT is
     CLK                  : in std_logic; --! 45 MHz clock iput
     RST                  : in std_logic; --! Soft reset signal
     --VME signals
-    DEVICE               : in  std_logic; --! Indicates whether this is the selected VME device
-    STROBE               : in  std_logic; --! Indicates VME command is ready to be executed
-    COMMAND              : in  std_logic_vector(9 downto 0); --! VME command to be executed (x"6" & COMMAND & "00" is user-readble version)
-    WRITER               : in  std_logic; --! Indicates if VME command is a read or write command
-    DTACK                : out std_logic; --! Data acknowledge to be sent once command is initialized/executed
+    DEVICE               : in  std_logic;                     --! Indicates whether this is the selected VME device
+    STROBE               : in  std_logic;                     --! Indicates VME command is ready to be executed
+    COMMAND              : in  std_logic_vector(9 downto 0);  --! VME command to be executed (x"6" & COMMAND & "00" is user-readble version)
+    WRITER               : in  std_logic;                     --! Indicates if VME command is a read or write command
+    DTACK                : out std_logic;                     --! Data acknowledge to be sent once command is initialized/executed
     INDATA               : in  std_logic_vector(15 downto 0); --! Input data from VME backplane
     OUTDATA              : out std_logic_vector(15 downto 0); --! Output data to VME backplane
     --CONFREGS signals
-    SPI_CFG_UL_PULSE     : out std_logic; --! Signal from VMECONFREGS to upload CFG registers to PROM
-    SPI_CONST_UL_PULSE   : out std_logic; --! Signal from VMECONFREGS to upload const registers to PROM
+    SPI_CFG_UL_PULSE     : out std_logic;                     --! Signal to VMECONFREGS to write CFG registers read from PROM
+    SPI_CONST_UL_PULSE   : out std_logic;                     --! Signal to VMECONFREGS to write const registers read from PROM
     SPI_UL_REG           : out std_logic_vector(15 downto 0); --! Contents of CFG/const registers read from PROM
-    SPI_CFG_BUSY         : out std_logic; --! Indicates CFG register upload in progress
-    SPI_CONST_BUSY       : out std_logic; --! Indicated const register upload in progress
-    SPI_CFG_REG_WE       : out integer range 0 to NREGS; --! Write enable for each CFG register
-    SPI_CONST_REG_WE     : out integer range 0 to NREGS; --! Write enable for each const register
-    SPI_CFG_REGS         : in cfg_regs_array; --! Contents of CFG registers read from PROM
-    SPI_CONST_REGS       : in cfg_regs_array; --! Contents of const registers read from PROM
+    SPI_CFG_BUSY         : out std_logic;                     --! Indicates CFG register upload in progress
+    SPI_CONST_BUSY       : out std_logic;                     --! Indicated const register upload in progress
+    SPI_CFG_REG_WE       : out integer range 0 to NREGS;      --! Write enable for each CFG register
+    SPI_CONST_REG_WE     : out integer range 0 to NREGS;      --! Write enable for each const register
+    SPI_CFG_REGS         : in cfg_regs_array;                 --! Contents of CFG registers to write to PROM
+    SPI_CONST_REGS       : in cfg_regs_array;                 --! Contents of const registers to write PROM
     --signals to/from QSPI_CTRL
-    SPI_CMD_FIFO_WRITE_EN     : out std_logic; --! Write enable to write command to PROM controller module
+    SPI_CMD_FIFO_WRITE_EN     : out std_logic;                     --! Write enable to write command to PROM controller module
     SPI_CMD_FIFO_IN           : out std_logic_vector(15 downto 0); --! Command to be written to PROM controller module
-    SPI_READBACK_FIFO_OUT     : in std_logic_vector(15 downto 0); --! Contents readback from PROM
-    SPI_READBACK_FIFO_READ_EN : out std_logic; --! Read enable to progress through contents readback from PROM
-    SPI_READ_BUSY             : in std_logic; --! Indicates a PROM read in progress
-    SPI_NCMDS_SPICTRL         : in unsigned(15 downto 0); --Debug signal: number of commands received by SPICTRL
-    SPI_NCMDS_SPIINTR         : in unsigned(15 downto 0); --Debug signal: number of commands processed by SPICTRL
+    SPI_READBACK_FIFO_OUT     : in std_logic_vector(15 downto 0);  --! Contents readback from PROM
+    SPI_READBACK_FIFO_READ_EN : out std_logic;                     --! Read enable to progress through contents readback from PROM
+    SPI_READ_BUSY             : in std_logic;                      --! Indicates a PROM read in progress
+    SPI_NCMDS_SPICTRL         : in unsigned(15 downto 0);          --! Debug signal: number of commands received by SPICTRL
+    SPI_NCMDS_SPIINTR         : in unsigned(15 downto 0);          --! Debug signal: number of commands processed by SPICTRL
     --debug
-    DIAGOUT                   : out std_logic_vector(17 downto 0) --Debug signals
+    DIAGOUT                   : out std_logic_vector(17 downto 0)  --! Debug signals
     );
 end SPI_PORT;
 
@@ -75,7 +75,7 @@ architecture SPI_PORT_Arch of SPI_PORT is
   signal spi_cfg_ul_pulse_inner           : std_logic := '0';
   signal spi_cfg_reg_we_inner             : integer := NREGS;
   signal spi_ul_reg_inner                 : std_logic_vector(15 downto 0) := x"0000";
-  signal readback_fifo_stall_counter      : unsigned(3 downto 0) := x"0";
+  signal readback_fifo_stall_counter      : unsigned(7 downto 0) := x"1F";
   
   --SPI command command signals
   signal strobe_meta               : std_logic := '0';
@@ -91,8 +91,8 @@ architecture SPI_PORT_Arch of SPI_PORT is
   
   --command parsing signals
   signal cmddev          : std_logic_vector(15 downto 0) := x"0000";
-  signal do_cfg_upload   : std_logic := '0';
-  signal do_cfg_download : std_logic := '0'; 
+  signal do_cfg_read   : std_logic := '0';
+  signal do_cfg_write : std_logic := '0'; 
   signal do_cfg_erase    : std_logic := '0';
   signal do_spi_cmd      : std_logic := '0';
   signal do_spi_read     : std_logic := '0';
@@ -126,12 +126,26 @@ begin
   ila_probe(18) <= q_dtack;
   ila_probe(34 downto 19) <= INDATA;
   ila_probe(50 downto 35) <= outdata_inner;
-
+  ila_probe(51) <= strobe_pulse;
+  ila_probe(52) <= do_cfg_write;
+  ila_probe(53) <= do_cfg_read;
+  ila_probe(54) <= spi_cmd_fifo_write_en_cmd;
+  ila_probe(55) <= spi_cmd_fifo_write_en_cfg_dl;
+  ila_probe(56) <= spi_cmd_fifo_write_en_cfg_ul;
+  ila_probe(72 downto 57) <= spi_cmd_fifo_in_cmd;
+  ila_probe(88 downto 73) <= spi_cmd_fifo_in_cfg_ul;
+  ila_probe(104 downto 89) <= spi_cmd_fifo_in_cfg_dl;
+  ila_probe(105) <= spi_readback_fifo_read_en_cmd;
+  ila_probe(106) <= spi_readback_fifo_read_en_cfg_ul;
+  ila_probe(107) <= spi_cfg_ul_pulse_inner;
+  ila_probe(111 downto 108) <= std_logic_vector(to_unsigned(upload_cfg_reg_index,4));
+  ila_probe(127 downto 112) <= spi_ul_reg_inner;
+  
   --Decode command
   cmddev    <= "000" & DEVICE & COMMAND & "00";
 
-  do_cfg_download <= '1' when (cmddev=x"1000" and STROBE='1') else '0'; --0x6000
-  do_cfg_upload <= '1' when (cmddev=x"1004" and STROBE='1') else '0'; --0x6004
+  do_cfg_write <= '1' when (cmddev=x"1000" and STROBE='1') else '0'; --0x6000
+  do_cfg_read <= '1' when (cmddev=x"1004" and STROBE='1') else '0'; --0x6004
   --temp command for debugging
   do_cfg_erase <= '1' when (cmddev=x"1008" and STROBE='1') else '0';
   do_spi_cmd <= '1' when (cmddev=x"102C") else '0';
@@ -182,17 +196,16 @@ begin
   end if;
   end process;
 
-
-  --handle CFG download command
-  cfg_download_proc : process (SLOWCLK)
+  --handle CFG write command
+  cfg_write_proc : process (SLOWCLK)
   begin
   if rising_edge(SLOWCLK) then
     case cfg_download_state is
     when S_IDLE => 
-      if do_cfg_download='1' then
+      if do_cfg_write='1' then
         spi_cmd_fifo_write_en_cfg_dl <= '1';
-        --send CMD to load address 003d...
-        spi_cmd_fifo_in_cfg_dl <= x"07B7";
+        --send CMD to load address 00FE0000
+        spi_cmd_fifo_in_cfg_dl <= x"1FD7";
         cfg_download_state <= S_SET_ADDR_LOWER;
       else
         spi_cmd_fifo_write_en_cfg_dl <= '0';
@@ -202,8 +215,8 @@ begin
       
     when S_SET_ADDR_LOWER =>
       spi_cmd_fifo_write_en_cfg_dl <= '1';
-      --send CMD to load address ....5000
-      spi_cmd_fifo_in_cfg_dl <= x"5000";
+      --load address lower bits
+      spi_cmd_fifo_in_cfg_dl <= x"0000";
       cfg_download_state <= S_ERASE;
     
     when S_ERASE =>
@@ -215,7 +228,7 @@ begin
     when S_BUFFER_PROGRAM =>
       spi_cmd_fifo_write_en_cfg_dl <= '1';
       --send CMD to buffer 16 word program
-      spi_cmd_fifo_in_cfg_dl <= x"01CC";
+      spi_cmd_fifo_in_cfg_dl <= x"01EC";
       cfg_download_state <= S_WRITE;
 
     when S_WRITE =>
@@ -235,7 +248,7 @@ begin
   end process;
   
   
-  --handle CFG upload command
+  --handle CFG read command
   cfg_upload_proc : process (SLOWCLK)
   begin
   if rising_edge(SLOWCLK) then
@@ -245,10 +258,10 @@ begin
       spi_cfg_ul_pulse_inner <= '0';
       spi_cfg_reg_we_inner <= NREGS;
       spi_ul_reg_inner <= x"0000";
-      if do_cfg_upload='1' then
+      if do_cfg_read='1' then
         spi_cmd_fifo_write_en_cfg_ul <= '1';
-        --send CMD to load address 003d...
-        spi_cmd_fifo_in_cfg_ul <= x"07B7";
+        --send CMD to load address 00FE0000
+        spi_cmd_fifo_in_cfg_ul <= x"1FD7";
         cfg_upload_state <= S_SET_ADDR_LOWER;
       else
         spi_cmd_fifo_write_en_cfg_ul <= '0';
@@ -262,15 +275,15 @@ begin
       spi_cfg_ul_pulse_inner <= '0';
       spi_cfg_reg_we_inner <= NREGS;
       spi_ul_reg_inner <= x"0000";
-      --send CMD to load address ....5000
-      spi_cmd_fifo_in_cfg_ul <= x"5000";
+      --load address lower bits
+      spi_cmd_fifo_in_cfg_ul <= x"0000";
       cfg_upload_state <= S_READN;
      
     when S_READN =>
       spi_cmd_fifo_write_en_cfg_ul <= '1';
       spi_readback_fifo_read_en_cfg_ul <= '0';
       --send CMD to read 16 words
-      spi_cmd_fifo_in_cfg_ul <= x"01C4";
+      spi_cmd_fifo_in_cfg_ul <= x"01E4";
       cfg_upload_state <= S_WAIT_READ_BUSY;
       
     when S_WAIT_READ_BUSY =>
@@ -289,15 +302,15 @@ begin
       
     when S_WAIT_READ_DONE =>
         spi_cmd_fifo_write_en_cfg_ul <= '0';
-        spi_readback_fifo_read_en_cfg_ul <= '0';
         spi_cfg_ul_pulse_inner <= '0';
         spi_cfg_reg_we_inner <= NREGS;
         spi_ul_reg_inner <= x"0000";
         --wait for spi_ctrl to finish reading
         spi_cmd_fifo_in_cfg_ul <= x"0000";
+        upload_cfg_reg_index <= 0;
+        spi_readback_fifo_read_en_cfg_ul <= '0';
         if (SPI_READ_BUSY='1') then
-          readback_fifo_stall_counter <= x"F";
-          cfg_upload_state <= S_WAIT_READ_STALL;      
+          cfg_upload_state <= S_WAIT_READ_STALL;    
         else
           cfg_upload_state <= S_WAIT_READ_DONE;
         end if;
@@ -305,17 +318,19 @@ begin
     when S_WAIT_READ_STALL => 
       --need to wait for some reason. FIFO propagation maybe?
       spi_cmd_fifo_write_en_cfg_ul <= '0';
-      spi_readback_fifo_read_en_cfg_ul <= '0';
       spi_cfg_ul_pulse_inner <= '0';
       spi_cfg_reg_we_inner <= NREGS;
-      spi_ul_reg_inner <= x"0000";
+      spi_ul_reg_inner <= SPI_READBACK_FIFO_OUT;
       spi_cmd_fifo_in_cfg_ul <= x"0000";
+      upload_cfg_reg_index <= 0;
       if (readback_fifo_stall_counter=x"0") then
         cfg_upload_state <= S_READBACK;           
-        readback_fifo_stall_counter <= x"F";
+        readback_fifo_stall_counter <= x"1F";
+        spi_readback_fifo_read_en_cfg_ul <= '1';
       else
         cfg_upload_state <= S_WAIT_READ_STALL;
         readback_fifo_stall_counter <= readback_fifo_stall_counter - 1;
+        spi_readback_fifo_read_en_cfg_ul <= '0';
       end if;
   
     when S_READBACK =>
@@ -326,7 +341,7 @@ begin
       spi_cfg_reg_we_inner <= upload_cfg_reg_index;
       spi_ul_reg_inner <= SPI_READBACK_FIFO_OUT;
       --read values from readback fifo and send to CFG registers
-      spi_cmd_fifo_in_cfg_ul <= SPI_CFG_REGS(download_cfg_reg_index);
+      spi_cmd_fifo_in_cfg_ul <= x"0000";
       if (upload_cfg_reg_index=15) then
         upload_cfg_reg_index <= 0;
         cfg_upload_State <= S_IDLE;
