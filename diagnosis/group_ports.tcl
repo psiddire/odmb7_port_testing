@@ -80,6 +80,7 @@ create_hw_probe -map {probe0[93:92]} rxchariscomma_ch3[1:0] [get_hw_ilas hw_ila_
 create_hw_probe -map {probe0[97:94]} bad_rx_int[3:0] [get_hw_ilas hw_ila_1]
 
 
+# Control_FSM
 
 
 # delete_hw_probe [get_hw_probes rxdata_spy ]

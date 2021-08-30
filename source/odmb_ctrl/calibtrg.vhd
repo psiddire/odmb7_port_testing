@@ -42,11 +42,10 @@ end CALIBTRG;
 architecture CALIBTRG_arch of CALIBTRG is
   component LCTDLY is  -- Aligns RAW_LCT with L1A by 2.4 us to 4.8 us
     port (
-      DIN   : in std_logic;
+      DOUT  : out std_logic;
       CLK   : in std_logic;
       DELAY : in std_logic_vector(5 downto 0);
-
-      DOUT : out std_logic
+      DIN   : in std_logic
       );
   end component;
 
@@ -153,6 +152,6 @@ begin
   CALLCT        <= callct_inner;
 
   -- Generate CAL_GTRG
-  LCTDLY_GTRG : LCTDLY port map(DIN => callct_inner, CLK => cmsclk, DELAY => lct_l1a_dly, DOUT => CAL_GTRG);
+  LCTDLY_GTRG : LCTDLY port map(DOUT => CAL_GTRG, CLK => cmsclk, DELAY => lct_l1a_dly, DIN => callct_inner);
 
 end CALIBTRG_arch;

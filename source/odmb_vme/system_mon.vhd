@@ -349,5 +349,4 @@ begin
   sysmon_data(0) <= sysmon_drdy;
   sysmon_data(1) <= sysmon_den;
 
-
 end SYSTEM_MON_ARCH;

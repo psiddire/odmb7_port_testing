@@ -25,8 +25,8 @@ entity CONTROL_FSM is
     --CSP_CONTROL_FSM_PORT_LA_CTRL : inout std_logic_vector(35 downto 0);
 
     RST    : in std_logic;
-    CLKCMS : in std_logic;
-    CLK    : in std_logic;
+    CLKCMS : in std_logic;              -- 40 MHz CMS clock
+    CLK    : in std_logic;              -- 80 MHz doubled clock
     STATUS : in std_logic_vector(47 downto 0);
 
 -- From DMB_VME
@@ -84,6 +84,13 @@ architecture CONTROL_arch of CONTROL_FSM is
       DATA    : in    std_logic_vector (127 downto 0);
       TRIG0   : in    std_logic_vector (7 downto 0);
       CONTROL : inout std_logic_vector (35 downto 0)
+      );
+  end component;
+
+  component ila_1 is
+    port (
+      clk : in std_logic := '0';
+      probe0 : in std_logic_vector(127 downto 0) := (others=> '0')
       );
   end component;
 
@@ -149,7 +156,8 @@ architecture CONTROL_arch of CONTROL_FSM is
 
   signal current_state_svl, next_state_svl : std_logic_vector(3 downto 0) := (others => '0');
   signal bad_l1a_lone, bad_l1a_change, bad_l1a_change40 : std_logic := '0'; 
-  signal  cafifo_l1a_cnt_reg   : std_logic_vector(23 downto 0);
+  signal cafifo_l1a_cnt_reg   : std_logic_vector(23 downto 0);
+
 begin
 
   -- csp ILA core
@@ -160,6 +168,12 @@ begin
   --    DATA    => control_fsm_la_data,
   --    TRIG0   => control_fsm_la_trig
   --    );
+
+  ctrlfsm_ila_inst : ila_1
+    port map(
+      clk => CLK,
+      probe0 => control_fsm_la_data
+      );
 
   expect_pckt         <= or_reduce(cafifo_l1a_match);
   dev_cnt_svl         <= std_logic_vector(to_unsigned(dev_cnt, 5));

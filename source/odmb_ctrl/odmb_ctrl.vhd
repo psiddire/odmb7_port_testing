@@ -181,22 +181,6 @@ architecture Behavioral of ODMB_CTRL is
       );
   end component;
 
-
-  --component DUMMY_TRIGCTRL is
-  --  generic (
-  --    NCFEB : integer range 1 to 7 := 7
-  --    );
-  --  port (
-  --    CLK40       : in  std_logic;
-  --    RAW_L1A     : in  std_logic;
-  --    CAL_L1A     : in  std_logic;
-  --    CAL_MODE    : in  std_logic;
-  --    PEDESTAL    : in  std_logic;
-  --    DCFEB_L1A   : out std_logic;
-  --    DCFEB_L1A_MATCH : out std_logic_vector(NCFEB downto 1)
-  --    );
-  --end component;
-
   signal LOGICL : std_logic := '0';
   signal LOGICH : std_logic := '1';
 
@@ -297,7 +281,7 @@ begin
     generic map (NCFEB => NCFEB)
     port map (
       CLK           => clk40,
-      CLK80        =>  clk80,
+      CLK80         => clk80,
       RAW_L1A       => raw_l1a,
       RAW_LCT       => rawlct,
       CAL_LCT       => cal_lct,

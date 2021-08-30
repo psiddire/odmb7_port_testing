@@ -205,6 +205,7 @@ architecture Behavioral of mgt_spy is
   signal txpd_int : std_logic_vector(2*NLINK-1 downto 0) := (others => '0');
 
   -- debug signals
+  signal ila_data_tx: std_logic_vector(127 downto 0) := (others=> '0');
   signal ila_data_rx: std_logic_vector(127 downto 0) := (others=> '0');
   signal gtpowergood_vio_sync : std_logic_vector(1 downto 0) := (others=> '0');
   signal txpmaresetdone_vio_sync: std_logic_vector(1 downto 0) := (others=> '0');
@@ -294,13 +295,6 @@ begin
   -- rxprbslocked_int   -- PRBS related control signals, to be developed later
   -- txprbsforceerr_int -- PRBS related control signals, to be developed later
 
-  -- -- Uncomment following when disable the in-system IBERT
-  -- rxlpmen_int <= "11";
-  -- rxrate_int <= "000" & "000";
-  -- txdiffctrl_int <= "1100" & "1100";
-  -- txpostcursor_int <= "00000" & "00000";
-  -- txprecursor_int <= "00000" & "00000";
-
   ---------------------------------------------------------------------------------------------------------------------
   -- EXAMPLE WRAPPER INSTANCE
   ---------------------------------------------------------------------------------------------------------------------
@@ -377,11 +371,21 @@ begin
   ila_data_rx(33 downto 32)   <= ch0_rxchariscomma;
   ila_data_rx(37 downto 36)   <= ch0_rxnotintable;
 
-  -- mgt_spy_ila_inst : ila_1
-  --   port map(
-  --     clk => gtwiz_userclk_rx_usrclk2_int,
-  --     probe0 => ila_data_rx
-  --     );
+  ila_spy_rx_inst : ila_1
+    port map(
+      clk => gtwiz_userclk_rx_usrclk2_int,
+      probe0 => ila_data_rx
+      );
+
+  ila_data_tx(15 downto 0)    <= gtwiz_userdata_tx_int;
+  ila_data_tx(31 downto 16)   <= txdata;
+  ila_data_tx(32)             <= txd_valid;
+
+  ila_spy_tx_inst : ila_1
+    port map(
+      clk => gtwiz_userclk_tx_usrclk2_int,
+      probe0 => ila_data_tx
+      );
 
 
 end Behavioral;

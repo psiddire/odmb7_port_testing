@@ -119,14 +119,14 @@ entity odmb7_ucsb_dev is
     --------------------------------
     -- OTMB communication signals
     --------------------------------
-    OTMB        : in  std_logic_vector(35 downto 0);      -- "TMB[35:0]" in Bank 44-45
-    RAWLCT      : in  std_logic_vector(6 downto 0);       -- Bank 45 <-- To be updated
-    OTMB_DAV    : in  std_logic;                          -- "TMB_DAV" in Bank 45
-    -- ALCTDAV     : in  std_logic;          --  lctdav2
-    OTMB_FF_CLK : in  std_logic;                          -- "TMB_FF_CLK" in Bank 45
-    RSVTD_IN    : in  std_logic_vector(7 downto 3);       -- "RSVTD[7:3]" in Bank 44-45  <-- To be updated
-    RSVTD_OUT   : out std_logic_vector(2 downto 0);       -- "RSVTD[2:0]" in Bank 44-45  <-- To be updated
-    LCT_RQST    : out std_logic_vector(2 downto 1);       -- Bank 45
+    OTMB            : in  std_logic_vector(35 downto 0);   -- "TMB[35:0]" in Bank 44-45
+    RAWLCT          : in  std_logic_vector(7 downto 0);    -- Bank 45 <-- To be updated
+    OTMB_DAV        : in  std_logic;                       -- "TMB_DAV" in Bank 45
+    LEGACY_ALCT_DAV : in  std_logic;                       -- "RSVTD[7]" in r4 schematics
+    OTMB_FF_CLK     : in  std_logic;                       -- "TMB_FF_CLK" in Bank 45
+    RSVTD           : in  std_logic_vector(5 downto 3);    -- Bank 44-45, remapped r4 schematics
+    RSVFD           : out std_logic_vector(3 downto 1);    -- Bank 44-45, "RSVTD[2:0]" in r4 schematics
+    LCT_RQST        : out std_logic_vector(2 downto 1);    -- Bank 45
 
     --------------------------------
     -- ODMB JTAG
@@ -164,7 +164,7 @@ entity odmb7_ucsb_dev is
     RX12_SDA       : inout std_logic;
     RX12_SCL       : inout std_logic;
     RX12_CS_B      : out std_logic;
-    RX12_RST_B    : out std_logic;
+    RX12_RST_B     : out std_logic;
     RX12_INT_B     : in std_logic;
     RX12_PRESENT_B : in std_logic;
 
@@ -405,12 +405,13 @@ architecture Behavioral of odmb7_ucsb_dev is
       --------------------
       -- OTMB signals
       --------------------
-      OTMB        : in  std_logic_vector(17 downto 0);      -- "TMB[35:0]" in Bank 44-45
-      RAWLCT      : in  std_logic_vector(NCFEB -1  downto 0); -- Bank 45
+      OTMB        : in  std_logic_vector(35 downto 0);      -- "TMB[35:0]" in Bank 44-45
+      RAWLCT      : in  std_logic_vector(7 downto 0);       -- Bank 45
       OTMB_DAV    : in  std_logic;                          -- "TMB_DAV" in Bank 45
-      OTMB_FF_CLK : in  std_logic;                          -- "TMB_FF_CLK" in Bank 45
-      --RSVTD_IN    : in  std_logic_vector(7 downto 3);       -- "RSVTD[7:3]" in Bank 44-45
-      RSVTD_OUT   : out std_logic_vector(2 downto 0);       -- "RSVTD[2:0]" in Bank 44-45
+      ALCT_DAV    : in  std_logic;                          -- "LEGACY_ALCT_DAV" in Bank 45
+      OTMB_FF_CLK : in  std_logic;                          -- "TMB_FF_CLK" in Bank 45, not used
+      RSVTD       : in  std_logic_vector(5 downto 3);       -- Bank 44-45, remapped from r4 schematics
+      RSVFD       : out std_logic_vector(2 downto 0);       -- Bank 44-45, "RSVTD[2:0]" in r4 schematics
       LCT_RQST    : out std_logic_vector(2 downto 1);       -- Bank 45
 
       --------------------
@@ -495,14 +496,14 @@ architecture Behavioral of odmb7_ucsb_dev is
   component ODMB_CTRL is
     generic (
       NCFEB       : integer range 1 to 7 := NCFEB; -- Number of DCFEBS, 7 for ME1/1, 5
-      CAFIFO_SIZE : integer range 1 to 128 := 32   -- Number FIFO words in CAFIFO
+      CAFIFO_SIZE : integer range 1 to 128 := 16   -- Number FIFO words in CAFIFO: 32 for ODMB, 16 for test
       );
     port (
       --------------------
       -- Clock
       --------------------
-      CLK80       : in std_logic;
-      CLK40       : in std_logic;
+      CLK80        : in std_logic;
+      CLK40        : in std_logic;
 
       CCB_CMD      : in  std_logic_vector (5 downto 0);  -- ccbcmnd(5 downto 0) - from J3
       CCB_CMD_S    : in  std_logic;       -- ccbcmnd(6) - from J3
@@ -627,10 +628,10 @@ architecture Behavioral of odmb7_ucsb_dev is
 
   component LCTDLY is  -- Aligns RAW_LCT with L1A by 2.4 us to 4.8 us
     port (
-      DIN   : in std_logic;
+      DOUT  : out std_logic;
       CLK   : in std_logic;
       DELAY : in std_logic_vector(5 downto 0);
-      DOUT : out std_logic
+      DIN   : in std_logic
       );
   end component;
 
@@ -1114,8 +1115,8 @@ begin
       DCFEB_FIFO_RST      => "0000000", -- auto-kill related
       EOF_DATA            => eof_data,
 
-      OTMB_DATA_IN        => otmb,
-      ALCT_DATA_IN        => alct,
+      OTMB_DATA_IN        => OTMB(17 downto 0),
+      ALCT_DATA_IN        => OTMB(35 downto 18),
 
       DCFEB_DV_IN         => dcfeb_dv_in,
       DCFEB1_DATA_IN      => dcfeb1_data,
@@ -1360,7 +1361,7 @@ begin
   LCTDLY_GTRG : LCTDLY port map(DOUT => test_l1a, CLK => cmsclk, DELAY => lct_l1a_dly, DIN => test_lct);
 
   --raw_l1a <= test_l1a;
-  raw_lct <= (others => '1') when (test_lct = '1') else rawlct; 
+  raw_lct <= (others => '1') when (test_lct = '1') else RAWLCT; 
   raw_l1a <= '1' when test_l1a = '1' else
              not ccb_l1a_b;
   --           tc_l1a when (testctrl_sel = '1') else
@@ -1377,10 +1378,10 @@ begin
 
   int_alct_dav <= '1' when test_alct_dav = '1' else
                   --tc_alct_dav when (testctrl_sel = '1') else
-                  alctdav;              -- lctdav2
+                  LEGACY_ALCT_DAV;
   int_otmb_dav <= '1' when test_otmb_dav = '1' else
                   --tc_otmb_dav when (testctrl_sel = '1') else
-                  otmbdav;              -- lctdav1
+                  OTMB_DAV;
 
   -------------------------------------------------------------------------------------------
   -- Handle Internal configuration signals
@@ -1612,10 +1613,11 @@ begin
 
       OTMB        => OTMB,
       RAWLCT      => RAWLCT(6 downto 0),
-      OTMB_DAV    => OTMBDAV,
+      OTMB_DAV    => OTMB_DAV,
+      ALCT_DAV    => LEGACY_ALCT_DAV,
       OTMB_FF_CLK => OTMB_FF_CLK,
-      --RSVTD_IN    => RSVTD_IN,
-      RSVTD_OUT   => RSVTD_OUT,
+      RSVTD       => RSVTD,
+      RSVFD       => RSVFD,
       LCT_RQST    => LCT_RQST,
 
       FW_RESET => fw_reset,
@@ -1763,7 +1765,7 @@ begin
       CAFIFO_L1A_DAV       => cafifo_l1a_dav, 
       CAFIFO_BX_CNT        => cafifo_bx_cnt, 
 
-      -- From GigaLinks
+      -- To GigaLinks
       DDU_DATA            => ddu_data, 
       DDU_DATA_VALID      => ddu_data_valid, 
   

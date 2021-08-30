@@ -93,12 +93,13 @@ entity ODMB_VME is
     --------------------
     -- OTMB connections through backplane
     --------------------
-    OTMB        : in  std_logic_vector(17 downto 0);      -- "TMB[35:0]" in Bank 44-45
-    RAWLCT      : in  std_logic_vector(NCFEB-1 downto 0); -- Bank 45
+    OTMB        : in  std_logic_vector(35 downto 0);      -- "TMB[35:0]" in Bank 44-45
+    RAWLCT      : in  std_logic_vector(7 downto 0);       -- Bank 45
     OTMB_DAV    : in  std_logic;                          -- "TMB_DAV" in Bank 45
+    ALCT_DAV    : in  std_logic;                          -- "LEGACY_ALCT_DAV" in Bank 45
     OTMB_FF_CLK : in  std_logic;                          -- "TMB_FF_CLK" in Bank 45, not used
-    --RSVTD_IN    : in  std_logic_vector(7 downto 3);       -- "RSVTD[7:3]" in Bank 44-45
-    RSVTD_OUT   : out std_logic_vector(2 downto 0);       -- "RSVTD[2:0]" in Bank 44-45
+    RSVTD       : in  std_logic_vector(5 downto 3);       -- Bank 44-45, remapped from r4 schematics
+    RSVFD       : out std_logic_vector(2 downto 0);       -- Bank 44-45, "RSVTD[2:0]" in r4 schematics
     LCT_RQST    : out std_logic_vector(2 downto 1);       -- Bank 45
 
     --------------------
@@ -609,6 +610,7 @@ begin
 
   outdata_dev(0) <= (others => '0');
   outdata_dev(5) <= (others => '0');
+  outdata_dev(6) <= (others => '0');
   idx_dev <= to_integer(unsigned(cmd_adrs_inner(15 downto 12)));
   VME_DATA_OUT <= outdata_dev(idx_dev);
 
@@ -617,11 +619,11 @@ begin
   ----------------------------------
   -- OTMB backplane pins
   ----------------------------------
-  LCT_RQST(1)  <= otmb_lct_rqst                when otmb_rx(0) = '0' else otmb_rx(0);
-  LCT_RQST(2)  <= otmb_ext_trig                when otmb_rx(0) = '0' else otmb_rx(1);
-  RSVTD_OUT(0) <= cafifo_l1a                   when otmb_rx(0) = '0' else otmb_rx(3); -- TODO: cafifo_l1a is place holder only
-  RSVTD_OUT(1) <= cafifo_l1a_match_in(NCFEB+1) when otmb_rx(0) = '0' else otmb_rx(4); -- TODO: cafifo_l1a is place holder only
-  RSVTD_OUT(2) <= cafifo_l1a_match_in(NCFEB+2) when otmb_rx(0) = '0' else otmb_rx(5); -- TODO: cafifo_l1a is place holder only
+  LCT_RQST(1) <= otmb_lct_rqst                when otmb_rx(0) = '0' else otmb_rx(0);
+  LCT_RQST(2) <= otmb_ext_trig                when otmb_rx(0) = '0' else otmb_rx(1);
+  RSVFD(0)    <= cafifo_l1a                   when otmb_rx(0) = '0' else otmb_rx(3); -- TODO: cafifo_l1a is place holder only
+  RSVFD(1)    <= cafifo_l1a_match_in(NCFEB+1) when otmb_rx(0) = '0' else otmb_rx(4); -- TODO: cafifo_l1a is place holder only
+  RSVFD(2)    <= cafifo_l1a_match_in(NCFEB+2) when otmb_rx(0) = '0' else otmb_rx(5); -- TODO: cafifo_l1a is place holder only
 
   -- Output referred to odmb_device.vhd: dmb_tx_odmb(48 downto 0)
   -- dmb_tx_odmb_inner <= "101" & lct(7 downto 6) & alct_dav & eof_alct_data(16 downto 15) &
@@ -629,21 +631,19 @@ begin
   --                      eof_otmb_data(16 downto 15) & eof_alct_data(14 downto 0) & eof_otmb_data(14 downto 0);
 
   otmb_tx(14 downto 0)  <= OTMB(14 downto 0);    -- tmb_data[14:0]      // fifo data
-  otmb_tx(29 downto 15) <= "000" & x"000";       -- OTMB(32 downto 18)  // -- alct_data[14:0]     // alct data	
+  otmb_tx(29 downto 15) <= OTMB(32 downto 18);   -- alct_data[14:0]     // alct data
   otmb_tx(30)           <= OTMB(15);             -- tmb_ddu_special     // DDU special
   otmb_tx(31)           <= OTMB(16);             -- tmb_last_frame      // DMB last
   otmb_tx(32)           <= OTMB_DAV;             -- tmb_first_frame     // DMB data available
   otmb_tx(33)           <= OTMB(17);             -- tmb_/wr_enable      // DMB /wr
   otmb_tx(34)           <= RAWLCT(0);            -- tmb_active_feb_flag // DMB active cfeb flag
   otmb_tx(39 downto 35) <= RAWLCT(5 downto 1);   -- tmb_active_feb[4:0] // DMB active cfeb list
-  otmb_tx(40)           <= '0'; --OTMB(35);             -- alct_/wr_enable     // ALCT _wr_fifo
-  otmb_tx(41)           <= '0'; --OTMB(33);             -- alct_ddu_special    // ALCT ddu_special (alct_data[15])
-  otmb_tx(42)           <= '0'; --OTMB(34);             -- alct_last_frame     // ALCT last frame  (alct_data[16])
-  --otmb_tx(43)           <= RSVTD_IN(7);          -- alct_first_frame    // ALCT first frame (ALCT_DAV)
-  --otmb_tx(45 downto 44) <= RSVTD_IN(5 downto 4); -- res_to_dmb[2:1]     // DMB active cfeb list
-  --otmb_tx(46)           <= RSVTD_IN(6);          -- res_to_dmb[3]       // Not used, ='1' in PRBS test
-  --otmb_tx(47)           <= RAWLCT(6);            -- res_to_dmb[4]       // Not used, ='0' in PRBS test
-  --otmb_tx(48)           <= RSVTD_IN(3);          -- res_to_dmb[5]       // Not used, ='1' in PRBS test
+  otmb_tx(40)           <= OTMB(35);             -- alct_/wr_enable     // ALCT _wr_fifo
+  otmb_tx(41)           <= OTMB(33);             -- alct_ddu_special    // ALCT ddu_special (alct_data[15])
+  otmb_tx(42)           <= OTMB(34);             -- alct_last_frame     // ALCT last frame  (alct_data[16])
+  otmb_tx(43)           <= ALCT_DAV;             -- alct_first_frame    // ALCT first frame (ALCT_DAV)
+  otmb_tx(45 downto 44) <= RAWLCT(7 downto 6);   -- res_to_dmb[2:1]     // DMB active cfeb list
+  otmb_tx(48 downto 46) <= RSVTD(5 downto 3);    -- res_to_dmb[5:3]     // Not used, ="101" in PRBS test
 
   ----------------------------------
   -- misc
@@ -959,6 +959,5 @@ begin
       NCMDS_SPIINTR => spi_ncmds_spiintr,
       DIAGOUT => diagout_buf
       );
-
 
 end Behavioral;

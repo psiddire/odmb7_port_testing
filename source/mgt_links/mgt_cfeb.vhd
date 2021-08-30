@@ -142,13 +142,13 @@ architecture Behavioral of mgt_cfeb is
       );
   end component;
 
-  -- -- Uncomment for debugging ILA module
-  -- component ila_2 is
-  --   port (
-  --     clk : in std_logic := '0';
-  --     probe0 : in std_logic_vector(383 downto 0) := (others=> '0')
-  --     );
-  -- end component;
+  -- Temporary debugging
+  component ila_cfeb is
+    port (
+      clk : in std_logic := '0';
+      probe0 : in std_logic_vector(383 downto 0) := (others=> '0')
+      );
+  end component;
 
   -- Synchronize the latched link down reset input and the VIO-driven signal into the free-running clock domain
   -- signals passed to wizard
@@ -406,10 +406,10 @@ begin
   ila_data_rx(359 downto 353) <= kill_rxpd;
   ila_data_rx(360)            <= reset;
 
-  -- mgt_cfeb_ila_inst : ila_2
-  --   port map(
-  --     clk => gtwiz_userclk_rx_usrclk2_int,
-  --     probe0 => ila_data_rx
-  --     );
+  mgt_cfeb_ila_inst : ila_cfeb
+    port map(
+      clk => gtwiz_userclk_rx_usrclk2_int,
+      probe0 => ila_data_rx
+      );
 
 end Behavioral;
