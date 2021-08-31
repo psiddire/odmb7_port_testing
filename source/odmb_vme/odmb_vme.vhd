@@ -2,17 +2,6 @@
 -- ODMB_VME: Handles the VME protocol and selects VME device
 ------------------------------
 
--- Device 0 => TESTCTRL
--- Device 1 => CFEBJTAG
--- Device 2 => ODMBJTAG
--- Device 3 => VMEMON
--- Device 4 => VMECONFREGS
--- Device 5 => TESTFIFOS
--- Device 6 => BPI_PORT
--- Device 7 => SYSTEM_MON
--- Device 8 => LVDBMON
--- Device 9 => SYSTEM_TEST
-
 library IEEE;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -22,6 +11,20 @@ library unisim;
 use unisim.vcomponents.all;
 use work.ucsb_types.all;
 
+--! @brief ODMB7 VME (slow control) module
+--! @details ODMB7 module that processes slow control commands from the VMEbus backplane
+--! This module contains several 'device' submodules dedicated to certain types of commands
+--! The commands for device X take the for XYYY. The devices are:
+--! Device 0 - TESTCTRL - not implemented
+--! Device 1 - CFEBJTAG - generates slow control commands in the JTAG protocol for (x)DCFEBs
+--! Device 2 - ODMBJTAG - generates slow control commands in the JTAG protocol for the ODMB7 FPGA (Kintex Ultrascale)
+--! Device 3 - VMEMON - used to monitor various registers, set certain settings, and send reset signals
+--! Device 4 - VMECONFREGS - used to interact with the configuration and constant registers in nonvolatile memory
+--! Device 5 - TESTFIFOS - not implemented
+--! Device 6 - SPI_PORT - used to interact with ODMB7 PROM ICs
+--! Device 7 - SYSTEM_MON - used to measure temperature, currents, and voltages
+--! Device 8 - LVDBMON - used to interact with LVMB7 board
+--! Device 9 - SYSTEM_TEST - used to perform communication tests including optical connection to (x)DCFEBs, backplane connection to OTMB, and FED/SPY loopback
 entity ODMB_VME is
   generic (
     NCFEB       : integer range 1 to 7 := 7
@@ -341,13 +344,15 @@ architecture Behavioral of ODMB_VME is
       SPI_CFG_REGS         : in cfg_regs_array;
       SPI_CONST_REGS       : in cfg_regs_array;
       --signals to/from SPI_CTRL
+      SPI_RST                   : out std_logic;
+      SPI_ENBL                  : out std_logic;
+      SPI_DSBL                  : out std_logic; 
       SPI_CMD_FIFO_WRITE_EN : out std_logic;
       SPI_CMD_FIFO_IN      : out std_logic_vector(15 downto 0);
       SPI_READBACK_FIFO_OUT     : in std_logic_vector(15 downto 0);
       SPI_READBACK_FIFO_READ_EN : out std_logic;
       SPI_READ_BUSY             : in std_logic;
-      SPI_NCMDS_SPICTRL         : in unsigned(15 downto 0);
-      SPI_NCMDS_SPIINTR         : in unsigned(15 downto 0);
+      SPI_RBK_WRD_CNT           : in std_logic_vector(10 downto 0);
       --debug
       DIAGOUT                   : out std_logic_vector(17 downto 0)
       );
@@ -494,9 +499,11 @@ architecture Behavioral of ODMB_VME is
       CNFG_DATA_OUT         : out std_logic_vector(7 downto 4);
       CNFG_DATA_DIR         : out std_logic_vector(7 downto 4);
       PROM_CS2_B            : out std_logic;
+      RBK_WRD_CNT           : out std_logic_vector(10 downto 0);
+      FSM_RST               : in std_logic;
+      FSM_ENABLE            : in std_logic;
+      FSM_DISABLE           : in std_logic;
 
-      NCMDS_SPICTRL         : out unsigned(15 downto 0);
-      NCMDS_SPIINTR         : out unsigned(15 downto 0);
       DIAGOUT               : out std_logic_vector(17 downto 0)
       );
   end component;
@@ -549,17 +556,19 @@ architecture Behavioral of ODMB_VME is
   signal spi_const_reg_we           : integer range 0 to NREGS := 0;
   signal spi_const_regs             : cfg_regs_array;
   signal spi_cfg_regs               : cfg_regs_array;
-  signal spi_ncmds_spictrl          : unsigned (15 downto 0);
-  signal spi_ncmds_spiintr          : unsigned (15 downto 0);
 
   --------------------------------------
   -- PROM signals
   --------------------------------------
+  signal spi_rst                   : std_logic := '0';
+  signal spi_enable                : std_logic := '0';
+  signal spi_disable               : std_logic := '0';
   signal spi_cmd_fifo_write_en     : std_logic := '0';
   signal spi_cmd_fifo_in           : std_logic_vector(15 downto 0) := x"0000";
   signal spi_readback_fifo_read_en : std_logic := '0';
   signal spi_readback_fifo_out     : std_logic_vector(15 downto 0) := x"0000";
   signal spi_read_busy             : std_logic := '0';
+  signal spi_rbk_wrd_cnt           : std_logic_vector(10 downto 0) := "00000000000";
 
 
 begin
@@ -771,13 +780,15 @@ begin
       SPI_CFG_REG_WE => spi_cfg_reg_we,
       SPI_CFG_REGS => spi_cfg_regs,
       SPI_CONST_REGS => spi_const_regs,
+      SPI_RST => spi_rst,
+      SPI_ENBL => spi_enable,
+      SPI_DSBL => spi_disable,
       SPI_CMD_FIFO_WRITE_EN => spi_cmd_fifo_write_en,
       SPI_CMD_FIFO_IN => spi_cmd_fifo_in,
       SPI_READBACK_FIFO_OUT => spi_readback_fifo_out,
       SPI_READBACK_FIFO_READ_EN => spi_readback_fifo_read_en,
       SPI_READ_BUSY => spi_read_busy,
-      SPI_NCMDS_SPICTRL => spi_ncmds_spictrl,
-      SPI_NCMDS_SPIINTR => spi_ncmds_spiintr,
+      SPI_RBK_WRD_CNT => spi_rbk_wrd_cnt,
       DIAGOUT => open
       );
 
@@ -909,8 +920,10 @@ begin
       CNFG_DATA_OUT         => CNFG_DATA_OUT,
       CNFG_DATA_DIR         => CNFG_DATA_DIR,
       PROM_CS2_B            => PROM_CS2_B,
-      NCMDS_SPICTRL         => spi_ncmds_spictrl,
-      NCMDS_SPIINTR         => spi_ncmds_spiintr,
+      RBK_WRD_CNT           => spi_rbk_wrd_cnt,
+      FSM_RST               => spi_rst,
+      FSM_ENABLE            => spi_enable,
+      FSM_DISABLE           => spi_disable,
       DIAGOUT               => diagout_buf
       );
 

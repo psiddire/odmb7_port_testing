@@ -6,7 +6,16 @@ use ieee.numeric_std.all;
 use work.ucsb_types.all;
 use unisim.vcomponents.all;
 
---! @brief Module that controls post-startup communication with EPROMs
+--! @brief Module that interprets PROM commands and controls post-startup communication with EPROMs
+--! @details supported PROM commands (sent with W 602C XXXX)
+--! (n-1)<<5 | 0004 read n words from PROM to readback FIFO
+--! 000A erase sector
+--! (n-1)<<5 | 000C write n words to PROM (follow with n words to write)
+--! 0012 write configuration register (follow with 2 words to write to configuration register)
+--! 0013 write lock bit on sector
+--! 0014 erase lock bit on sector
+--! (addr_upper)<<5 | 0017 load address (follow with 1 word of lower address bits)
+--! (prom_number)<<5 | 001D switch to PROM prom_number (0 or 1)
 entity SPI_CTRL is
   port (
     
@@ -26,8 +35,12 @@ entity SPI_CTRL is
     CNFG_DATA_DIR         : out std_logic_vector(7 downto 4);  --! Tristate controller for second EPROM (1=to PROM)
     PROM_CS2_B            : out std_logic;                     --! Chip select for second EPROM
     
-    NCMDS_SPICTRL         : out unsigned(15 downto 0);         --! Debug signal that counts the number of commands received by SPI_CTRL
-    NCMDS_SPIINTR         : out unsigned(15 downto 0);         --! Debug signal that counts the number of commands passed to SPI_INTERFACE
+    RBK_WRD_CNT           : out std_logic_vector(10 downto 0); --! Number of words in readback FIFO
+    
+    FSM_RST               : in std_logic;                      --! reset signal for finite state machine
+    FSM_ENABLE            : in std_logic;                      --! enable signal for finite state machine
+    FSM_DISABLE           : in std_logic;                      --! disable signal for finite state machine
+    
     DIAGOUT               : out std_logic_vector(17 downto 0)  --! Debug signals
 
     );
@@ -163,6 +176,8 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
   signal write_config_done   : std_logic := '0';
   signal register_contents   : std_logic_vector(15 downto 0) := (others => '0');
   
+  signal fsm_is_enabled      : std_logic := '1';
+  
   --READ signals
   type rd_fifo_states is (S_FIFOIDLE, S_FIFOWRITE_PRE, S_FIFOWRITE);
   signal rd_fifo_state : rd_fifo_states := S_FIFOIDLE;
@@ -177,10 +192,13 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
   signal spi_readdata              : std_logic_vector(15 downto 0) := x"0000";
   signal readback_fifo_wr_rst_busy : std_logic := '0'; 
   signal readback_fifo_rd_rst_busy : std_logic := '0';
+  signal nwords_readback           : unsigned(10 downto 0) := "00000000000";
+  signal read_en_clk40_meta        : std_logic := '0';
+  signal read_en_clk40_sync1       : std_logic := '0';
+  signal read_en_clk40_sync2       : std_logic := '0';
+  signal read_en_clk40_pulse       : std_logic := '0';
   
   --debugging signals
-  signal ncmds_spictrl_inner    : unsigned (15 downto 0) := x"0000";
-  signal ncmds_spiintr_inner    : unsigned (15 downto 0) := x"0000";
   signal cmd_fifo_read_en_q     : std_logic := '0';
   signal cmd_fifo_read_en_pulse : std_logic := '0';
   signal ila_probe              : std_logic_vector(511 downto 0) := (others => '0');
@@ -229,9 +247,6 @@ begin
   CNFG_DATA_OUT <= cnfg_data_out_inner;
   CNFG_DATA_DIR <= cnfg_data_dir_inner;
 
-  ncmds_spictrl_inner <= (ncmds_spictrl_inner + 1) when (rising_edge(CLK2P5) and CMD_FIFO_WRITE_EN='1') else
-                         ncmds_spictrl_inner;
-
   --Handle outside signals coming to command FIFO
   spi_cmd_fifo_i : spi_cmd_fifo
       PORT MAP (
@@ -250,681 +265,708 @@ begin
       
   cmd_fifo_read_en_q <= cmd_fifo_read_en when rising_edge(CLK40) else cmd_fifo_read_en_q;
   cmd_fifo_read_en_pulse <= (not cmd_fifo_read_en_q) and cmd_fifo_read_en;
+  
+  enable_cmd_fifo_fsm : process(CLK40, RST)
+  begin
+    if (RST='1') then
+      fsm_is_enabled <= '1';
+    else
+      if (FSM_ENABLE='1') then
+        fsm_is_enabled <= '1';
+      elsif (FSM_DISABLE='1') then
+        fsm_is_enabled <= '0';
+      else
+        fsm_is_enabled <= fsm_is_enabled;
+      end if;
+    end if;
+  end process;
 
   --FSM to process command FIFO
   process_cmd_fifo_fsm : process(CLK40, RST)
   begin
-  if (RST='1') then
+  if (RST='1' or FSM_RST='1') then
     cmd_fifo_state <= S_IDLE;
   elsif (rising_edge(CLK40)) then
-    case cmd_fifo_state is
-    
-    when S_IDLE =>
-      --do nothing until command to process (command FIFO is not empty)
-      if (cmd_fifo_empty='0') then
-        case "000" & cmd_fifo_out(4 downto 0) is
-        when x"04" =>
-          --read n
-          cmd_fifo_state  <= S_READ_CMD;
-        when x"0A" =>
-          --erase sector (hardcode to 1 sector?)
-          cmd_fifo_state  <= S_ERASE_CMD;
-        when x"0C" =>
-          --buffer program 
-          cmd_fifo_state  <= S_WRITE_CMD;
-        when x"12" =>
-          --write configuration register
-          cmd_fifo_state  <= S_WRITE_CONFIG_CMD;
-        when x"13" =>
-          --lock block
-          cmd_fifo_state  <= S_LOCK_CMD;
-        when x"14" =>
-          --unlock
-          cmd_fifo_state  <= S_UNLOCK_CMD;
-        when x"17" =>
-          --load address
-          cmd_fifo_state  <= S_LOAD_ADDR_CMD;
-        when x"1D" =>
-          --switch prom
-          cmd_fifo_state  <= S_SWITCH_PROM_CMD;
-        when others =>
-          --unknown command
-          cmd_fifo_state  <= S_UNKNOWN_CMD;
-        end case;
-      else
-        cmd_fifo_state    <= S_IDLE;
-      end if;
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '0';
-      read_nwords         <= read_nwords;
-      program_nwords      <= program_nwords;
-      prom_addr           <= prom_addr;
-      prom_select         <= prom_select;
-      register_contents   <= register_contents;
+    if (fsm_is_enabled='1') then
+      case cmd_fifo_state is
       
-    when S_READ_CMD =>
-      --start read process by sending read enable and number of words to read. Also remove command from FIFO
-      ncmds_spiintr_inner <= ncmds_spiintr_inner + 1;
-      cmd_fifo_state      <= S_READ_LOW;
-      prom_read_en        <= '1';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '1';
-      read_nwords         <= "0" & unsigned(cmd_fifo_out(15 downto 5)); 
-      program_nwords      <= program_nwords;
-      prom_addr           <= prom_addr;
-      prom_select         <= prom_select;
-      register_contents   <= register_contents;
-      
-    when S_READ_LOW => 
-      --needed to wait for read_done to go low
-      cmd_fifo_state      <= S_READ_WAIT;
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '0';
-      read_nwords         <= read_nwords; 
-      program_nwords      <= program_nwords;
-      write_word_counter  <= write_word_counter;
-      prom_addr           <= prom_addr;
-      prom_select         <= prom_select;
-      register_contents   <= register_contents;
-      
-    when S_READ_WAIT =>
-      --don't process any more commands until read is finished
-      if (read_done='1') then
-        cmd_fifo_state    <= S_IDLE;
-      else 
-        cmd_fifo_state    <= S_READ_WAIT;
-      end if;
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '0';
-      read_nwords         <= read_nwords; 
-      program_nwords      <= program_nwords;
-      prom_addr           <= prom_addr;
-      prom_select         <= prom_select;
-      register_contents   <= register_contents;
-      
-    when S_ERASE_CMD =>
-      --start erase sector command with erase enable and remove command from FIFO
-      ncmds_spiintr_inner <= ncmds_spiintr_inner + 1;
-      cmd_fifo_state      <= S_ERASE_LOW;
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '1';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '1';  
-      read_nwords         <= read_nwords;
-      program_nwords      <= program_nwords;
-      prom_addr           <= prom_addr;
-      prom_select         <= prom_select;
-      register_contents   <= register_contents;
-      
-    when S_ERASE_LOW => 
-      --wait for erase_done to go low
-      cmd_fifo_state      <= S_ERASE_WAIT;
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '0';
-      read_nwords         <= read_nwords;
-      program_nwords      <= program_nwords;
-      prom_addr           <= prom_addr;
-      prom_select         <= prom_select;
-      register_contents   <= register_contents;
-      
-    when S_ERASE_WAIT =>
-      --don't accept any more commands until done with erase command
-      if (erase_done='1') then
-        cmd_fifo_state    <= S_IDLE;
-      else 
-        cmd_fifo_state    <= S_ERASE_WAIT;
-      end if;
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '0';
-      read_nwords         <= read_nwords;
-      program_nwords      <= program_nwords;
-      prom_addr           <= prom_addr;
-      prom_select         <= prom_select;
-      register_contents   <= register_contents;
-      
-    when S_WRITE_CMD =>
-      --read number of words to program from command and remove command from FIFO
-      ncmds_spiintr_inner <= ncmds_spiintr_inner + 1;
-      write_word_counter  <= x"000";
-      cmd_fifo_state      <= S_WRITE_STALL_1; 
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '1';
-      read_nwords         <= read_nwords;      
-      program_nwords      <= "0" & unsigned(cmd_fifo_out(15 downto 5));
-      prom_addr           <= prom_addr;
-      prom_select         <= prom_select;
-      register_contents   <= register_contents;
+      when S_IDLE =>
+        --do nothing until command to process (command FIFO is not empty)
+        if (cmd_fifo_empty='0') then
+          case "000" & cmd_fifo_out(4 downto 0) is
+          when x"04" =>
+            --read n
+            cmd_fifo_state  <= S_READ_CMD;
+          when x"0A" =>
+            --erase sector (hardcode to 1 sector?)
+            cmd_fifo_state  <= S_ERASE_CMD;
+          when x"0C" =>
+            --buffer program 
+            cmd_fifo_state  <= S_WRITE_CMD;
+          when x"12" =>
+            --write configuration register
+            cmd_fifo_state  <= S_WRITE_CONFIG_CMD;
+          when x"13" =>
+            --lock block
+            cmd_fifo_state  <= S_LOCK_CMD;
+          when x"14" =>
+            --unlock
+            cmd_fifo_state  <= S_UNLOCK_CMD;
+          when x"17" =>
+            --load address
+            cmd_fifo_state  <= S_LOAD_ADDR_CMD;
+          when x"1D" =>
+            --switch prom
+            cmd_fifo_state  <= S_SWITCH_PROM_CMD;
+          when others =>
+            --unknown command
+            cmd_fifo_state  <= S_UNKNOWN_CMD;
+          end case;
+        else
+          cmd_fifo_state    <= S_IDLE;
+        end if;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        
+      when S_READ_CMD =>
+        --start read process by sending read enable and number of words to read. Also remove command from FIFO
+        cmd_fifo_state      <= S_READ_LOW;
+        prom_read_en        <= '1';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '1';
+        read_nwords         <= "0" & unsigned(cmd_fifo_out(15 downto 5)); 
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        
+      when S_READ_LOW => 
+        --needed to wait for read_done to go low
+        cmd_fifo_state      <= S_READ_WAIT;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';
+        read_nwords         <= read_nwords; 
+        program_nwords      <= program_nwords;
+        write_word_counter  <= write_word_counter;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        
+      when S_READ_WAIT =>
+        --don't process any more commands until read is finished
+        if (read_done='1') then
+          cmd_fifo_state    <= S_IDLE;
+        else 
+          cmd_fifo_state    <= S_READ_WAIT;
+        end if;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';
+        read_nwords         <= read_nwords; 
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        
+      when S_ERASE_CMD =>
+        --start erase sector command with erase enable and remove command from FIFO
+        cmd_fifo_state      <= S_ERASE_LOW;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '1';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '1';  
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        
+      when S_ERASE_LOW => 
+        --wait for erase_done to go low
+        cmd_fifo_state      <= S_ERASE_WAIT;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        
+      when S_ERASE_WAIT =>
+        --don't accept any more commands until done with erase command
+        if (erase_done='1') then
+          cmd_fifo_state    <= S_IDLE;
+        else 
+          cmd_fifo_state    <= S_ERASE_WAIT;
+        end if;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        
+      when S_WRITE_CMD =>
+        --read number of words to program from command and remove command from FIFO
+        write_word_counter  <= x"000";
+        cmd_fifo_state      <= S_WRITE_STALL_1; 
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '1';
+        read_nwords         <= read_nwords;      
+        program_nwords      <= "0" & unsigned(cmd_fifo_out(15 downto 5));
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
 
-    when S_WRITE_STALL_1 =>
-      --wait an extra cycle for empty to be potentially de-asserted
-      cmd_fifo_state      <= S_WRITE_STALL_2;
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '0';
-      read_nwords         <= read_nwords;
-      program_nwords      <= program_nwords;
-      prom_addr           <= prom_addr;
-      prom_select         <= prom_select;
-      register_contents   <= register_contents;
-     
-    when S_WRITE_STALL_2 =>
-      --continue when next word to write ready in command FIFO
-      if (cmd_fifo_empty='0') then
-        cmd_fifo_state    <= S_WRITE_WORD;
-      else
-        cmd_fifo_state    <= S_WRITE_STALL_2;
-      end if;
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '0';
-      read_nwords         <= read_nwords;
-      program_nwords      <= program_nwords;
-      prom_addr           <= prom_addr;
-      prom_select         <= prom_select;
-      register_contents   <= register_contents;
-      
-    when S_WRITE_WORD =>
-      --write this word to the spi_interface write buffer FIFO (goes directly from command FIFO to spi_interface buffer)
-      write_word_counter  <= write_word_counter + 1;
-      ncmds_spiintr_inner <= ncmds_spiintr_inner + 1;
-      if (write_word_counter = program_nwords) then
-        cmd_fifo_state    <= S_WRITE_START;
-      else
-        cmd_fifo_state    <= S_WRITE_STALL_1;
-      end if;
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '1';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '1';
-      read_nwords         <= read_nwords;
-      program_nwords      <= program_nwords;
-      prom_addr           <= prom_addr;
-      prom_select         <= prom_select;
-      register_contents   <= register_contents;
-      
-    when S_WRITE_START =>
-      --start write command
-      cmd_fifo_state      <= S_WRITE_WAIT;
-      prom_read_en        <= '0';
-      prom_write_en       <= '1';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '0';
-      read_nwords         <= read_nwords;
-      program_nwords      <= program_nwords;
-      prom_addr           <= prom_addr;
-      prom_select         <= prom_select;
-      register_contents   <= register_contents;
-      
-    when S_WRITE_WAIT => 
-      --wait until write_done is 1
-      if (write_done='1') then
-        cmd_fifo_state    <= S_IDLE;
-      else 
-        cmd_fifo_state    <= S_WRITE_WAIT;
-      end if;
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '0';
-      read_nwords         <= read_nwords;
-      program_nwords      <= program_nwords;
-      prom_addr           <= prom_addr;
-      prom_select         <= prom_select;
-      register_contents   <= register_contents;
+      when S_WRITE_STALL_1 =>
+        --wait an extra cycle for empty to be potentially de-asserted
+        cmd_fifo_state      <= S_WRITE_STALL_2;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+       
+      when S_WRITE_STALL_2 =>
+        --continue when next word to write ready in command FIFO
+        if (cmd_fifo_empty='0') then
+          cmd_fifo_state    <= S_WRITE_WORD;
+        else
+          cmd_fifo_state    <= S_WRITE_STALL_2;
+        end if;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        
+      when S_WRITE_WORD =>
+        --write this word to the spi_interface write buffer FIFO (goes directly from command FIFO to spi_interface buffer)
+        write_word_counter  <= write_word_counter + 1;
+        if (write_word_counter = program_nwords) then
+          cmd_fifo_state    <= S_WRITE_START;
+        else
+          cmd_fifo_state    <= S_WRITE_STALL_1;
+        end if;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '1';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '1';
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        
+      when S_WRITE_START =>
+        --start write command
+        cmd_fifo_state      <= S_WRITE_WAIT;
+        prom_read_en        <= '0';
+        prom_write_en       <= '1';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        
+      when S_WRITE_WAIT => 
+        --wait until write_done is 1
+        if (write_done='1') then
+          cmd_fifo_state    <= S_IDLE;
+        else 
+          cmd_fifo_state    <= S_WRITE_WAIT;
+        end if;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
 
-    when S_WRITE_CONFIG_CMD =>
-      --remove command from FIFO
-      ncmds_spiintr_inner <= ncmds_spiintr_inner + 1;
-      write_word_counter  <= x"000";
-      cmd_fifo_state      <= S_WRITE_CONFIG_STALL_1; 
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '1';
-      read_nwords         <= read_nwords;      
-      program_nwords      <= program_nwords;
-      prom_addr           <= prom_addr;
-      prom_select         <= prom_select;
-      register_contents   <= register_contents;
+      when S_WRITE_CONFIG_CMD =>
+        --remove command from FIFO
+        write_word_counter  <= x"000";
+        cmd_fifo_state      <= S_WRITE_CONFIG_STALL_1; 
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '1';
+        read_nwords         <= read_nwords;      
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
 
-    when S_WRITE_CONFIG_STALL_1 => 
-      --need to wait because empty takes an extra cycle to go low
-      cmd_fifo_state      <= S_WRITE_CONFIG_STALL_2;
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '0';  
-      read_nwords         <= read_nwords;
-      program_nwords      <= program_nwords;
-      prom_addr           <= prom_addr;
-      prom_select         <= prom_select;
-      register_contents   <= register_contents;
-      
-    when S_WRITE_CONFIG_STALL_2 => 
-      --continue when lower part of address is ready in command FIFO
-      if (cmd_fifo_empty='0') then
-        cmd_fifo_state    <= S_WRITE_CONFIG_LOWER;
-      else
-        cmd_fifo_state    <= S_WRITE_CONFIG_STALL_2;
-      end if;
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '0';  
-      read_nwords         <= read_nwords;
-      program_nwords      <= program_nwords;
-      prom_addr           <= prom_addr;
-      prom_select         <= prom_select;
-      register_contents   <= register_contents;
-            
-    when S_WRITE_CONFIG_LOWER =>
-      --set lower part of address, remove command from FIFO, and pass address onto spi_interface
-      ncmds_spiintr_inner <= ncmds_spiintr_inner + 1;
-      cmd_fifo_state      <= S_WRITE_CONFIG_WAIT;
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '1';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '1';  
-      read_nwords         <= read_nwords;
-      program_nwords      <= program_nwords;
-      prom_addr           <= prom_addr;
-      prom_select         <= prom_select;
-      register_contents   <= cmd_fifo_out;
+      when S_WRITE_CONFIG_STALL_1 => 
+        --need to wait because empty takes an extra cycle to go low
+        cmd_fifo_state      <= S_WRITE_CONFIG_STALL_2;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';  
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        
+      when S_WRITE_CONFIG_STALL_2 => 
+        --continue when lower part of address is ready in command FIFO
+        if (cmd_fifo_empty='0') then
+          cmd_fifo_state    <= S_WRITE_CONFIG_LOWER;
+        else
+          cmd_fifo_state    <= S_WRITE_CONFIG_STALL_2;
+        end if;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';  
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+              
+      when S_WRITE_CONFIG_LOWER =>
+        --set lower part of address, remove command from FIFO, and pass address onto spi_interface
+        cmd_fifo_state      <= S_WRITE_CONFIG_WAIT;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '1';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '1';  
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= cmd_fifo_out;
 
-    when S_WRITE_CONFIG_WAIT =>
-      --don't accept any more commands until done with erase command
-      if (write_config_done='1') then
-        cmd_fifo_state    <= S_IDLE;
-      else 
-        cmd_fifo_state    <= S_WRITE_CONFIG_WAIT;
-      end if;
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '0';
-      read_nwords         <= read_nwords;
-      program_nwords      <= program_nwords;
-      prom_addr           <= prom_addr;
-      prom_select         <= prom_select;
-      register_contents   <= register_contents;
+      when S_WRITE_CONFIG_WAIT =>
+        --don't accept any more commands until done with erase command
+        if (write_config_done='1') then
+          cmd_fifo_state    <= S_IDLE;
+        else 
+          cmd_fifo_state    <= S_WRITE_CONFIG_WAIT;
+        end if;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
 
-    when S_LOCK_CMD =>
-      --start lock sector command with lock enable and remove command from FIFO
-      ncmds_spiintr_inner <= ncmds_spiintr_inner + 1;
-      cmd_fifo_state      <= S_LOCK_LOW;
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '1';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '1';  
-      read_nwords         <= read_nwords;
-      program_nwords      <= program_nwords;
-      prom_addr           <= prom_addr;
-      prom_select         <= prom_select;
-      register_contents   <= register_contents;
-      
-    when S_LOCK_LOW => 
-      --wait for lock_done to go low
-      cmd_fifo_state      <= S_LOCK_WAIT;
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '0';
-      read_nwords         <= read_nwords;
-      program_nwords      <= program_nwords;
-      prom_addr           <= prom_addr;
-      prom_select         <= prom_select;
-      register_contents   <= register_contents;
-      
-    when S_LOCK_WAIT =>
-      --don't accept any more commands until done with erase command
-      if (lock_done='1') then
-        cmd_fifo_state    <= S_IDLE;
-      else 
-        cmd_fifo_state    <= S_LOCK_WAIT;
-      end if;
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '0';
-      read_nwords         <= read_nwords;
-      program_nwords      <= program_nwords;
-      prom_addr           <= prom_addr;
-      prom_select         <= prom_select;
-      register_contents   <= register_contents;
+      when S_LOCK_CMD =>
+        --start lock sector command with lock enable and remove command from FIFO
+        cmd_fifo_state      <= S_LOCK_LOW;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '1';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '1';  
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        
+      when S_LOCK_LOW => 
+        --wait for lock_done to go low
+        cmd_fifo_state      <= S_LOCK_WAIT;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        
+      when S_LOCK_WAIT =>
+        --don't accept any more commands until done with erase command
+        if (lock_done='1') then
+          cmd_fifo_state    <= S_IDLE;
+        else 
+          cmd_fifo_state    <= S_LOCK_WAIT;
+        end if;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
 
-    when S_UNLOCK_CMD =>
-      --start erase sector command with erase enable and remove command from FIFO
-      ncmds_spiintr_inner <= ncmds_spiintr_inner + 1;
-      cmd_fifo_state      <= S_UNLOCK_LOW;
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '1';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '1';  
-      read_nwords         <= read_nwords;
-      program_nwords      <= program_nwords;
-      prom_addr           <= prom_addr;
-      prom_select         <= prom_select;
-      register_contents   <= register_contents;
-      
-    when S_UNLOCK_LOW => 
-      --wait for erase_done to go low
-      cmd_fifo_state      <= S_UNLOCK_WAIT;
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '0';
-      read_nwords         <= read_nwords;
-      program_nwords      <= program_nwords;
-      prom_addr           <= prom_addr;
-      prom_select         <= prom_select;
-      register_contents   <= register_contents;
-      
-    when S_UNLOCK_WAIT =>
-      --don't accept any more commands until done with erase command
-      if (erase_done='1') then
-        cmd_fifo_state    <= S_IDLE;
-      else 
-        cmd_fifo_state    <= S_UNLOCK_WAIT;
-      end if;
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '0';
-      read_nwords         <= read_nwords;
-      program_nwords      <= program_nwords;
-      prom_addr           <= prom_addr;
-      prom_select         <= prom_select;
-      register_contents   <= register_contents;
-      
-    when S_LOAD_ADDR_CMD =>
-      --set the upper part of address and remove command from FIFO
-      ncmds_spiintr_inner <= ncmds_spiintr_inner + 1;
-      cmd_fifo_state      <= S_LOAD_ADDR_STALL_1;
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '1';  
-      read_nwords         <= read_nwords;
-      program_nwords      <= program_nwords;
-      prom_addr           <= "00000" & cmd_fifo_out(15 downto 5) & prom_addr(15 downto 0);
-      prom_select         <= prom_select;
-      register_contents   <= register_contents;
+      when S_UNLOCK_CMD =>
+        --start erase sector command with erase enable and remove command from FIFO
+        cmd_fifo_state      <= S_UNLOCK_LOW;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '1';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '1';  
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        
+      when S_UNLOCK_LOW => 
+        --wait for erase_done to go low
+        cmd_fifo_state      <= S_UNLOCK_WAIT;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        
+      when S_UNLOCK_WAIT =>
+        --don't accept any more commands until done with erase command
+        if (erase_done='1') then
+          cmd_fifo_state    <= S_IDLE;
+        else 
+          cmd_fifo_state    <= S_UNLOCK_WAIT;
+        end if;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        
+      when S_LOAD_ADDR_CMD =>
+        --set the upper part of address and remove command from FIFO
+        cmd_fifo_state      <= S_LOAD_ADDR_STALL_1;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '1';  
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= "00000" & cmd_fifo_out(15 downto 5) & prom_addr(15 downto 0);
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
 
-    when S_LOAD_ADDR_STALL_1 => 
-      --need to wait because empty takes an extra cycle to go low
-      cmd_fifo_state      <= S_LOAD_ADDR_STALL_2;
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '0';  
-      read_nwords         <= read_nwords;
-      program_nwords      <= program_nwords;
-      prom_addr           <= prom_addr;
-      prom_select         <= prom_select;
-      register_contents   <= register_contents;
-      
-    when S_LOAD_ADDR_STALL_2 => 
-      --continue when lower part of address is ready in command FIFO
-      if (cmd_fifo_empty='0') then
-        cmd_fifo_state    <= S_LOAD_ADDR_LOWER;
-      else
-        cmd_fifo_state    <= S_LOAD_ADDR_STALL_2;
-      end if;
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '0';  
-      read_nwords         <= read_nwords;
-      program_nwords      <= program_nwords;
-      prom_addr           <= prom_addr;
-      prom_select         <= prom_select;
-      register_contents   <= register_contents;
-            
-    when S_LOAD_ADDR_LOWER =>
-      --set lower part of address, remove command from FIFO, and pass address onto spi_interface
-      ncmds_spiintr_inner <= ncmds_spiintr_inner + 1;
-      cmd_fifo_state      <= S_STALL;
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '1';
-      cmd_fifo_read_en    <= '1';  
-      read_nwords         <= read_nwords;
-      program_nwords      <= program_nwords;
-      prom_addr           <= prom_addr(31 downto 16) & cmd_fifo_out;
-      prom_select         <= prom_select;
-      register_contents   <= register_contents;
+      when S_LOAD_ADDR_STALL_1 => 
+        --need to wait because empty takes an extra cycle to go low
+        cmd_fifo_state      <= S_LOAD_ADDR_STALL_2;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';  
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        
+      when S_LOAD_ADDR_STALL_2 => 
+        --continue when lower part of address is ready in command FIFO
+        if (cmd_fifo_empty='0') then
+          cmd_fifo_state    <= S_LOAD_ADDR_LOWER;
+        else
+          cmd_fifo_state    <= S_LOAD_ADDR_STALL_2;
+        end if;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';  
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+              
+      when S_LOAD_ADDR_LOWER =>
+        --set lower part of address, remove command from FIFO, and pass address onto spi_interface
+        cmd_fifo_state      <= S_STALL;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '1';
+        cmd_fifo_read_en    <= '1';  
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr(31 downto 16) & cmd_fifo_out;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
 
-    when S_SWITCH_PROM_CMD =>
-      --switch selected PROM and remove command from FIFO
-      ncmds_spiintr_inner <= ncmds_spiintr_inner + 1;
-      cmd_fifo_state      <= S_STALL;
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '1';  
-      read_nwords         <= read_nwords;
-      program_nwords      <= program_nwords;
-      prom_addr           <= prom_addr;
-      prom_select         <= cmd_fifo_out(5);
-      register_contents   <= register_contents;
-      
-    when S_UNKNOWN_CMD =>
-      --do nothing but remove command from FIFO
-      ncmds_spiintr_inner <= ncmds_spiintr_inner + 1;
-      cmd_fifo_state      <= S_STALL;
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '1';
-      read_nwords         <= read_nwords;
-      program_nwords      <= program_nwords;
-      prom_addr           <= prom_addr;
-      prom_select         <= prom_select;
-      register_contents   <= register_contents;
+      when S_SWITCH_PROM_CMD =>
+        --switch selected PROM and remove command from FIFO
+        cmd_fifo_state      <= S_STALL;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '1';  
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= cmd_fifo_out(5);
+        register_contents   <= register_contents;
+        
+      when S_UNKNOWN_CMD =>
+        --do nothing but remove command from FIFO
+        cmd_fifo_state      <= S_STALL;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '1';
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
 
-    when S_STALL =>
-      --need to wait because empty takes an extra cycle to go low
-      cmd_fifo_state      <= S_IDLE;
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '0';
-      read_nwords         <= read_nwords;
-      program_nwords      <= program_nwords;
-      prom_addr           <= prom_addr;
-      prom_select         <= prom_select;
-      register_contents   <= register_contents;
-    
-    when others =>
-      --unimplemented state
-      cmd_fifo_state      <= S_IDLE;
-      prom_read_en        <= '0';
-      prom_write_en       <= '0';
-      prom_erase_en       <= '0';
-      prom_lock_en        <= '0';
-      prom_unlock_en      <= '0';
-      prom_wr_config_en   <= '0';
-      write_fifo_write_en <= '0';
-      prom_load_addr      <= '0';
-      cmd_fifo_read_en    <= '0';
-      read_nwords         <= read_nwords;
-      program_nwords      <= program_nwords;
-      prom_addr           <= prom_addr;
-      prom_select         <= prom_select;
-      register_contents   <= register_contents;
-    end case;
+      when S_STALL =>
+        --need to wait because empty takes an extra cycle to go low
+        cmd_fifo_state      <= S_IDLE;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+      
+      when others =>
+        --unimplemented state
+        cmd_fifo_state      <= S_IDLE;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= '0';
+        prom_unlock_en      <= '0';
+        prom_wr_config_en   <= '0';
+        write_fifo_write_en <= '0';
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+      end case;
+    end if;
   end if;
   end process;
+  
+  --FSM to record number of words in readback FIFO. Involves some clock domain crossings
+  process_nword_readback : process(CLK40, RST)
+  begin
+  if (RST='1') then
+    nwords_readback <= "00000000000";
+  elsif (rising_edge(CLK40)) then
+    if (readback_fifo_wr_en = '1' and read_en_clk40_pulse = '0') then
+      nwords_readback <= nwords_readback+1;
+    elsif (read_en_clk40_pulse = '1' and readback_fifo_wr_en = '0') then
+      nwords_readback <= nwords_readback-1;
+    else
+      nwords_readback <= nwords_readback;
+    end if;
+    read_en_clk40_meta <= READBACK_FIFO_READ_EN;
+    read_en_clk40_sync1 <= read_en_clk40_meta;
+    read_en_clk40_sync2 <= read_en_clk40_sync1;
+    read_en_clk40_pulse <= read_en_clk40_sync1 and not read_en_clk40_sync2;
+  end if;
+  end process;
+  
+  RBK_WRD_CNT <= std_logic_vector(nwords_readback);
 
   --readback_fifo_wr_en <= '1' when (rd_data_valid = '1' and load_rd_fifo = '1') else '0';
   spi_readback_fifo_i : spi_readback_fifo
@@ -996,8 +1038,5 @@ begin
   --DIAGOUT(12 downto 8) <= cmd_fifo_read_en & prom_read_en & prom_write_en & prom_erase_en & write_done;
   --DIAGOUT(16 downto 13) <= std_logic_vector(write_word_counter(3 downto 0));
   --DIAGOUT(17) <= cmd_fifo_read_en_pulse;
-  
-  NCMDS_SPICTRL <= ncmds_spictrl_inner;
-  NCMDS_SPIINTR <= ncmds_spiintr_inner;
   
 end SPI_CTRL_Arch;

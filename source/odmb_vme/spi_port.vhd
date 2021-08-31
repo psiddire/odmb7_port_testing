@@ -8,6 +8,15 @@ use ieee.numeric_std.all;
 use work.ucsb_types.all;
 
 --! @brief VME device that acts as user interface to EPROM
+--! @details Supported VME commands:
+--! W 6000 write configuration registers to PROM
+--! W 6004 load configuration registers from PROM
+--! W 6020 reset SPI_CTRL finite state machine
+--! W 6024 disable SPI_CTRL finite state machine
+--! W 6028 enable SPI_CTRL finite state machine
+--! W 602C XXXX write XXXX to SPI command FIFO. See SPI_CTRL for details.
+--! R 6030 read 1 word from readback FIFO
+--! R 6034 read number of words in readback FIFO
 entity SPI_PORT is
   port (
     SLOWCLK              : in std_logic; --! 2.5 MHz clock input
@@ -32,13 +41,15 @@ entity SPI_PORT is
     SPI_CFG_REGS         : in cfg_regs_array;                 --! Contents of CFG registers to write to PROM
     SPI_CONST_REGS       : in cfg_regs_array;                 --! Contents of const registers to write PROM
     --signals to/from QSPI_CTRL
+    SPI_RST                   : out std_logic;                     --! reset signal for SPI_CTRL state machine
+    SPI_ENBL                  : out std_logic;                     --! signal to enable SPI_CTRL state machine
+    SPI_DSBL                  : out std_logic;                     --! signal to disable SPI_CTRL state machine
     SPI_CMD_FIFO_WRITE_EN     : out std_logic;                     --! Write enable to write command to PROM controller module
     SPI_CMD_FIFO_IN           : out std_logic_vector(15 downto 0); --! Command to be written to PROM controller module
     SPI_READBACK_FIFO_OUT     : in std_logic_vector(15 downto 0);  --! Contents readback from PROM
     SPI_READBACK_FIFO_READ_EN : out std_logic;                     --! Read enable to progress through contents readback from PROM
     SPI_READ_BUSY             : in std_logic;                      --! Indicates a PROM read in progress
-    SPI_NCMDS_SPICTRL         : in unsigned(15 downto 0);          --! Debug signal: number of commands received by SPICTRL
-    SPI_NCMDS_SPIINTR         : in unsigned(15 downto 0);          --! Debug signal: number of commands processed by SPICTRL
+    SPI_RBK_WRD_CNT           : in std_logic_vector(10 downto 0);  --! Number of words in SPI readback FIFO
     --debug
     DIAGOUT                   : out std_logic_vector(17 downto 0)  --! Debug signals
     );
@@ -90,12 +101,16 @@ architecture SPI_PORT_Arch of SPI_PORT is
   signal spi_readback_fifo_read_en_cmd : std_logic := '0';
   
   --command parsing signals
-  signal cmddev          : std_logic_vector(15 downto 0) := x"0000";
-  signal do_cfg_read   : std_logic := '0';
-  signal do_cfg_write : std_logic := '0'; 
-  signal do_cfg_erase    : std_logic := '0';
-  signal do_spi_cmd      : std_logic := '0';
-  signal do_spi_read     : std_logic := '0';
+  signal cmddev                       : std_logic_vector(15 downto 0) := x"0000";
+  signal do_cfg_read                  : std_logic := '0';
+  signal do_cfg_write                 : std_logic := '0'; 
+  signal do_cfg_erase                 : std_logic := '0';
+  signal do_spi_cmd                   : std_logic := '0';
+  signal do_spi_read                  : std_logic := '0';
+  signal do_read_readback_fifo_nwords : std_logic := '0';
+  signal do_reset_spi_fsm             : std_logic := '0';
+  signal do_enable_spi_fsm            : std_logic := '0';
+  signal do_disable_spi_fsm           : std_logic := '0';
   
   --dtack signals
   signal ce_d_dtack : std_logic := '0'; 
@@ -103,10 +118,6 @@ architecture SPI_PORT_Arch of SPI_PORT is
   signal q_dtack    : std_logic := '0';
   
   --debugging signals
-  signal ncmds_spiport         : unsigned(15 downto 0) := x"0000";
-  signal do_ncmds_spiport_read : std_logic := '0';
-  signal do_ncmds_spictrl_read : std_logic := '0';
-  signal do_ncmds_spiintr_read : std_logic := '0';
   signal outdata_inner         : std_logic_vector(15 downto 0) := x"0000";
   signal ila_probe             : std_logic_vector(511 downto 0) := (others => '0');
 
@@ -150,9 +161,10 @@ begin
   do_cfg_erase <= '1' when (cmddev=x"1008" and STROBE='1') else '0';
   do_spi_cmd <= '1' when (cmddev=x"102C") else '0';
   do_spi_read <= '1' when (cmddev=x"1030") else '0';
-  do_ncmds_spiport_read <= '1' when (cmddev=x"1100") else '0';
-  do_ncmds_spictrl_read <= '1' when (cmddev=x"1104") else '0';
-  do_ncmds_spiintr_read <= '1' when (cmddev=x"1108") else '0';
+  do_read_readback_fifo_nwords <= '1' when (cmddev=x"1034") else '0';
+  do_reset_spi_fsm <= '1' when (cmddev=x"1020" and STROBE='1') else '0';
+  do_disable_spi_fsm <= '1' when (cmddev=x"1024" and STROBE='1') else '0';
+  do_enable_spi_fsm <= '1' when (cmddev=x"1028" and STROBE='1') else '0';
 
   --generate strobe_pulse, note STROBE comes from FASTCLK clock domain
   strobe_meta <= STROBE when rising_edge(SLOWCLK);
@@ -164,21 +176,13 @@ begin
   spi_cmd_fifo_write_en_cmd <= do_spi_cmd and strobe_pulse;
   spi_cmd_fifo_in_cmd <= INDATA;
   
-  spi_count_proc : process (SLOWCLK)
-  begin
-  if rising_edge(SLOWCLK) then
-    if (do_spi_cmd='1' and strobe_pulse='1') then
-      ncmds_spiport <= ncmds_spiport + 1;
-    else
-      ncmds_spiport <= ncmds_spiport;
-    end if;
-  end if;
-  end process;            
+  --generate SPI FSM signals (TODO: check that no operation (ex. cfg register write) in progress?)
+  SPI_RST <= do_reset_spi_fsm and strobe_pulse;
+  SPI_DSBL <= do_disable_spi_fsm and strobe_pulse;
+  SPI_ENBL <= do_enable_spi_fsm and strobe_pulse;        
   
   --handle SPI read command
-  outdata_inner <= std_logic_vector(ncmds_spiport) when (do_ncmds_spiport_read = '1') else
-             std_logic_vector(SPI_NCMDS_SPICTRL) when (do_ncmds_spictrl_read = '1') else
-             std_logic_vector(SPI_NCMDS_SPIINTR) when (do_ncmds_spiintr_read = '1') else
+  outdata_inner <= "00000" & SPI_RBK_WRD_CNT when (do_read_readback_fifo_nwords = '1') else
              spi_read_data; --currently the only output in this module, will fix later
   
   OUTDATA <= outdata_inner; --temp, for debugging
