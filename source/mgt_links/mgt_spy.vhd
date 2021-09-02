@@ -63,7 +63,7 @@ architecture Behavioral of mgt_spy is
   --------------------------------------------------------------------------
   -- Component declaration for the GTH transceiver container
   --------------------------------------------------------------------------
-  component gtwiz_spy_f1_example_wrapper
+  component gtwiz_spy_ddu_example_wrapper
     port (
       gthrxn_in : in std_logic_vector(NLINK-1 downto 0);
       gthrxp_in : in std_logic_vector(NLINK-1 downto 0);
@@ -298,7 +298,7 @@ begin
   ---------------------------------------------------------------------------------------------------------------------
   -- EXAMPLE WRAPPER INSTANCE
   ---------------------------------------------------------------------------------------------------------------------
-  spy_wrapper_inst : gtwiz_spy_f1_example_wrapper
+  spy_wrapper_inst : gtwiz_spy_ddu_example_wrapper
     port map (
       gthrxn_in                          => gthrxn_int,
       gthrxp_in                          => gthrxp_int,
@@ -381,11 +381,11 @@ begin
   ila_data_tx(31 downto 16)   <= txdata;
   ila_data_tx(32)             <= txd_valid;
 
-  ila_spy_tx_inst : ila_1
-    port map(
-      clk => gtwiz_userclk_tx_usrclk2_int,
-      probe0 => ila_data_tx
-      );
+  -- ila_spy_tx_inst : ila_1
+  --   port map(
+  --     clk => gtwiz_userclk_tx_usrclk2_int,
+  --     probe0 => ila_data_tx
+  --     );
 
 
 end Behavioral;

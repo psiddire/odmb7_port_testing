@@ -145,10 +145,10 @@ entity ODMB_VME is
     -- DDU/SPY/DCFEB/ALCT Optical PRBS test signals
     --------------------
     MGT_PRBS_TYPE        : out std_logic_vector(3 downto 0); -- DDU/SPY/DCFEB/ALCT Common PRBS type
-    DDU_PRBS_TX_EN       : out std_logic_vector(3 downto 0);
-    DDU_PRBS_RX_EN       : out std_logic_vector(3 downto 0);
-    DDU_PRBS_TST_CNT     : out std_logic_vector(15 downto 0);
-    DDU_PRBS_ERR_CNT     : in  std_logic_vector(15 downto 0);
+    FED_PRBS_TX_EN       : out std_logic_vector(3 downto 0);
+    FED_PRBS_RX_EN       : out std_logic_vector(3 downto 0);
+    FED_PRBS_TST_CNT     : out std_logic_vector(15 downto 0);
+    FED_PRBS_ERR_CNT     : in  std_logic_vector(15 downto 0);
     SPY_PRBS_TX_EN       : out std_logic;
     SPY_PRBS_RX_EN       : out std_logic;
     SPY_PRBS_TST_CNT     : out std_logic_vector(15 downto 0);
@@ -444,17 +444,17 @@ architecture Behavioral of ODMB_VME is
       -- DDU/PC/DCFEB COMMON PRBS
       MGT_PRBS_TYPE : out std_logic_vector(3 downto 0);
 
-      -- DDU PRBS signals
-      DDU_PRBS_TX_EN   : out std_logic;
-      DDU_PRBS_RX_EN   : out std_logic;
-      DDU_PRBS_TST_CNT : out std_logic_vector(15 downto 0);
-      DDU_PRBS_ERR_CNT : in  std_logic_vector(15 downto 0);
+      -- FED PRBS signals
+      FED_PRBS_TX_EN   : out std_logic;
+      FED_PRBS_RX_EN   : out std_logic;
+      FED_PRBS_TST_CNT : out std_logic_vector(15 downto 0);
+      FED_PRBS_ERR_CNT : in  std_logic_vector(15 downto 0);
 
       -- PC PRBS signals
-      PC_PRBS_TX_EN   : out std_logic;
-      PC_PRBS_RX_EN   : out std_logic;
-      PC_PRBS_TST_CNT : out std_logic_vector(15 downto 0);
-      PC_PRBS_ERR_CNT : in  std_logic_vector(15 downto 0);
+      SPY_PRBS_TX_EN   : out std_logic_vector(0 downto 0);
+      SPY_PRBS_RX_EN   : out std_logic_vector(0 downto 0);
+      SPY_PRBS_TST_CNT : out std_logic_vector(15 downto 0);
+      SPY_PRBS_ERR_CNT : in  std_logic_vector(15 downto 0);
 
       -- DCFEB PRBS signals
       DCFEB_PRBS_FIBER_SEL : out std_logic_vector(3 downto 0);
@@ -894,18 +894,18 @@ begin
       OUTDATA => outdata_dev(9),
       DTACK   => dtack_dev(9),
 
-      -- DDU/PC/DCFEB COMMON PRBS
+      -- FED/PC/DCFEB COMMON PRBS
       MGT_PRBS_TYPE => MGT_PRBS_TYPE,
-      -- TODO: DDU PRBS signals
-      DDU_PRBS_TX_EN   => DDU_PRBS_TX_EN(0), -- temporary
-      DDU_PRBS_RX_EN   => DDU_PRBS_RX_EN(0), -- temporary
-      DDU_PRBS_TST_CNT => DDU_PRBS_TST_CNT,
-      DDU_PRBS_ERR_CNT => DDU_PRBS_ERR_CNT,
+      -- TODO: FED PRBS signals
+      FED_PRBS_TX_EN   => FED_PRBS_TX_EN(0), -- temporary
+      FED_PRBS_RX_EN   => FED_PRBS_RX_EN(0), -- temporary
+      FED_PRBS_TST_CNT => FED_PRBS_TST_CNT,
+      FED_PRBS_ERR_CNT => FED_PRBS_ERR_CNT,
       -- TODO: PC PRBS signals
-      PC_PRBS_TX_EN   => SPY_PRBS_TX_EN,
-      PC_PRBS_RX_EN   => SPY_PRBS_RX_EN,
-      PC_PRBS_TST_CNT => SPY_PRBS_TST_CNT,
-      PC_PRBS_ERR_CNT => SPY_PRBS_ERR_CNT,
+      SPY_PRBS_TX_EN   => SPY_PRBS_TX_EN,
+      SPY_PRBS_RX_EN   => SPY_PRBS_RX_EN,
+      SPY_PRBS_TST_CNT => SPY_PRBS_TST_CNT,
+      SPY_PRBS_ERR_CNT => SPY_PRBS_ERR_CNT,
       -- TODO: DCFEB PRBS signals
       DCFEB_PRBS_FIBER_SEL => DCFEB_PRBS_FIBER_SEL,
       DCFEB_PRBS_EN        => DCFEB_PRBS_EN,

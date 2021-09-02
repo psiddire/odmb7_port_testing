@@ -406,10 +406,10 @@ begin
   ila_data_rx(359 downto 353) <= kill_rxpd;
   ila_data_rx(360)            <= reset;
 
-  mgt_cfeb_ila_inst : ila_cfeb
-    port map(
-      clk => gtwiz_userclk_rx_usrclk2_int,
-      probe0 => ila_data_rx
-      );
+  -- mgt_cfeb_ila_inst : ila_cfeb
+  --   port map(
+  --     clk => gtwiz_userclk_rx_usrclk2_int,
+  --     probe0 => ila_data_rx
+  --     );
 
 end Behavioral;

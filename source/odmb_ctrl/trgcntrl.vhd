@@ -40,7 +40,9 @@ entity TRGCNTRL is
     DCFEB_L1A_MATCH : out std_logic_vector(NCFEB downto 1);
     FIFO_PUSH       : out std_logic;
     FIFO_L1A_MATCH  : out std_logic_vector(NCFEB+2 downto 0);
-    LCT_ERR         : out std_logic
+    LCT_ERR         : out std_logic;
+
+    DIAGOUT         : out std_logic_vector(26 downto 0)
     );
 
 end TRGCNTRL;
@@ -52,13 +54,6 @@ architecture TRGCNTRL_Arch of TRGCNTRL is
       CLK   : in std_logic;
       DELAY : in std_logic_vector(5 downto 0);
       DIN   : in std_logic
-      );
-  end component;
-
-  component ila_1 is
-    port (
-      clk : in std_logic := '0';
-      probe0 : in std_logic_vector(127 downto 0) := (others=> '0')
       );
   end component;
 
@@ -77,8 +72,8 @@ architecture TRGCNTRL_Arch of TRGCNTRL is
 
   signal ila_data : std_logic_vector(127 downto 0);
 
-  constant alct_push_dly_cnst  : integer := 32;
-  constant otmb_push_dly_cnst  : integer := 2;
+  constant alct_push_dly_cnst  : integer := 33;
+  constant otmb_push_dly_cnst  : integer := 3;
   constant lct_l1a_dly_cnst    : std_logic_vector(5 downto 0) := "100110"; -- 0x26 = 38
 
 begin  --Architecture
@@ -148,25 +143,19 @@ begin  --Architecture
   OTMB_DAV_SYNC_OUT <= otmb_dav_sync;
   ALCT_DAV_SYNC_OUT <= alct_dav_sync;
 
-  ila_data(3 downto 0)   <= otmb_dav & alct_dav & raw_lct(0) & raw_l1a; -- raw signal
-  ila_data(11 downto 8)  <= otmb_dav_sync & alct_dav_sync & fifo_push_inner & l1a;  
-  ila_data(18 downto 12) <= raw_lct(7 downto 1);  
-  ila_data(25 downto 19) <= lct(7 downto 1);  
-  ila_data(32 downto 26) <= l1a_match(7 downto 1);  
-  ila_data(41 downto 33) <= fifo_l1a_match_inner(9 downto 1);  
-  ila_data(50 downto 42) <= KILL(9 downto 1);
-  ila_data(55 downto 51) <= LCT_Q(1);
-  ila_data(60 downto 56) <= LCT_Q(2);
-  ila_data(66 downto 61) <= LCT_L1A_DLY;
-  ila_data(72 downto 67) <= std_logic_vector(to_unsigned(OTMB_PUSH_DLY, 6));
-  ila_data(78 downto 73) <= std_logic_vector(to_unsigned(ALCT_PUSH_DLY, 6));
-  ila_data(84 downto 79) <= std_logic_vector(to_unsigned(PUSH_DLY, 6));
-  ila_data(88 downto 86) <= CAL_LCT & CAL_L1A & CAL_MODE;
+  -- ila_data(3 downto 0)   <= otmb_dav & alct_dav & raw_lct(0) & raw_l1a; -- raw signal
+  -- ila_data(18 downto 12) <= raw_lct(7 downto 1);
+  -- ila_data(55 downto 51) <= LCT_Q(1);
+  -- ila_data(60 downto 56) <= LCT_Q(2);
+  -- ila_data(66 downto 61) <= LCT_L1A_DLY;
+  -- ila_data(72 downto 67) <= std_logic_vector(to_unsigned(OTMB_PUSH_DLY, 6));
+  -- ila_data(78 downto 73) <= std_logic_vector(to_unsigned(ALCT_PUSH_DLY, 6));
+  -- ila_data(84 downto 79) <= std_logic_vector(to_unsigned(PUSH_DLY, 6));
 
-  trgcntrl_ila_inst : ila_1
-    port map(
-      clk => clk80,
-      probe0 => ila_data
-      );
+  DIAGOUT(3 downto 0)  <= otmb_dav_sync & alct_dav_sync & fifo_push_inner & l1a;
+  DIAGOUT(10 downto 4) <= lct(7 downto 1);  
+  DIAGOUT(17 downto 11) <= l1a_match(7 downto 1);  
+  -- DIAGOUT(26 downto 18) <= fifo_l1a_match_inner(9 downto 1);  
+  -- DIAGOUT <= ila_data;
 
 end TRGCNTRL_Arch;

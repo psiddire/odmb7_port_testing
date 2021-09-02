@@ -454,13 +454,13 @@ architecture Behavioral of odmb7_ucsb_dev is
       CHANGE_REG_INDEX : in integer range 0 to NREGS;
 
       --------------------
-      -- DDU/SPY/DCFEB/ALCT Optical PRBS test signals
+      -- FED/SPY/DCFEB/ALCT Optical PRBS test signals
       --------------------
       MGT_PRBS_TYPE        : out std_logic_vector(3 downto 0); -- DDU/SPY/DCFEB/ALCT Common PRBS type
-      DDU_PRBS_TX_EN       : out std_logic_vector(3 downto 0);
-      DDU_PRBS_RX_EN       : out std_logic_vector(3 downto 0);
-      DDU_PRBS_TST_CNT     : out std_logic_vector(15 downto 0);
-      DDU_PRBS_ERR_CNT     : in  std_logic_vector(15 downto 0);
+      FED_PRBS_TX_EN       : out std_logic_vector(3 downto 0);
+      FED_PRBS_RX_EN       : out std_logic_vector(3 downto 0);
+      FED_PRBS_TST_CNT     : out std_logic_vector(15 downto 0);
+      FED_PRBS_ERR_CNT     : in  std_logic_vector(15 downto 0);
       SPY_PRBS_TX_EN       : out std_logic;
       SPY_PRBS_RX_EN       : out std_logic;
       SPY_PRBS_TST_CNT     : out std_logic_vector(15 downto 0);
@@ -502,8 +502,8 @@ architecture Behavioral of odmb7_ucsb_dev is
       --------------------
       -- Clock
       --------------------
-      CLK80        : in std_logic;
-      CLK40        : in std_logic;
+      TXUSRCLK     : in std_logic;
+      CMSCLK       : in std_logic;
 
       CCB_CMD      : in  std_logic_vector (5 downto 0);  -- ccbcmnd(5 downto 0) - from J3
       CCB_CMD_S    : in  std_logic;       -- ccbcmnd(6) - from J3
@@ -925,34 +925,34 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal spy_prbs_err_cnt : std_logic_vector(15 downto 0) := (others => '0');
 
   --------------------------------------
-  -- MGT signals for DDU channels
+  -- MGT signals for FED channels
   --------------------------------------
-  constant DDU_NTXLINK : integer := 4;
-  constant DDU_NRXLINK : integer := 4;
-  constant DDUTXDWIDTH : integer := 16;
-  constant DDURXDWIDTH : integer := 16;
+  constant FED_NTXLINK : integer := 4;
+  constant FED_NRXLINK : integer := 4;
+  constant FEDTXDWIDTH : integer := 16;
+  constant FEDRXDWIDTH : integer := 16;
 
-  signal usrclk_ddu_tx : std_logic; -- USRCLK for TX data preparation
-  signal usrclk_ddu_rx : std_logic; -- USRCLK for RX data readout
-  signal ddu_txdata1 : std_logic_vector(DDUTXDWIDTH-1 downto 0);   -- Data to be transmitted
-  signal ddu_txdata2 : std_logic_vector(DDUTXDWIDTH-1 downto 0);   -- Data to be transmitted
-  signal ddu_txdata3 : std_logic_vector(DDUTXDWIDTH-1 downto 0);   -- Data to be transmitted
-  signal ddu_txdata4 : std_logic_vector(DDUTXDWIDTH-1 downto 0);   -- Data to be transmitted
-  signal ddu_txd_valid : std_logic_vector(DDU_NTXLINK downto 1);   -- Flag for tx valid data;
-  signal ddu_rxdata1 : std_logic_vector(DDURXDWIDTH-1 downto 0);   -- Data received
-  signal ddu_rxdata2 : std_logic_vector(DDURXDWIDTH-1 downto 0);   -- Data received
-  signal ddu_rxdata3 : std_logic_vector(DDURXDWIDTH-1 downto 0);   -- Data received
-  signal ddu_rxdata4 : std_logic_vector(DDURXDWIDTH-1 downto 0);   -- Data received
-  signal ddu_rxd_valid : std_logic_vector(DDU_NRXLINK downto 1);   -- Flag for rx valid data;
-  signal ddu_bad_rx : std_logic_vector(DDU_NRXLINK downto 1);   -- Flag for fiber errors;
-  signal ddu_rxready : std_logic; -- Flag for rx reset done
-  signal ddu_txready : std_logic; -- Flag for rx reset done
-  signal ddu_reset : std_logic;
+  signal usrclk_fed_tx : std_logic; -- USRCLK for TX data preparation
+  signal usrclk_fed_rx : std_logic; -- USRCLK for RX data readout
+  signal fed_txdata1 : std_logic_vector(FEDTXDWIDTH-1 downto 0);   -- Data to be transmitted
+  signal fed_txdata2 : std_logic_vector(FEDTXDWIDTH-1 downto 0);   -- Data to be transmitted
+  signal fed_txdata3 : std_logic_vector(FEDTXDWIDTH-1 downto 0);   -- Data to be transmitted
+  signal fed_txdata4 : std_logic_vector(FEDTXDWIDTH-1 downto 0);   -- Data to be transmitted
+  signal fed_txd_valid : std_logic_vector(FED_NTXLINK downto 1);   -- Flag for tx valid data;
+  signal fed_rxdata1 : std_logic_vector(FEDRXDWIDTH-1 downto 0);   -- Data received
+  signal fed_rxdata2 : std_logic_vector(FEDRXDWIDTH-1 downto 0);   -- Data received
+  signal fed_rxdata3 : std_logic_vector(FEDRXDWIDTH-1 downto 0);   -- Data received
+  signal fed_rxdata4 : std_logic_vector(FEDRXDWIDTH-1 downto 0);   -- Data received
+  signal fed_rxd_valid : std_logic_vector(FED_NRXLINK downto 1);   -- Flag for rx valid data;
+  signal fed_bad_rx : std_logic_vector(FED_NRXLINK downto 1);   -- Flag for fiber errors;
+  signal fed_rxready : std_logic; -- Flag for rx reset done
+  signal fed_txready : std_logic; -- Flag for rx reset done
+  signal fed_reset : std_logic;
 
-  signal ddu_prbs_tx_en : std_logic_vector(4 downto 1);
-  signal ddu_prbs_rx_en : std_logic_vector(4 downto 1);
-  signal ddu_prbs_tst_cnt : std_logic_vector(15 downto 0);
-  signal ddu_prbs_err_cnt : std_logic_vector(15 downto 0);
+  signal fed_prbs_tx_en : std_logic_vector(4 downto 1);
+  signal fed_prbs_rx_en : std_logic_vector(4 downto 1);
+  signal fed_prbs_tst_cnt : std_logic_vector(15 downto 0);
+  signal fed_prbs_err_cnt : std_logic_vector(15 downto 0);
 
   --------------------------------------
   -- MGT signals for DCFEB RX channels
@@ -1654,10 +1654,10 @@ begin
       CHANGE_REG_INDEX => change_reg_index,
 
       MGT_PRBS_TYPE        => mgt_prbs_type,
-      DDU_PRBS_TX_EN       => ddu_prbs_tx_en,
-      DDU_PRBS_RX_EN       => ddu_prbs_rx_en,
-      DDU_PRBS_TST_CNT     => ddu_prbs_tst_cnt,
-      DDU_PRBS_ERR_CNT     => ddu_prbs_err_cnt,
+      FED_PRBS_TX_EN       => fed_prbs_tx_en,
+      FED_PRBS_RX_EN       => fed_prbs_rx_en,
+      FED_PRBS_TST_CNT     => fed_prbs_tst_cnt,
+      FED_PRBS_ERR_CNT     => fed_prbs_err_cnt,
       SPY_PRBS_TX_EN       => spy_prbs_tx_en,
       SPY_PRBS_RX_EN       => spy_prbs_rx_en,
       SPY_PRBS_TST_CNT     => spy_prbs_tst_cnt,
@@ -1687,8 +1687,8 @@ begin
       CAFIFO_SIZE => 32
       )
     port map (
-      CLK80  => sysclk80,
-      CLK40  => cmsclk,
+      TXUSRCLK  => usrclk_spy_tx,
+      CMSCLK    => cmsclk,
 
       CCB_CMD      => ccb_cmd, 
       CCB_CMD_S    => ccb_cmd_s, 
@@ -1808,9 +1808,10 @@ begin
   spy_rx_n <= DAQ_SPY_RX_N when SPY_SEL = '1' else '0';
   spy_rx_p <= DAQ_SPY_RX_P when SPY_SEL = '1' else '0';
 
+  -- Connet to DDU via the spy ports
   GTH_DDU : mgt_spy
     port map (
-      mgtrefclk       => mgtrefclk1_226, -- sourced from the 125 MHz crystal
+      mgtrefclk       => mgtrefclk0_226, -- for 1.6 Gb/s DDU transmission, mgtrefclk1_226 is sourced from the 125 MHz crystal
       txusrclk        => usrclk_spy_tx,  -- 80 MHz for 1.6 Gb/s with 8b/10b encoding, 62.5 MHz for 1.25 Gb/s
       rxusrclk        => usrclk_spy_rx,
       sysclk          => cmsclk,    -- maximum DRP clock frequency 62.5 MHz for 1.25 Gb/s line rate

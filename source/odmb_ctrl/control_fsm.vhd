@@ -20,59 +20,59 @@ entity CONTROL_FSM is
     );  
   port (
 
--- Chip Scope Pro Logic Analyzer control
-
-    --CSP_CONTROL_FSM_PORT_LA_CTRL : inout std_logic_vector(35 downto 0);
+    -- Chip Scope Pro Logic Analyzer control
+    -- CSP_CONTROL_FSM_PORT_LA_CTRL : inout std_logic_vector(35 downto 0);
 
     RST    : in std_logic;
     CLKCMS : in std_logic;              -- 40 MHz CMS clock
     CLK    : in std_logic;              -- 80 MHz doubled clock
     STATUS : in std_logic_vector(47 downto 0);
 
--- From DMB_VME
+    -- From DMB_VME
     RDFFNXT : in std_logic;
     KILL    : in std_logic_vector(NCFEB+2 downto 1);
 
--- to GigaBit Link
+    -- to GigaBit Link
     DOUT : out std_logic_vector(15 downto 0);
     DAV  : out std_logic;
 
--- to FIFOs
+    -- to FIFOs
     OEFIFO_B  : out std_logic_vector(NCFEB+2 downto 1);
     RENFIFO_B : out std_logic_vector(NCFEB+2 downto 1);
 
--- from FIFOs
+    -- from FIFOs
     FIFO_HALF_FULL : in std_logic_vector(NCFEB+2 downto 1);
     FFOR_B         : in std_logic_vector(NCFEB+2 downto 1);
     DATAIN         : in std_logic_vector(15 downto 0);
     DATAIN_LAST    : in std_logic;
 
--- From JTAGCOM
+    -- From JTAGCOM
     JOEF : in std_logic_vector(NCFEB+2 downto 1);
 
--- For headers/trailers
+    -- For headers/trailers
     DAQMBID : in std_logic_vector(11 downto 0);
     AUTOKILLED_DCFEBS  : in std_logic_vector(NCFEB downto 1);
 
--- FROM SW1
+    -- FROM SW1
     GIGAEN : in std_logic;
 
--- TO CAFIFO
+    -- TO CAFIFO
     FIFO_POP : out std_logic;
 
--- TO DDUFIFO
+    -- TO DDUFIFO
     EOF : out std_logic;
 
--- DEBUG
+    -- DEBUG
     control_debug : out std_logic_vector(143 downto 0);
 
--- FROM CAFIFO
+    -- FROM CAFIFO
     cafifo_l1a_dav   : in std_logic_vector(NCFEB+2 downto 1);
     cafifo_l1a_match : in std_logic_vector(NCFEB+2 downto 1);
     cafifo_l1a_cnt   : in std_logic_vector(23 downto 0);
     cafifo_bx_cnt    : in std_logic_vector(11 downto 0);
     cafifo_lost_pckt : in std_logic_vector(NCFEB+2 downto 1);
     cafifo_lone      : in std_logic
+
     );
 end CONTROL_FSM;
 
@@ -84,13 +84,6 @@ architecture CONTROL_arch of CONTROL_FSM is
       DATA    : in    std_logic_vector (127 downto 0);
       TRIG0   : in    std_logic_vector (7 downto 0);
       CONTROL : inout std_logic_vector (35 downto 0)
-      );
-  end component;
-
-  component ila_1 is
-    port (
-      clk : in std_logic := '0';
-      probe0 : in std_logic_vector(127 downto 0) := (others=> '0')
       );
   end component;
 
@@ -168,12 +161,6 @@ begin
   --    DATA    => control_fsm_la_data,
   --    TRIG0   => control_fsm_la_trig
   --    );
-
-  ctrlfsm_ila_inst : ila_1
-    port map(
-      clk => CLK,
-      probe0 => control_fsm_la_data
-      );
 
   expect_pckt         <= or_reduce(cafifo_l1a_match);
   dev_cnt_svl         <= std_logic_vector(to_unsigned(dev_cnt, 5));
