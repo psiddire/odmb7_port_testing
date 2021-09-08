@@ -2,7 +2,6 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.all;
 
 Library UNISIM;
-use UNISIM.all;
 
 use UNISIM.vcomponents.all;
 --use UNISIM.vpck.all;
@@ -85,19 +84,19 @@ begin
 
   -- generate BC0
   BC0_CMD <= '1' when (CCB_CMD_S = '0' and CCB_CMD(5 downto 0) = "111110") else '0';
-  BC0_GEN: FDC port map (Q => BC0_CMD, C => CMSCLK, CLR => BC0_RST, D => BC0_INNER);
-  BC0_RST_GEN : FD port map (Q => BC0_RST, C => CMSCLK_B, D => BC0_INNER);
+  BC0_GEN: FDC port map (Q => BC0_INNER, C => CMSCLK, CLR => BC0_RST, D => BC0_CMD);
+  BC0_RST_GEN : FD_1 port map (Q => BC0_RST, C => CMSCLK_B, D => BC0_INNER);
   BC0 <= BC0_INNER;
   
   -- generate START_TRG command
   START_TRG_CMD <= '1' when (CCB_CMD_S = '0' and   CCB_CMD(5 downto 0) = "111001") else '0';
   START_TRG_GEN : FDC port map (Q => START_TRG_INNER, C => CMSCLK, CLR => START_TRG_RST,  D => START_TRG_CMD);
-  START_TRG_RST_GEN : FD port map (Q => START_TRG_RST, C => CMSCLK_B, D => START_TRG_INNER);
+  START_TRG_RST_GEN : FD_1 port map (Q => START_TRG_RST, C => CMSCLK_B, D => START_TRG_INNER);
 
   -- generate STOP_TRG command
   STOP_TRG_CMD <= '1' when (CCB_CMD_S = '0' and   CCB_CMD(5 downto 0) = "111000") else '0';
   STOP_TRG_GEN : FDC port map (Q => STOP_TRG_INNER, C => CMSCLK, CLR => STOP_TRG_RST,  D => STOP_TRG_CMD);
-  STOP_TRG_RST_GEN : FD port map (Q => STOP_TRG_RST, C => CMSCLK_B, D => STOP_TRG_INNER);
+  STOP_TRG_RST_GEN : FD_1 port map (Q => STOP_TRG_RST, C => CMSCLK_B, D => STOP_TRG_INNER);
 
   -- generate L1ASRST
   L1ASRST_CMD <= '1' when (CCB_CMD(5 downto 0) = "111100" and CCB_CMD_S = '0') else '0';
@@ -110,17 +109,14 @@ begin
   -- generate TTCCAL
   TTCCAL_CMD(0) <= '1' when (CCB_CMD_S = '0' and   CCB_CMD(5 downto 0) = "101011") else '0';
   TTCCAL_GEN : FDC port map (Q => TTCCAL_INNER(0), C => CMSCLK, CLR => TTCCAL_RST(0), D => TTCCAL_CMD(0));
---  FD_1(TTCCAL_INNER(0), CMSCLK, TTCCAL_RST(0));
   TTCCAL_RST_GEN : FD port map (Q => TTCCAL_RST(0), C => CMSCLK, D => TTCCAL_INNER(0));
 
   TTCCAL_CMD(1) <= '1' when (CCB_CMD_S = '0' and   CCB_CMD(5 downto 0) = "101010") else '0';
   TTCCAL1_GEN : FDC port map (Q => TTCCAL_INNER(1), C => CMSCLK, CLR => TTCCAL_RST(1), D => TTCCAL_CMD(1) );
---  FD_1(TTCCAL_INNER(1), CMSCLK, TTCCAL_RST(1));
   TTCCAL1_RST_GEN : FD port map (Q => TTCCAL_RST(1), C => CMSCLK, D => TTCCAL_INNER(1));
 
   TTCCAL_CMD(2) <= '1' when (CCB_CMD_S = '0' and   CCB_CMD(5 downto 0) = "101001") else '0';
   TTCCAL2_GEN : FDC port map (Q => TTCCAL_INNER(2), C => CMSCLK, CLR => TTCCAL_RST(2), D => TTCCAL_CMD(2));
---  FD_1(TTCCAL_INNER(2), CMSCLK, TTCCAL_RST(2));
   TTCCAL2_RST_GEN : FD port map (Q => TTCCAL_RST(2), C => CMSCLK, D => TTCCAL_INNER(2));
   
   TTCCAL <= TTCCAL_INNER;

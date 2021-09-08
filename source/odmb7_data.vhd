@@ -12,37 +12,37 @@ use work.ucsb_types.all;
 -- consider make this 2 different modules
 -- one for dcfeb, one for alct+otmb
 entity odmb7_data is
-    generic (
-      NCFEB       : integer range 1 to 7 := 7  -- Number of DCFEBS, 7 for ME1/1, 5
-      );
+  generic (
+    NCFEB       : integer range 1 to 7 := 7  -- Number of DCFEBS, 7 for ME1/1, 5
+  );
   port (
 
-    CMSCLK     : in std_logic;
-    SYSCLK80   : in std_logic;
-    SYSCLK160  : in std_logic;
-    RESET      : in std_logic;
-    L1ACNT_FIFO_RST : in std_logic;
-    KILL       : in std_logic_vector(NCFEB+2 downto 1);
-    CAFIFO_L1A : in std_logic;
+    CMSCLK              : in std_logic;
+    DDUCLK              : in std_logic;
+    DCFEBCLK            : in std_logic;
+    RESET               : in std_logic;
+    L1ACNT_FIFO_RST     : in std_logic;
+    KILL                : in std_logic_vector(NCFEB+2 downto 1);
+    CAFIFO_L1A          : in std_logic;
     CAFIFO_L1A_MATCH_IN : in std_logic_vector(NCFEB+2 downto 1);
-    DCFEB_L1A : in std_logic;
-    DCFEB_L1A_MATCH : in std_logic_vector(NCFEB downto 1);
-    NWORDS_DUMMY   : in std_logic_vector(15 downto 0);
+    DCFEB_L1A           : in std_logic;
+    DCFEB_L1A_MATCH     : in std_logic_vector(NCFEB downto 1);
+    NWORDS_DUMMY        : in std_logic_vector(15 downto 0);
 
-    DCFEB_TCK        : in std_logic_vector(NCFEB downto 1);
-    DCFEB_TDO        : out std_logic_vector(NCFEB downto 1);
-    DCFEB_TMS  : in std_logic;  
-    DCFEB_TDI  : in std_logic;
+    DCFEB_TCK           : in std_logic_vector(NCFEB downto 1);
+    DCFEB_TDO           : out std_logic_vector(NCFEB downto 1);
+    DCFEB_TMS           : in std_logic;
+    DCFEB_TDI           : in std_logic;
 
-    DATAFIFO_MASK : in std_logic;
-    DCFEB_FIFO_RST : in std_logic_vector (NCFEB downto 1); -- auto-kill related
+    DATAFIFO_MASK       : in std_logic;
+    DCFEB_FIFO_RST      : in std_logic_vector (NCFEB downto 1); -- auto-kill related
 
-    EOF_DATA    : out std_logic_vector(NCFEB+2 downto 1);
+    EOF_DATA            : out std_logic_vector(NCFEB+2 downto 1);
 
-    OTMB_DATA_IN       : in std_logic_vector(17 downto 0);
-    ALCT_DATA_IN       : in std_logic_vector(17 downto 0);
+    OTMB_DATA_IN        : in std_logic_vector(17 downto 0);
+    ALCT_DATA_IN        : in std_logic_vector(17 downto 0);
 
-    DCFEB_DV_IN        : in std_logic_vector(NCFEB downto 1);
+    DCFEB_DV_IN         : in std_logic_vector(NCFEB downto 1);
 
     DCFEB1_DATA_IN      : in std_logic_vector(15 downto 0);
     DCFEB2_DATA_IN      : in std_logic_vector(15 downto 0);
@@ -54,26 +54,26 @@ entity odmb7_data is
 
     GEN_DCFEB_SEL       : in std_logic;
 
-    OTMB_FIFO_DATA_OUT       : out std_logic_vector(17 downto 0);
-    OTMB_FIFO_DV       : out std_logic;
+    OTMB_FIFO_DATA_OUT  : out std_logic_vector(17 downto 0);
+    OTMB_FIFO_DV        : out std_logic;
 
-    ALCT_FIFO_DATA_OUT       : out std_logic_vector(17 downto 0);
-    ALCT_FIFO_DV       : out std_logic;
+    ALCT_FIFO_DATA_OUT  : out std_logic_vector(17 downto 0);
+    ALCT_FIFO_DV        : out std_logic;
 
-    DCFEB1_FIFO_OUT      : out std_logic_vector(17 downto 0);
-    DCFEB2_FIFO_OUT      : out std_logic_vector(17 downto 0);
-    DCFEB3_FIFO_OUT      : out std_logic_vector(17 downto 0);
-    DCFEB4_FIFO_OUT      : out std_logic_vector(17 downto 0);
-    DCFEB5_FIFO_OUT      : out std_logic_vector(17 downto 0);
-    DCFEB6_FIFO_OUT      : out std_logic_vector(17 downto 0);
-    DCFEB7_FIFO_OUT      : out std_logic_vector(17 downto 0);
-    DCFEB_DV_OUT         : out std_logic_vector(NCFEB downto 1);
+    DCFEB1_FIFO_OUT     : out std_logic_vector(17 downto 0);
+    DCFEB2_FIFO_OUT     : out std_logic_vector(17 downto 0);
+    DCFEB3_FIFO_OUT     : out std_logic_vector(17 downto 0);
+    DCFEB4_FIFO_OUT     : out std_logic_vector(17 downto 0);
+    DCFEB5_FIFO_OUT     : out std_logic_vector(17 downto 0);
+    DCFEB6_FIFO_OUT     : out std_logic_vector(17 downto 0);
+    DCFEB7_FIFO_OUT     : out std_logic_vector(17 downto 0);
+    DCFEB_DV_OUT        : out std_logic_vector(NCFEB downto 1);
 
     DATA_FIFO_RE        : in std_logic_vector(NCFEB+2 downto 1);
     DATA_FIFO_EMPTY     : out std_logic_vector(NCFEB+2 downto 1);
     DATA_FIFO_HALF_FULL : out std_logic_vector (NCFEB+2 downto 1)
 
-    );
+  );
 end odmb7_data;
 
 architecture data_Arch of odmb7_data is
@@ -95,31 +95,34 @@ architecture data_Arch of odmb7_data is
   component DCFEB_V6 is
     generic (
       dcfeb_addr : std_logic_vector(3 downto 0) := "1000"  -- DCFEB address
-      );  
-    port
-      (clk          : in std_logic;
-       dcfebclk     : in std_logic;
-       rst          : in std_logic;
-       l1a          : in std_logic;
-       l1a_match    : in std_logic;
-       tx_ack       : in std_logic;
-       nwords_dummy : in std_logic_vector(15 downto 0);
+      );
+    port (
+      clk           : in std_logic;
+      dcfebclk      : in std_logic;
+      rst           : in std_logic;
+      l1a           : in std_logic;
+      l1a_match     : in std_logic;
+      tx_ack        : in std_logic;
+      nwords_dummy  : in std_logic_vector(15 downto 0);
 
-       dcfeb_dv      : out std_logic;
-       dcfeb_data    : out std_logic_vector(15 downto 0);
-       adc_mask      : out std_logic_vector(11 downto 0);
-       dcfeb_fsel    : out std_logic_vector(63 downto 0);
-       dcfeb_jtag_ir : out std_logic_vector(9 downto 0);
-       trst          : in  std_logic;
-       tck           : in  std_logic;
-       tms           : in  std_logic;
-       tdi           : in  std_logic;
-       rtn_shft_en   : out std_logic;
-       injpls        : in std_logic; 
-       extpls        : in std_logic;
-       bc0           : in std_logic;
-       resync        : in std_logic;
-       tdo           : out std_logic);
+      dcfeb_dv      : out std_logic;
+      dcfeb_data    : out std_logic_vector(15 downto 0);
+      adc_mask      : out std_logic_vector(11 downto 0);
+      dcfeb_fsel    : out std_logic_vector(63 downto 0);
+      dcfeb_jtag_ir : out std_logic_vector(9 downto 0);
+      trst          : in  std_logic;
+      tck           : in  std_logic;
+      tms           : in  std_logic;
+      tdi           : in  std_logic;
+      tdo           : out std_logic;
+      rtn_shft_en   : out std_logic;
+      done          : out std_logic;
+      injpls        : in std_logic;
+      extpls        : in std_logic;
+      bc0           : in std_logic;
+      resync        : in std_logic;
+      diagout       : out std_logic_vector(17 downto 0)
+       );
   end component;
 
   component alct_otmb_data_gen is
@@ -277,9 +280,9 @@ begin
   -- datafifo for alct and otmb
   datafifo_alct_pm : datafifo_40mhz
     port map(
-      srst       => l1acnt_fifo_rst,
-      wr_clk    => cmsclk,
-      rd_clk    => sysclk80,
+      srst      => l1acnt_fifo_rst,
+      wr_clk    => CMSCLK,
+      rd_clk    => DDUCLK,
       din       => alct_fifo_data_in,
       wr_en     => data_fifo_we(NCFEB+2),
       rd_en     => data_fifo_re(NCFEB+2),
@@ -291,9 +294,9 @@ begin
 
   datafifo_otmb_pm : datafifo_40mhz
     port map(
-      srst       => l1acnt_fifo_rst,
-      wr_clk    => cmsclk,
-      rd_clk    => sysclk80,
+      srst      => l1acnt_fifo_rst,
+      wr_clk    => CMSCLK,
+      rd_clk    => DDUCLK,
       din       => otmb_fifo_data_in,
       wr_en     => data_fifo_we(NCFEB+1),
       rd_en     => data_fifo_re(NCFEB+1),
@@ -303,7 +306,7 @@ begin
       prog_full => data_fifo_half_full(NCFEB+1)
       );
 
-  -- eof_data 
+  -- eof_data
   PULSEEOFALCT : PULSE2SAME port map(DOUT => eof_data(NCFEB+2), CLK_DOUT => cmsclk, RST => reset, DIN => alct_fifo_data_in(17));
   PULSEEOFOTMB : PULSE2SAME port map(DOUT => eof_data(NCFEB+1), CLK_DOUT => cmsclk, RST => reset, DIN => otmb_fifo_data_in(17));
 
@@ -314,7 +317,7 @@ begin
   dcfeb_data_in_inner(5) <= dcfeb5_data_in;
   dcfeb_data_in_inner(6) <= dcfeb6_data_in;
   dcfeb_data_in_inner(7) <= dcfeb7_data_in;
-  
+
   GEN_DCFEB : for I in NCFEB downto 1 generate
   begin
 
@@ -323,7 +326,7 @@ begin
         dcfeb_addr => dcfeb_addr(I))
       port map(
         clk          => cmsclk,
-        dcfebclk     => sysclk160,
+        dcfebclk     => dcfebclk,
         rst          => reset,
         l1a          => dcfeb_l1a,
         l1a_match    => dcfeb_l1a_match(I),
@@ -339,31 +342,34 @@ begin
         tck           => dcfeb_tck(I),
         tms           => dcfeb_tms,
         tdi           => dcfeb_tdi,
+        tdo           => gen_tdo(I),
         rtn_shft_en   => open,
-        injpls        => '0', 
+        done          => open,
+        injpls        => '0',
         extpls        => '0',
         bc0           => '0',
         resync        => '0',
-        tdo           => gen_tdo(I));
+        diagout       => open
+        );
 
     dcfeb_data_valid_d(I) <= '0' when kill(I) = '1' else
                              dcfeb_dv_in(I) when (gen_dcfeb_sel = '0') else
                              gen_dcfeb_data_valid(I);
     dcfeb_data(I) <= dcfeb_data_in_inner(I) when (gen_dcfeb_sel = '0') else gen_dcfeb_data(I);
 
-    FD_DCFEBDV   : FDC port map(Q => dcfeb_data_valid(I), C => sysclk160, CLR => reset, D => dcfeb_data_valid_d(I));
-    FD_DCFEBDATA : FDVEC port map(DOUT => dcfeb_fifo_in(I), CLK => sysclk160, RST => reset, DIN => dcfeb_data(I));
+    FD_DCFEBDV   : FDC port map(Q => dcfeb_data_valid(I), C => dcfebclk, CLR => reset, D => dcfeb_data_valid_d(I));
+    FD_DCFEBDATA : FDVEC port map(DOUT => dcfeb_fifo_in(I), CLK => dcfebclk, RST => reset, DIN => dcfeb_data(I));
 
     --masked_l1a_match(I) <= '0' when mask_l1a(I) = '1' else int_l1a_match(I);
     --DS_L1AMATCH : DELAY_SIGNAL generic map(1)
     --  port map(DCFEB_L1A_MATCH(I), cmsclk, cable_dly, masked_l1a_match(I));
-    
+
     --int_tdo(I) <= dcfeb_tdo(I) when (gen_dcfeb_sel = '0') else gen_tdo(I);
     dcfeb_tdo(I) <= gen_tdo(I);
 
     EOFGEN_PM : EOFGEN
       port map (
-        clk => sysclk160,
+        clk => DCFEBCLK,
         rst => reset,
 
         dv_in   => dcfeb_data_valid(I),
@@ -378,8 +384,8 @@ begin
         --need change due to use auto-kill
         --rst       => dcfeb_fifo_rst(I),
         srst      => l1acnt_fifo_rst,
-        wr_clk    => sysclk160,
-        rd_clk    => sysclk80,
+        wr_clk    => DCFEBCLK,
+        rd_clk    => DDUCLK,
         din       => eofgen_dcfeb_fifo_in(I),
         wr_en     => data_fifo_we(I),
         rd_en     => data_fifo_re(I),
@@ -391,7 +397,7 @@ begin
 
     --pulse_eof160(i) <= eofgen_dcfeb_fifo_in(I)(17) and not kill(i) and not bad_dcfeb_pulse_long(i);
     pulse_eof160(i) <= eofgen_dcfeb_fifo_in(I)(17) and not kill(i);
-    PULSEEOFDCFEB : PULSE2SLOW port map(DOUT => pulse_eof40(i), CLK_DOUT => cmsclk, CLK_DIN => sysclk160, RST => reset, DIN => pulse_eof160(i));
+    PULSEEOFDCFEB : PULSE2SLOW port map(DOUT => pulse_eof40(i), CLK_DOUT => cmsclk, CLK_DIN => dcfebclk, RST => reset, DIN => pulse_eof160(i));
     DS_EOF_PUSH   : DELAY_SIGNAL generic map(push_dlyp4) port map(DOUT => eof_data(I), CLK => cmsclk, NCYCLES => push_dlyp4, DIN => pulse_eof40(I));
 
     data_fifo_we(I) <= eofgen_dcfeb_data_valid(I) and datafifo_mask and not dcfeb_fifo_rst(I);

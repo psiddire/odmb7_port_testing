@@ -16,7 +16,6 @@ entity TRGCNTRL is
     );  
   port (
     CLK           : in std_logic;
-    CLK80         : in std_logic;
     RAW_L1A       : in std_logic;
     RAW_LCT       : in std_logic_vector(NCFEB downto 0);
     CAL_LCT       : in std_logic;

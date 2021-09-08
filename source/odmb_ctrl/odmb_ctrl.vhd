@@ -21,7 +21,7 @@ entity ODMB_CTRL is
     --------------------
     -- Clock
     --------------------
-    TXUSRCLK     : in std_logic;
+    DDUCLK       : in std_logic;
     CMSCLK       : in std_logic;
 
     CCB_CMD      : in  std_logic_vector (5 downto 0);  -- ccbcmnd(5 downto 0) - from J3
@@ -188,7 +188,6 @@ architecture Behavioral of ODMB_CTRL is
       );  
     port (
       CLK           : in std_logic;
-      CLK80         : in std_logic;
       RAW_L1A       : in std_logic;
       RAW_LCT       : in std_logic_vector(NCFEB downto 0);
       CAL_LCT       : in std_logic;
@@ -360,10 +359,18 @@ architecture Behavioral of ODMB_CTRL is
       );        
   end component;
 
+  -- Temporary debugging
   component ila_1 is
     port (
       clk : in std_logic := '0';
       probe0 : in std_logic_vector(127 downto 0) := (others=> '0')
+      );
+  end component;
+
+  component ila_2 is
+    port (
+      clk : in std_logic := '0';
+      probe0 : in std_logic_vector(383 downto 0) := (others=> '0')
       );
   end component;
 
@@ -408,7 +415,8 @@ architecture Behavioral of ODMB_CTRL is
   signal daqmbid : std_logic_vector(11 downto 0);
 
   signal diag_trigctrl : std_logic_vector(26 downto 0);
-  signal ila_data : std_logic_vector(127 downto 0);
+  signal ila_data1 : std_logic_vector(127 downto 0);
+  signal ila_data2 : std_logic_vector(383 downto 0);
 
 begin
 
@@ -426,7 +434,7 @@ begin
   CALIBTRG_PM : CALIBTRG
     port map (
       CMSCLK => CMSCLK,
-      CLK80 => TXUSRCLK,
+      CLK80 => DDUCLK,
       RST => RST, 
       PLSINJEN => PLSINJEN, 
       CCBPLS => '0',              --TODO generate from CCB input
@@ -458,7 +466,6 @@ begin
       )
     port map (
       CLK           => CMSCLK,
-      CLK80         => TXUSRCLK,
       RAW_L1A       => raw_l1a,
       RAW_LCT       => rawlct,
       CAL_LCT       => cal_lct,
@@ -494,7 +501,7 @@ begin
     port map(
       --CSP_FREE_AGENT_PORT_LA_CTRL => CSP_FREE_AGENT_PORT_LA_CTRL,
       clk        => CMSCLK,
-      dduclk     => TXUSRCLK,
+      dduclk     => DDUCLK,
       l1acnt_rst => l1acnt_rst,
       bxcnt_rst  => bxcnt_rst,
 
@@ -552,7 +559,7 @@ begin
       )
     port map(
       --CSP_CONTROL_FSM_PORT_LA_CTRL => CSP_CONTROL_FSM_PORT_LA_CTRL,
-      CLK    => TXUSRCLK,
+      CLK    => DDUCLK,
       CLKCMS => CMSCLK,
       RST    => l1acnt_rst,
       STATUS => status,
@@ -639,25 +646,35 @@ begin
   daqmbid(3 downto 0)  <= not ga(4 downto 1);  -- GA0 not included so that this is ODMB counter
 
   -- ILA
-  ila_data(3 downto 0)   <= otmb_dav & alct_dav & rawlct(0) & raw_l1a; -- raw signal
-  ila_data(10 downto 4)  <= rawlct(7 downto 1);  
-  ila_data(28 downto 11) <= diag_trigctrl(17 downto 0);
-  ila_data(37 downto 29) <= cafifo_l1a_match_in_inner(9 downto 1);
-  ila_data(46 downto 38) <= control_debug_full(41 downto 33); -- CAFIFO_L1A_MATCH
-  ila_data(55 downto 47) <= control_debug_full(50 downto 42); -- CAFIFO_L1A_DAV
-  ila_data(56)           <= control_debug_full(16); -- dav_inner
-  -- ila_data(60 downto 52) <= KILL(9 downto 1);
-  ila_data(66 downto 61) <= LCT_L1A_DLY;
-  ila_data(72 downto 67) <= std_logic_vector(to_unsigned(OTMB_PUSH_DLY, 6));
-  ila_data(78 downto 73) <= std_logic_vector(to_unsigned(ALCT_PUSH_DLY, 6));
-  ila_data(84 downto 79) <= std_logic_vector(to_unsigned(PUSH_DLY, 6));
-  ila_data(100 downto 85) <= control_debug_full(69 downto 54); -- dout_inner
-  ila_data(103 downto 101) <= cal_lct & cal_gtrg & cal_mode;
+  ila_data1(3 downto 0)   <= otmb_dav & alct_dav & rawlct(0) & raw_l1a; -- raw signal
+  ila_data1(10 downto 4)  <= rawlct(7 downto 1);  
+  ila_data1(28 downto 11) <= diag_trigctrl(17 downto 0);
+  ila_data1(37 downto 29) <= cafifo_l1a_match_in_inner(9 downto 1);
+  ila_data1(46 downto 38) <= control_debug_full(41 downto 33); -- CAFIFO_L1A_MATCH
+  ila_data1(55 downto 47) <= control_debug_full(50 downto 42); -- CAFIFO_L1A_DAV
+  ila_data1(56)           <= control_debug_full(16); -- dav_inner
+  ila_data1(59 downto 57) <= cal_lct & cal_gtrg & cal_mode;
+  ila_data1(66 downto 61) <= LCT_L1A_DLY;
+  ila_data1(72 downto 67) <= std_logic_vector(to_unsigned(OTMB_PUSH_DLY, 6));
+  ila_data1(78 downto 73) <= std_logic_vector(to_unsigned(ALCT_PUSH_DLY, 6));
+  ila_data1(84 downto 79) <= std_logic_vector(to_unsigned(PUSH_DLY, 6));
+  ila_data1(100 downto 85)  <= control_debug_full(69 downto 54); -- dout_inner
+  ila_data1(104 downto 101) <= control_debug_full(20 downto 17); -- current_state_svl
+  ila_data1(109 downto 105) <= control_debug_full(25 downto 21); -- dev_cnt_svl
+  ila_data1(110)            <= control_debug_full(32);           -- q_datain_last
 
-  ila_odmb_ctrl_inst : ila_1
+  ila_data2(119 downto 0) <= control_debug_full(135 downto 16);
+
+  ila_odmb_ctrl_inst1 : ila_1
     port map(
-      clk => TXUSRCLK,
-      probe0 => ila_data
+      clk => DDUCLK,
+      probe0 => ila_data1
       );
+
+  -- ila_odmb_ctrl_inst2 : ila_2
+  --   port map(
+  --     clk => DDUCLK,
+  --     probe0 => ila_data2
+  --     );
 
 end Behavioral;

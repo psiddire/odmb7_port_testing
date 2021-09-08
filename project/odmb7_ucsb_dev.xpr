@@ -30,20 +30,20 @@
     <Option Name="IPUserFilesDir" Val="$PIPUSERFILESDIR"/>
     <Option Name="IPStaticSourceDir" Val="$PIPUSERFILESDIR/ipstatic"/>
     <Option Name="EnableBDX" Val="FALSE"/>
-    <Option Name="WTXSimLaunchSim" Val="137"/>
+    <Option Name="WTXSimLaunchSim" Val="142"/>
     <Option Name="WTModelSimLaunchSim" Val="0"/>
     <Option Name="WTQuestaLaunchSim" Val="0"/>
     <Option Name="WTIesLaunchSim" Val="0"/>
     <Option Name="WTVcsLaunchSim" Val="0"/>
     <Option Name="WTRivieraLaunchSim" Val="0"/>
     <Option Name="WTActivehdlLaunchSim" Val="0"/>
-    <Option Name="WTXSimExportSim" Val="135"/>
-    <Option Name="WTModelSimExportSim" Val="135"/>
-    <Option Name="WTQuestaExportSim" Val="135"/>
-    <Option Name="WTIesExportSim" Val="135"/>
-    <Option Name="WTVcsExportSim" Val="135"/>
-    <Option Name="WTRivieraExportSim" Val="135"/>
-    <Option Name="WTActivehdlExportSim" Val="135"/>
+    <Option Name="WTXSimExportSim" Val="138"/>
+    <Option Name="WTModelSimExportSim" Val="138"/>
+    <Option Name="WTQuestaExportSim" Val="138"/>
+    <Option Name="WTIesExportSim" Val="138"/>
+    <Option Name="WTVcsExportSim" Val="138"/>
+    <Option Name="WTRivieraExportSim" Val="138"/>
+    <Option Name="WTActivehdlExportSim" Val="138"/>
     <Option Name="GenerateIPUpgradeLog" Val="TRUE"/>
     <Option Name="XSimRadix" Val="hex"/>
     <Option Name="XSimTimeUnit" Val="ns"/>
@@ -67,6 +67,13 @@
         </FileInfo>
       </File>
       <File Path="$PPRDIR/../ip/L1ACNT_DAV_FIFO/L1ACNT_DAV_FIFO.xci">
+        <FileInfo>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PPRDIR/../ip/ila_2/ila_2.xci">
         <FileInfo>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
@@ -227,7 +234,7 @@
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
-      <File Path="$PPRDIR/../source/odmb_vme/package_latches_flipflops.vhd">
+      <File Path="$PPRDIR/../source/utils/package_latches_flipflops.vhd">
         <FileInfo>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="simulation"/>
@@ -464,14 +471,6 @@
       <File Path="$PPRDIR/../source/odmb7_dev_top.vhd">
         <FileInfo>
           <Attr Name="UsedIn" Val="synthesis"/>
-          <Attr Name="UsedIn" Val="simulation"/>
-        </FileInfo>
-      </File>
-      <File Path="$PPRDIR/../ip/ila_cfeb/ila_cfeb.xci">
-        <FileInfo>
-          <Attr Name="AutoDisabled" Val="1"/>
-          <Attr Name="UsedIn" Val="synthesis"/>
-          <Attr Name="UsedIn" Val="implementation"/>
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>

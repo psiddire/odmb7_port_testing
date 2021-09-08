@@ -143,7 +143,7 @@ architecture Behavioral of mgt_cfeb is
   end component;
 
   -- Temporary debugging
-  component ila_cfeb is
+  component ila_2 is
     port (
       clk : in std_logic := '0';
       probe0 : in std_logic_vector(383 downto 0) := (others=> '0')

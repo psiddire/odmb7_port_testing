@@ -11,6 +11,7 @@ use work.ucsb_types.all;
 use ieee.std_logic_1164.all;
 use ieee.std_logic_misc.and_reduce;
 use ieee.std_logic_misc.or_reduce;
+use ieee.std_logic_misc.xor_reduce;
 use ieee.numeric_std.all;
 use ieee.std_logic_unsigned.all;
 
@@ -105,7 +106,7 @@ architecture CONTROL_arch of CONTROL_FSM is
   -- constant data_fifo_half   : std_logic_vector(NCFEB+2 downto 1) := (others => '0');
   constant dmb_l1pipe       : std_logic_vector(7 downto 0)      := (others => '0');
   constant wait_max         : integer := 16;
-  constant wait_dev_max         : integer := 5;
+  constant wait_dev_max     : integer := 5;
 
   type control_state is (IDLE, HEADER, WAIT_DEV, TX_DEV, TAIL, LONE, WAIT_IDLE);
   signal control_current_state, control_next_state, q_control_current_state : control_state := IDLE;
@@ -116,8 +117,8 @@ architecture CONTROL_arch of CONTROL_FSM is
   signal lone_cnt              : integer range 1 to 4  := 1;
   signal wait_cnt_en           : std_logic             := '0';
   signal wait_cnt              : integer range 1 to wait_max := 1;
-  signal wait_dev_cnt_en           : std_logic             := '0';
-  signal wait_dev_cnt              : integer range 1 to wait_dev_max := 1;
+  signal wait_dev_cnt_en       : std_logic             := '0';
+  signal wait_dev_cnt          : integer range 1 to wait_dev_max := 1;
   signal dev_cnt_en            : std_logic             := '0';
   signal dev_cnt               : integer range 1 to 9  := 9;
   signal tx_cnt_en, tx_cnt_rst : std_logic             := '0';
@@ -165,7 +166,7 @@ begin
   expect_pckt         <= or_reduce(cafifo_l1a_match);
   dev_cnt_svl         <= std_logic_vector(to_unsigned(dev_cnt, 5));
   hdr_tail_cnt_svl    <= std_logic_vector(to_unsigned(hdr_tail_cnt, 5));
-  lone_cnt_svl    <= std_logic_vector(to_unsigned(lone_cnt, 5));
+  lone_cnt_svl        <= std_logic_vector(to_unsigned(lone_cnt, 5));
   bad_l1a_lone<= '1' when (or_reduce(cafifo_l1a_match) = '0' and cafifo_lone = '0'
                            and control_current_state /= IDLE and control_current_state /= WAIT_IDLE) else '0';
   FD_CFL1A : FDVEC generic map(0, 23) port map(DOUT => cafifo_l1a_cnt_reg, CLK => clk, RST => rst, DIN => CAFIFO_L1A_CNT);
@@ -237,7 +238,7 @@ begin
           lone_cnt <= lone_cnt + 1;
         end if;
       end if;
-      if(dev_cnt_en = '1') then
+      if (dev_cnt_en = '1') then
         if(dev_cnt = 9) then
           dev_cnt <= 8;
         elsif(dev_cnt = 8) then
@@ -259,23 +260,23 @@ begin
 
   with control_current_state select
     current_state_svl <= x"1" when IDLE,
-    x"2"                      when HEADER,
-    x"3"                      when WAIT_DEV,
-    x"4"                      when TX_DEV,
-    x"5"                      when TAIL,
-    x"6"                      when LONE,
-    x"7"                      when WAIT_IDLE,
-    x"0"                      when others;
+                         x"2" when HEADER,
+                         x"3" when WAIT_DEV,
+                         x"4" when TX_DEV,
+                         x"5" when TAIL,
+                         x"6" when LONE,
+                         x"7" when WAIT_IDLE,
+                         x"0" when others;
   
   with control_next_state select
     next_state_svl <= x"1" when IDLE,
-    x"2"                   when HEADER,
-    x"3"                   when WAIT_DEV,
-    x"4"                   when TX_DEV,
-    x"5"                   when TAIL,
-    x"6"                   when LONE,
-    x"7"                   when WAIT_IDLE,
-    x"0"                   when others;
+                      x"2" when HEADER,
+                      x"3" when WAIT_DEV,
+                      x"4" when TX_DEV,
+                      x"5" when TAIL,
+                      x"6" when LONE,
+                      x"7" when WAIT_IDLE,
+                      x"0" when others;
 
   control_fsm_logic : process (control_current_state, cafifo_l1a_match, cafifo_l1a_dav,
                                hdr_word, hdr_tail_cnt, lone_cnt, dev_cnt, tx_cnt, DATAIN,
@@ -321,14 +322,14 @@ begin
         tx_cnt_rst <= '1';
         wait_dev_cnt_en <= '1';
         if (wait_dev_cnt = wait_dev_max) then
-          if(cafifo_l1a_match(dev_cnt) = '0' or cafifo_lost_pckt(dev_cnt) = '1' or KILL(dev_cnt) = '1') then
+          if (cafifo_l1a_match(dev_cnt) = '0' or cafifo_lost_pckt(dev_cnt) = '1' or KILL(dev_cnt) = '1') then
             dev_cnt_en <= '1';
             if (dev_cnt = 7) then
               control_next_state <= TAIL;
             else
               control_next_state <= WAIT_DEV;
             end if;
-          elsif(cafifo_l1a_dav(dev_cnt) = '1') then
+          elsif (cafifo_l1a_dav(dev_cnt) = '1') then
             control_next_state      <= TX_DEV;
             oefifo_b_inner(dev_cnt) <= '0';
           else
@@ -348,7 +349,7 @@ begin
         else
           dav_d <= '0';
         end if;
-        if(q_datain_last = '1' or KILL(dev_cnt) = '1') then
+        if (q_datain_last = '1' or KILL(dev_cnt) = '1') then
           dev_cnt_en <= '1';
           if (dev_cnt = 7) then
             control_next_state <= TAIL;
@@ -433,8 +434,11 @@ begin
   crc(21)         <= dout_d(15) xor reg_crc(15);
   crc(22)         <= crc(0) xor crc(1) xor crc(2) xor crc(3) xor crc(4) xor crc(5)
                      xor crc(6) xor crc(7) xor crc(8) xor crc(9) xor crc(10);
-  crc(23) <= crc(11) xor crc(12) xor crc(13) xor crc(14) xor crc(15) xor crc(16)
-             xor crc(17) xor crc(18) xor crc(19) xor crc(20) xor crc(21);
+  crc(23)         <= crc(11) xor crc(12) xor crc(13) xor crc(14) xor crc(15) xor crc(16)
+                     xor crc(17) xor crc(18) xor crc(19) xor crc(20) xor crc(21);
+  -- crc(22)         <= xor_reduce(crc(10 downto 0)); 
+  -- crc(23)         <= xor_reduce(crc(21 downto 11));
+
 
   GEN_REG_CRC : for K in 0 to 23 generate
   begin
