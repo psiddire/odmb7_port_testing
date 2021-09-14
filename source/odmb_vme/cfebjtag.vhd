@@ -6,33 +6,50 @@ use work.Latches_Flipflops.all;
 use ieee.std_logic_1164.all;
 use work.ucsb_types.all;
 
+--! @brief module handling JTAG (slow control) communication to (x)DCFEBs within ODMB VME
+--! @details Supported VME commands:
+--! * W 1Y00 shift Y+1 data bits with no JTAG header or tailer
+--! * W 1Y04 shift Y+1 data bits with JTAG header 
+--! * W 1Y08 shift Y+1 data bits with JTAG tailer
+--! * W 1Y0C shift Y+1 data bits with JTAG header and tailer
+--! * R 1014 read last data bits shifted into TDO register
+--! * W 1018 send JTAG reset pattern
+--! * W 1Y1C identical to W 1Y3C
+--! * W 1020 select (x)DCFEBs; one bit per (x)DCFEB
+--! * R 1024 read selected (x)DCFEBs
+--! * W 1Y30 shift Y+1 instruction bits with no JTAG header or tailer
+--! * W 1Y34 shift Y+1 instruction bits with JTAG header
+--! * W 1Y38 shift Y+1 instruction bits with JTAG tailer
+--! * W 1Y3C shift Y+1 instruction bits with JTAG header and tailer
+--! * W 1Y48 shift Y+1 instruction bits with special JTAG tailer
+--! * W 1Y4C shift Y+1 instruction bits with JTAG header and special JTAG tailer
 entity CFEBJTAG is
   generic (
     NCFEB   : integer range 1 to 7 := 7  -- Number of DCFEBS, 7 for ME1/1, 5
     );
   port (
-    FASTCLK : in std_logic;
-    SLOWCLK : in std_logic;
-    RST     : in std_logic;
+    FASTCLK : in std_logic;                           --! 40 MHz clock. Currently unused.
+    SLOWCLK : in std_logic;                           --! 1.25MHz clock (previously 2.5 MHz clock, but this was too fast for some HD50 cables)
+    RST     : in std_logic;                           --! Firmware soft reset signal.
 
-    DEVICE  : in std_logic;
-    STROBE  : in std_logic;
-    COMMAND : in std_logic_vector(9 downto 0);
-    WRITER  : in std_logic;
+    DEVICE  : in std_logic;                           --! Indicates if this is the selected ODMB VME device.
+    STROBE  : in std_logic;                           --! Strobe signal indicating a VME command is ready.
+    COMMAND : in std_logic_vector(9 downto 0);        --! VME command signal.
+    WRITER  : in std_logic;                           --! Indicates if VME command is a read or write command. Currently unused.
 
-    INDATA  : in  std_logic_vector(15 downto 0);
-    OUTDATA : out std_logic_vector(15 downto 0);
+    INDATA  : in  std_logic_vector(15 downto 0);      --! Input data accompanying VME command.
+    OUTDATA : out std_logic_vector(15 downto 0);      --! Output data to VME backplane.
 
-    DTACK : out std_logic;
+    DTACK : out std_logic;                            --! Data acknowledge, indicates that VME command has been received.
 
-    INITJTAGS : in  std_logic;
-    TCK       : out std_logic_vector(NCFEB downto 1);
-    TDI       : out std_logic;
-    TMS       : out std_logic;
-    FEBTDO    : in  std_logic_vector(NCFEB downto 1);
+    INITJTAGS : in  std_logic;                        --! Signal generated when (x)DCFEBs finish programming to invoke a reset of the JTAG state machine.
+    TCK       : out std_logic_vector(NCFEB downto 1); --! JTAG test clock signal to (x)DCFEBs. One per (x)DCFEB to allow communication with a single board.
+    TDI       : out std_logic;                        --! JTAG test data in signal to (x)DCFEBs.
+    TMS       : out std_logic;                        --! JTAG test mode select signal to (x)DCFEBs.
+    FEBTDO    : in  std_logic_vector(NCFEB downto 1); --! JTAG test data out signal from (x)DCFEBs.
 
-    LED     : out std_logic;
-    DIAGOUT : out std_logic_vector(17 downto 0)
+    LED     : out std_logic;                          --! Debug signals.
+    DIAGOUT : out std_logic_vector(17 downto 0)       --! Debug signals.
     );
 end CFEBJTAG;
 

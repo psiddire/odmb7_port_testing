@@ -47,38 +47,38 @@ entity odmb7_ucsb_dev is
     -- Signals controlled by ODMB_VME
     --------------------
     -- From/To VME controller to/from MBV
-    VME_DATA        : inout std_logic_vector(15 downto 0); --! Data to/from VME backplane. Used by ODMB VME module. Connected to bank 48.
-    VME_GAP_B       : in std_logic;                        --! Geographical address (VME slot) parity. Used by ODMB VME module. Connected to bank 48.
-    VME_GA_B        : in std_logic_vector(4 downto 0);     --! Geographical address (VME slot). Used by ODMB VME and ODMB CTRL module. Connected to bank 48.
-    VME_ADDR        : in std_logic_vector(23 downto 1);    --! VME address (command). Used by ODMB VME module. Conencted to bank 46.
-    VME_AM          : in std_logic_vector(5 downto 0);     --! VME address modifier. Used by ODMB VME module. Connected to cank 46.
-    VME_AS_B        : in std_logic;                        --! VME address strobe. Used by ODMB VME module. Connected to bank 46.
-    VME_DS_B        : in std_logic_vector(1 downto 0);     --! VME data strobe. Used by ODMB VME module. Connected to bank 46.
-    VME_LWORD_B     : in std_logic;                        --! VME data word length. Used by ODMB VME module. Connected to bank 48.
-    VME_WRITE_B     : in std_logic;                        --! VME write/read indicator. Used by ODMB VME module. Connected to bank 48.
-    VME_IACK_B      : in std_logic;                        --! VME interrupt acknowledge. Used by ODMB VME module. Connected to bank 48.
-    VME_BERR_B      : in std_logic;                        --! VME bus error indicator. Used by ODMB VME module. Connected to bank 48.
+    VME_DATA        : inout std_logic_vector(15 downto 0); --! Data to/from VME backplane. Used by ODMB_VME module. Connected to bank 48.
+    VME_GAP_B       : in std_logic;                        --! Geographical address (VME slot) parity. Used by ODMB_VME module. Connected to bank 48.
+    VME_GA_B        : in std_logic_vector(4 downto 0);     --! Geographical address (VME slot). Used by ODMB_VME and ODMB CTRL module. Connected to bank 48.
+    VME_ADDR        : in std_logic_vector(23 downto 1);    --! VME address (command). Used by ODMB_VME module. Conencted to bank 46.
+    VME_AM          : in std_logic_vector(5 downto 0);     --! VME address modifier. Used by ODMB_VME module. Connected to cank 46.
+    VME_AS_B        : in std_logic;                        --! VME address strobe. Used by ODMB_VME module. Connected to bank 46.
+    VME_DS_B        : in std_logic_vector(1 downto 0);     --! VME data strobe. Used by ODMB_VME module. Connected to bank 46.
+    VME_LWORD_B     : in std_logic;                        --! VME data word length. Used by ODMB_VME module. Connected to bank 48.
+    VME_WRITE_B     : in std_logic;                        --! VME write/read indicator. Used by ODMB_VME module. Connected to bank 48.
+    VME_IACK_B      : in std_logic;                        --! VME interrupt acknowledge. Used by ODMB_VME module. Connected to bank 48.
+    VME_BERR_B      : in std_logic;                        --! VME bus error indicator. Used by ODMB_VME module. Connected to bank 48.
     VME_SYSRST_B    : in std_logic;                        --! VME system reset. Not used. Connected to bank 48.
-    VME_SYSFAIL_B   : in std_logic;                        --! VME system failure indicator. Used by ODMB VME module. Connected to bank 48.
+    VME_SYSFAIL_B   : in std_logic;                        --! VME system failure indicator. Used by ODMB_VME module. Connected to bank 48.
     VME_CLK_B       : in std_logic;                        --! VME clock. Not used. Connected to bank 48.
-    KUS_VME_OE_B    : out std_logic;                       --! VME output enable. Controlled by ODMB VME module. Connected to bank 44.
-    KUS_VME_DIR     : out std_logic;                       --! ODMB board VME input/output direction. Controlled by ODMB VME module. Connected to bank 44.
-    VME_DTACK_KUS_B : out std_logic;                       --! VME data acknowledge. Controlled by ODMB VME module. Connected to bank 44.
+    KUS_VME_OE_B    : out std_logic;                       --! VME output enable. Controlled by ODMB_VME module. Connected to bank 44.
+    KUS_VME_DIR     : out std_logic;                       --! ODMB board VME input/output direction. Controlled by ODMB_VME module. Connected to bank 44.
+    VME_DTACK_KUS_B : out std_logic;                       --! VME data acknowledge. Controlled by ODMB_VME module. Connected to bank 44.
 
     -- From/To PPIB (connectors J3 and J4)
-    DCFEB_TCK_P    : out std_logic_vector(7 downto 1);     --! (x)DCFEB JTAG TCK signal. One per (x)DCFEB. Used by ODMB VME module. Connected to bank 68.
-    DCFEB_TCK_N    : out std_logic_vector(7 downto 1);     --! (x)DCFEB JTAG TCK signal. One per (x)DCFEB. Used by ODMB VME module. Connected to bank 68. 
-    DCFEB_TMS_P    : out std_logic;                        --! (x)DCFEB JTAG TMS signal. Used by ODMB VME module. Connected to bank 68.
-    DCFEB_TMS_N    : out std_logic;                        --! (x)DCFEB JTAG TMS signal. Used by ODMB VME module. Connected to bank 68.
-    DCFEB_TDI_P    : out std_logic;                        --! (x)DCFEB JTAG TDI signal. Used by ODMB VME module. Connected to bank 68.
-    DCFEB_TDI_N    : out std_logic;                        --! (x)DCFEB JTAG TDI signal. Used by ODMB VME module. Connected to bank 68.
-    DCFEB_TDO_P    : in  std_logic_vector(7 downto 1);     --! (x)DCFEB JTAG TDO signal. One per (x)DCFEB. Used by ODMB VME module. Connected to bank 67-68 as "C_TDO".
-    DCFEB_TDO_N    : in  std_logic_vector(7 downto 1);     --! (x)DCFEB JTAG TDO signal. One per (x)DCFEB. Used by ODMB VME module. Connected to bank 67-68 as "C_TDO". 
+    DCFEB_TCK_P    : out std_logic_vector(7 downto 1);     --! (x)DCFEB JTAG TCK signal. One per (x)DCFEB. Used by ODMB_VME module. Connected to bank 68.
+    DCFEB_TCK_N    : out std_logic_vector(7 downto 1);     --! (x)DCFEB JTAG TCK signal. One per (x)DCFEB. Used by ODMB_VME module. Connected to bank 68. 
+    DCFEB_TMS_P    : out std_logic;                        --! (x)DCFEB JTAG TMS signal. Used by ODMB_VME module. Connected to bank 68.
+    DCFEB_TMS_N    : out std_logic;                        --! (x)DCFEB JTAG TMS signal. Used by ODMB_VME module. Connected to bank 68.
+    DCFEB_TDI_P    : out std_logic;                        --! (x)DCFEB JTAG TDI signal. Used by ODMB_VME module. Connected to bank 68.
+    DCFEB_TDI_N    : out std_logic;                        --! (x)DCFEB JTAG TDI signal. Used by ODMB_VME module. Connected to bank 68.
+    DCFEB_TDO_P    : in  std_logic_vector(7 downto 1);     --! (x)DCFEB JTAG TDO signal. One per (x)DCFEB. Used by ODMB_VME module. Connected to bank 67-68 as "C_TDO".
+    DCFEB_TDO_N    : in  std_logic_vector(7 downto 1);     --! (x)DCFEB JTAG TDO signal. One per (x)DCFEB. Used by ODMB_VME module. Connected to bank 67-68 as "C_TDO". 
     DCFEB_DONE     : in  std_logic_vector(7 downto 1);     --! (x)DCFEB programming done signal. Used only by top level DCFEB startup process. Connected to bank 68 as "DONE_*".
-    RESYNC_P       : out std_logic;                        --! (x)DCFEB resync signal. Used by ODMB VME module. Connected to bank 66.
-    RESYNC_N       : out std_logic;                        --! (x)DCFEB resync signal. Used by ODMB VME module. Connected to bank 66.
-    BC0_P          : out std_logic;                        --! (x)DCFEB bunch crossing 0 synchronization signal. Initiated by CCB_BX0 signal or from ODMB VME. Connected to bank 68.
-    BC0_N          : out std_logic;                        --! (x)DCFEB bunch crossing 0 synchronization signal. Initiated by CCB_BX0 signal or from ODMB VME. Connected to bank 68.
+    RESYNC_P       : out std_logic;                        --! (x)DCFEB resync signal. Used by ODMB_VME module. Connected to bank 66.
+    RESYNC_N       : out std_logic;                        --! (x)DCFEB resync signal. Used by ODMB_VME module. Connected to bank 66.
+    BC0_P          : out std_logic;                        --! (x)DCFEB bunch crossing 0 synchronization signal. Initiated by CCB_BX0 signal or from ODMB_VME. Connected to bank 68.
+    BC0_N          : out std_logic;                        --! (x)DCFEB bunch crossing 0 synchronization signal. Initiated by CCB_BX0 signal or from ODMB_VME. Connected to bank 68.
     INJPLS_P       : out std_logic;                        --! Calibration INJPLS signal for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
     INJPLS_N       : out std_logic;                        --! Calibration INJPLS signal for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
     EXTPLS_P       : out std_logic;                        --! Calibration EXTPLS signal for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
@@ -88,7 +88,7 @@ entity odmb7_ucsb_dev is
     L1A_MATCH_P    : out std_logic_vector(7 downto 1);     --! L1A match for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
     L1A_MATCH_N    : out std_logic_vector(7 downto 1);     --! L1A match for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
     PPIB_OUT_EN_B  : out std_logic;                        --! PPIB output enable signal. Fixed to '0'. Connected to bank 68.
-    DCFEB_REPROG_B : out std_logic;                        --! (x)DCFEB reprogram signal. From ODMBCTRL in ODMB VME module. Connected to bank 68.
+    DCFEB_REPROG_B : out std_logic;                        --! (x)DCFEB reprogram signal. From ODMBCTRL in ODMB_VME module. Connected to bank 68.
 
     --------------------
     -- CCB Signals
@@ -115,15 +115,15 @@ entity odmb7_ucsb_dev is
     --------------------
     -- LVMB Signals
     --------------------
-    LVMB_PON     : out std_logic_vector(7 downto 0);       --! Signal to LVMB to power on (x)DCFEBs and ALCT. Mapping of bits to boards is chamber dependent. Used by ODMB VME. Connected to bank 67.
-    PON_LOAD_B   : out std_logic;                          --! Signal to write LVMB_PON to LVMB. Used by ODMB VME. Connected to bank 67.
-    PON_OE       : out std_logic;                          --! Output enable for LVMB_PON. Fixed to '1'. Used by ODMB VME. Connected to bank 67.
-    MON_LVMB_PON : in  std_logic_vector(7 downto 0);       --! Signal to check (x)DCFEBs and ALCT power status from LVMB. Mapping of bits to boards is chamber dependent. Used by ODMB VME. Connected to bank 67.
-    LVMB_CSB     : out std_logic_vector(6 downto 0);       --! LVMB ADC SPI chip select. Used by ODMB VME. Connected to bank 67.
-    LVMB_SCLK    : out std_logic;                          --! LVMB ADC SPI clock. Used by ODMB VME. Connected to bank 68.
-    LVMB_SDIN    : out std_logic;                          --! LVMB ADC SPI input. Used by ODMB VME. Connected to bank 68.
-    LVMB_SDOUT_P : in std_logic;                           --! LVMB ADC SPI output. Used by ODMB VME. Connected to bank 67 as C_LVMB_SDOUT_P.
-    LVMB_SDOUT_N : in std_logic;                           --! LVMB ADC SPI output. Used by ODMB VME. Connected to bank 67 as C_LVMB_SDOUT_N.
+    LVMB_PON     : out std_logic_vector(7 downto 0);       --! Signal to LVMB to power on (x)DCFEBs and ALCT. Mapping of bits to boards is chamber dependent. Used by ODMB_VME. Connected to bank 67.
+    PON_LOAD_B   : out std_logic;                          --! Signal to write LVMB_PON to LVMB. Used by ODMB_VME. Connected to bank 67.
+    PON_OE       : out std_logic;                          --! Output enable for LVMB_PON. Fixed to '1'. Used by ODMB_VME. Connected to bank 67.
+    MON_LVMB_PON : in  std_logic_vector(7 downto 0);       --! Signal to check (x)DCFEBs and ALCT power status from LVMB. Mapping of bits to boards is chamber dependent. Used by ODMB_VME. Connected to bank 67.
+    LVMB_CSB     : out std_logic_vector(6 downto 0);       --! LVMB ADC SPI chip select. Used by ODMB_VME. Connected to bank 67.
+    LVMB_SCLK    : out std_logic;                          --! LVMB ADC SPI clock. Used by ODMB_VME. Connected to bank 68.
+    LVMB_SDIN    : out std_logic;                          --! LVMB ADC SPI input. Used by ODMB_VME. Connected to bank 68.
+    LVMB_SDOUT_P : in std_logic;                           --! LVMB ADC SPI output. Used by ODMB_VME. Connected to bank 67 as C_LVMB_SDOUT_P.
+    LVMB_SDOUT_N : in std_logic;                           --! LVMB ADC SPI output. Used by ODMB_VME. Connected to bank 67 as C_LVMB_SDOUT_N.
 
     --------------------------------
     -- OTMB communication signals
@@ -134,7 +134,7 @@ entity odmb7_ucsb_dev is
     OTMB_FF_CLK : in  std_logic;                           --! Unused. Connected to bank 45 as TMB_FF_CLK.
     RSVTD_IN    : in  std_logic_vector(7 downto 3);        --! Reserved to DMB signals used only for OTMB PRBS test. Connected to bank 44-45 as RSVTD[7:3] (to be updated).
     RSVTD_OUT   : out std_logic_vector(2 downto 0);        --! Reserved to DMB signals used to send L1A info to OTMB and for PRBS test. Connected to bank 44-45 as RSVTD[2:0] (to be updated).
-    LCT_RQST    : out std_logic_vector(2 downto 1);        --! Used to send LCT and external trigger requests generated by ODMB VME and for PRBS test. Connected to bank 45.
+    LCT_RQST    : out std_logic_vector(2 downto 1);        --! Used to send LCT and external trigger requests generated by ODMB_VME and for PRBS test. Connected to bank 45.
 
     --------------------------------
     -- ODMB optical ports
@@ -211,9 +211,9 @@ entity odmb7_ucsb_dev is
     --------------------------------
     -- PROM pins
     --------------------------------
-    PROM_RST_B    : out std_logic;                         --! Reset signal to both PROM ICs used by spi_interface in ODMB VME. Connected to bank 65.
-    PROM_CS2_B    : out std_logic;                         --! Chip select signal to secondary PROM, used by spi_interface in ODMB VME. Connected to bank 65.
-    CNFG_DATA     : inout std_logic_vector(7 downto 4);    --! Data signals to/from the secondary PROM, used by spi_interface in ODMB VME. Connected to bank 65.
+    PROM_RST_B    : out std_logic;                         --! Reset signal to both PROM ICs currently tied to 1. Connected to bank 65.
+    PROM_CS2_B    : out std_logic;                         --! Chip select signal to secondary PROM, used by spi_interface in ODMB_VME. Connected to bank 65.
+    CNFG_DATA     : inout std_logic_vector(7 downto 4);    --! Data signals to/from the secondary PROM, used by spi_interface in ODMB_VME. Connected to bank 65.
 
     --------------------------------
     -- Others
