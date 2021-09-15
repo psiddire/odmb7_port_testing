@@ -222,6 +222,14 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
   signal spi_register_we           : std_logic := '0';
   signal spi_register_readback     : std_logic_vector(7 downto 0) := x"00";
   signal spi_timer_countup         : unsigned(7 downto 0) := x"FF";
+  signal readback_fifo_empty_meta  : std_logic := '0';
+  signal readback_fifo_empty_sync  : std_logic := '0';
+  signal readback_fifo_full_meta   : std_logic := '0';
+  signal readback_fifo_full_sync   : std_logic := '0';
+  signal cmd_fifo_empty_meta       : std_logic := '0';
+  signal cmd_fifo_empty_sync       : std_logic := '0';
+  signal cmd_fifo_full_meta        : std_logic := '0';
+  signal cmd_fifo_full_sync        : std_logic := '0';
   
   --debugging signals
   signal cmd_fifo_read_en_q     : std_logic := '0';
@@ -1228,6 +1236,9 @@ begin
         spi_timer_inner <= spi_timer_inner + 1;
       end if;
     else
+      if (spi_timer_rst = '1') then
+        spi_timer_inner <= x"00000000";
+      end if;
       spi_timer_countup <= spi_timer_countup + 1;
     end if;
   end if;
@@ -1236,12 +1247,20 @@ begin
   status_fsm : process(CLK40, RST)
   begin
   if (RST='1') then
-    spi_register_inner <= readback_fifo_empty & readback_fifo_full & "00" & cmd_fifo_empty & cmd_fifo_full & "00" & x"00";
+    spi_register_inner <= x"0000";
   elsif (rising_edge(CLK40)) then
+    readback_fifo_empty_meta <= readback_fifo_empty;
+    readback_fifo_empty_sync <= readback_fifo_empty_meta;
+    readback_fifo_full_meta <= readback_fifo_full;
+    readback_fifo_full_sync <= readback_fifo_full_meta;
+    cmd_fifo_empty_meta <= cmd_fifo_empty;
+    cmd_fifo_empty_sync <= cmd_fifo_empty_meta;
+    cmd_fifo_full_meta <= cmd_fifo_full;
+    cmd_fifo_full_sync <= cmd_fifo_full_meta;
     if (spi_register_we = '1') then
-      spi_register_inner <= readback_fifo_empty & readback_fifo_full & "00" & cmd_fifo_empty & cmd_fifo_full & "00" & spi_register_readback;
+      spi_register_inner <= readback_fifo_empty_sync & readback_fifo_full_sync & "00" & cmd_fifo_empty_sync & cmd_fifo_full_sync & "00" & spi_register_readback;
     else
-      spi_register_inner <= readback_fifo_empty & readback_fifo_full & "00" & cmd_fifo_empty & cmd_fifo_full & "00" & spi_register_inner(7 downto 0);
+      spi_register_inner <= readback_fifo_empty_sync & readback_fifo_full_sync & "00" & cmd_fifo_empty_sync & cmd_fifo_full_sync & "00" & spi_register_inner(7 downto 0);
     end if;
   end if;
   end process;

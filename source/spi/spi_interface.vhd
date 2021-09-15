@@ -1046,7 +1046,9 @@ process_read_register : process (CLK)
          read_register_done <= '0';
          read_register_state <= S_READ_REGISTER_ASSERT_CS_READ;
          read_register_type <= START_READ_REGISTER;
-        end if;
+       else
+         read_register_done <= '1';
+       end if;
 
   when S_READ_REGISTER_ASSERT_CS_READ =>
        -- assert CS and prep read register command
@@ -1088,7 +1090,6 @@ process_read_register : process (CLK)
          read_register_bit_index <= read_register_bit_index + 1;
          register_inner <= spi_miso & register_inner(7 downto 1);
          if (write_config_status_bit_index = read_register_max_index) then 
-           --fix: change based on length of register being read
            read_register_done <= '1';
            register_we <= '1';
            read_register_state <= S_READ_REGISTER_IDLE;

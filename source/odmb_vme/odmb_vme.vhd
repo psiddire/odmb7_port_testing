@@ -653,7 +653,7 @@ begin
     port map (
       -- CSP_LVMB_LA_CTRL => CSP_LVMB_LA_CTRL,
       FASTCLK => CLK40,
-      SLOWCLK => CLK1p25,
+      SLOWCLK => CLK1P25,
       RST     => RST,
 
       DEVICE  => device(1),
@@ -680,7 +680,7 @@ begin
       NCFEB => NCFEB
       )
     port map (
-      SLOWCLK => CLK2p5,
+      SLOWCLK => CLK2P5,
       CLK40   => CLK40,
       RST     => RST,
 
