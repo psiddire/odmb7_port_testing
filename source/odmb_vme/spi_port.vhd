@@ -8,15 +8,33 @@ use ieee.numeric_std.all;
 use work.ucsb_types.all;
 
 --! @brief VME device that acts as user interface to EPROM
+--! @details Replaces BPI_PORT and BPI_CFG_CONTROLLER modules from legacy ODMB firmware.
+--! Supported VME commands:
+--! * W 6000 write configuration registers to PROM
+--! * W 6004 load configuration registers from PROM
+--! * W 6010 write constant registers to PROM
+--! * W 6014 load constant registers from PROM
+--! * W 6020 reset SPI_CTRL finite state machine
+--! * W 6024 disable SPI_CTRL finite state machine
+--! * W 6028 enable SPI_CTRL finite state machine
+--! * W 602C XXXX write XXXX to SPI command FIFO. See SPI_CTRL for details.
+--! * R 6030 read 1 word from readback FIFO
+--! * R 6034 read number of words in readback FIFO
+--! * R 6038 read SPI status
+--! * R 603C read BPI timer (16 LSB)
+--! * R 6040 read BPI timer (16 MSB)
+--! VME commands to be implemented:
+--! Other features to be implemented:
+--! * upload CONST and CFG registers on reset, then reset SPI_CTRL
 entity SPI_PORT is
   port (
     SLOWCLK              : in std_logic; --! 2.5 MHz clock input
-    CLK                  : in std_logic; --! 45 MHz clock iput
+    CLK                  : in std_logic; --! 40 MHz clock input
     RST                  : in std_logic; --! Soft reset signal
     --VME signals
     DEVICE               : in  std_logic;                     --! Indicates whether this is the selected VME device
     STROBE               : in  std_logic;                     --! Indicates VME command is ready to be executed
-    COMMAND              : in  std_logic_vector(9 downto 0);  --! VME command to be executed (x"6" & COMMAND & "00" is user-readble version)
+    COMMAND              : in  std_logic_vector(9 downto 0);  --! VME command to be executed (x"6" & COMMAND & "00" is user-readable version)
     WRITER               : in  std_logic;                     --! Indicates if VME command is a read or write command
     DTACK                : out std_logic;                     --! Data acknowledge to be sent once command is initialized/executed
     INDATA               : in  std_logic_vector(15 downto 0); --! Input data from VME backplane
@@ -31,14 +49,18 @@ entity SPI_PORT is
     SPI_CONST_REG_WE     : out integer range 0 to NREGS;      --! Write enable for each const register
     SPI_CFG_REGS         : in cfg_regs_array;                 --! Contents of CFG registers to write to PROM
     SPI_CONST_REGS       : in cfg_regs_array;                 --! Contents of const registers to write PROM
-    --signals to/from QSPI_CTRL
+    --signals to/from SPI_CTRL
+    SPI_RST                   : out std_logic;                     --! reset signal for SPI_CTRL state machine
+    SPI_ENBL                  : out std_logic;                     --! signal to enable SPI_CTRL state machine
+    SPI_DSBL                  : out std_logic;                     --! signal to disable SPI_CTRL state machine
     SPI_CMD_FIFO_WRITE_EN     : out std_logic;                     --! Write enable to write command to PROM controller module
     SPI_CMD_FIFO_IN           : out std_logic_vector(15 downto 0); --! Command to be written to PROM controller module
     SPI_READBACK_FIFO_OUT     : in std_logic_vector(15 downto 0);  --! Contents readback from PROM
     SPI_READBACK_FIFO_READ_EN : out std_logic;                     --! Read enable to progress through contents readback from PROM
     SPI_READ_BUSY             : in std_logic;                      --! Indicates a PROM read in progress
-    SPI_NCMDS_SPICTRL         : in unsigned(15 downto 0);          --! Debug signal: number of commands received by SPICTRL
-    SPI_NCMDS_SPIINTR         : in unsigned(15 downto 0);          --! Debug signal: number of commands processed by SPICTRL
+    SPI_RBK_WRD_CNT           : in std_logic_vector(10 downto 0);  --! Number of words in SPI readback FIFO
+    SPI_TIMER                 : in std_logic_vector(31 downto 0);  --! SPI timer register from SPI_CTRL
+    SPI_STATUS                : in std_logic_vector(15 downto 0);  --! SPI status register from SPI_CTRL
     --debug
     DIAGOUT                   : out std_logic_vector(17 downto 0)  --! Debug signals
     );
@@ -60,22 +82,39 @@ architecture SPI_PORT_Arch of SPI_PORT is
   
   --CFG register download signals
   type cfg_download_states is (S_IDLE, S_SET_ADDR_LOWER, S_ERASE, S_BUFFER_PROGRAM, S_WRITE);
-  signal cfg_download_state  : cfg_download_states := S_IDLE;
-  signal spi_cmd_fifo_write_en_cfg_dl : std_logic := '0';
-  signal spi_cmd_fifo_in_cfg_dl : std_logic_vector(15 downto 0) := x"0000";
-  signal download_cfg_reg_index : integer := 0;
+  signal cfg_download_state             : cfg_download_states := S_IDLE;
+  signal spi_cmd_fifo_write_en_cfg_dl   : std_logic := '0';
+  signal spi_cmd_fifo_in_cfg_dl         : std_logic_vector(15 downto 0) := x"0000";
+  signal download_cfg_reg_index         : integer := 0;
+
+  --const register download signals
+  signal const_download_state           : cfg_download_states := S_IDLE;
+  signal spi_cmd_fifo_write_en_const_dl : std_logic := '0';
+  signal spi_cmd_fifo_in_const_dl       : std_logic_vector(15 downto 0) := x"0000";
+  signal download_const_reg_index       : integer := 0;
   
   --CFG register upload signals
   type cfg_upload_states is (S_IDLE, S_SET_ADDR_LOWER, S_READN, S_WAIT_READ_BUSY, S_WAIT_READ_DONE, S_WAIT_READ_STALL, S_READBACK);
-  signal cfg_upload_state                 : cfg_upload_states := S_IDLE;
-  signal spi_cmd_fifo_write_en_cfg_ul     : std_logic := '0';
-  signal spi_cmd_fifo_in_cfg_ul           : std_logic_vector(15 downto 0) := x"0000";
-  signal upload_cfg_reg_index             : integer := 0;  
-  signal spi_readback_fifo_read_en_cfg_ul : std_logic := '0';
-  signal spi_cfg_ul_pulse_inner           : std_logic := '0';
-  signal spi_cfg_reg_we_inner             : integer := NREGS;
-  signal spi_ul_reg_inner                 : std_logic_vector(15 downto 0) := x"0000";
-  signal readback_fifo_stall_counter      : unsigned(7 downto 0) := x"1F";
+  signal cfg_upload_state                   : cfg_upload_states := S_IDLE;
+  signal spi_cmd_fifo_write_en_cfg_ul       : std_logic := '0';
+  signal spi_cmd_fifo_in_cfg_ul             : std_logic_vector(15 downto 0) := x"0000";
+  signal upload_cfg_reg_index               : integer := 0;  
+  signal spi_readback_fifo_read_en_cfg_ul   : std_logic := '0';
+  signal spi_cfg_ul_pulse_inner             : std_logic := '0';
+  signal spi_cfg_reg_we_inner               : integer := NREGS;
+  signal spi_cfg_ul_reg                     : std_logic_vector(15 downto 0) := x"0000";
+  signal cfg_readback_fifo_stall_counter    : unsigned(7 downto 0) := x"1F";
+
+  --const register upload signals
+  signal const_upload_state                 : cfg_upload_states := S_IDLE;
+  signal spi_cmd_fifo_write_en_const_ul     : std_logic := '0';
+  signal spi_cmd_fifo_in_const_ul           : std_logic_vector(15 downto 0) := x"0000";
+  signal upload_const_reg_index             : integer := 0;  
+  signal spi_readback_fifo_read_en_const_ul : std_logic := '0';
+  signal spi_const_ul_pulse_inner           : std_logic := '0';
+  signal spi_const_reg_we_inner             : integer := NREGS;
+  signal spi_const_ul_reg                   : std_logic_vector(15 downto 0) := x"0000";
+  signal const_readback_fifo_stall_counter  : unsigned(7 downto 0) := x"1F";
   
   --SPI command command signals
   signal strobe_meta               : std_logic := '0';
@@ -90,12 +129,20 @@ architecture SPI_PORT_Arch of SPI_PORT is
   signal spi_readback_fifo_read_en_cmd : std_logic := '0';
   
   --command parsing signals
-  signal cmddev          : std_logic_vector(15 downto 0) := x"0000";
-  signal do_cfg_read   : std_logic := '0';
-  signal do_cfg_write : std_logic := '0'; 
-  signal do_cfg_erase    : std_logic := '0';
-  signal do_spi_cmd      : std_logic := '0';
-  signal do_spi_read     : std_logic := '0';
+  signal cmddev                       : std_logic_vector(15 downto 0) := x"0000";
+  signal do_cfg_read                  : std_logic := '0';
+  signal do_cfg_write                 : std_logic := '0'; 
+  signal do_const_read                : std_logic := '0';
+  signal do_const_write               : std_logic := '0'; 
+  signal do_spi_cmd                   : std_logic := '0';
+  signal do_spi_read                  : std_logic := '0';
+  signal do_read_readback_fifo_nwords : std_logic := '0';
+  signal do_reset_spi_fsm             : std_logic := '0';
+  signal do_enable_spi_fsm            : std_logic := '0';
+  signal do_disable_spi_fsm           : std_logic := '0';
+  signal do_read_timer_lsb            : std_logic := '0';
+  signal do_read_timer_msb            : std_logic := '0';
+  signal do_read_status               : std_logic := '0';
   
   --dtack signals
   signal ce_d_dtack : std_logic := '0'; 
@@ -103,10 +150,6 @@ architecture SPI_PORT_Arch of SPI_PORT is
   signal q_dtack    : std_logic := '0';
   
   --debugging signals
-  signal ncmds_spiport         : unsigned(15 downto 0) := x"0000";
-  signal do_ncmds_spiport_read : std_logic := '0';
-  signal do_ncmds_spictrl_read : std_logic := '0';
-  signal do_ncmds_spiintr_read : std_logic := '0';
   signal outdata_inner         : std_logic_vector(15 downto 0) := x"0000";
   signal ila_probe             : std_logic_vector(511 downto 0) := (others => '0');
 
@@ -139,50 +182,49 @@ begin
   ila_probe(106) <= spi_readback_fifo_read_en_cfg_ul;
   ila_probe(107) <= spi_cfg_ul_pulse_inner;
   ila_probe(111 downto 108) <= std_logic_vector(to_unsigned(upload_cfg_reg_index,4));
-  ila_probe(127 downto 112) <= spi_ul_reg_inner;
+  ila_probe(127 downto 112) <= spi_cfg_ul_reg;
   
   --Decode command
   cmddev    <= "000" & DEVICE & COMMAND & "00";
 
-  do_cfg_write <= '1' when (cmddev=x"1000" and STROBE='1') else '0'; --0x6000
-  do_cfg_read <= '1' when (cmddev=x"1004" and STROBE='1') else '0'; --0x6004
-  --temp command for debugging
-  do_cfg_erase <= '1' when (cmddev=x"1008" and STROBE='1') else '0';
-  do_spi_cmd <= '1' when (cmddev=x"102C") else '0';
-  do_spi_read <= '1' when (cmddev=x"1030") else '0';
-  do_ncmds_spiport_read <= '1' when (cmddev=x"1100") else '0';
-  do_ncmds_spictrl_read <= '1' when (cmddev=x"1104") else '0';
-  do_ncmds_spiintr_read <= '1' when (cmddev=x"1108") else '0';
+  do_cfg_write                 <= '1' when (cmddev=x"1000" and STROBE='1') else '0'; --0x6000
+  do_cfg_read                  <= '1' when (cmddev=x"1004" and STROBE='1') else '0'; --0x6004
+  do_const_write               <= '1' when (cmddev=x"1010" and STROBE='1') else '0'; --0x6010
+  do_const_read                <= '1' when (cmddev=x"1014" and STROBE='1') else '0'; --0x6014
+  do_reset_spi_fsm             <= '1' when (cmddev=x"1020" and STROBE='1') else '0'; --0x6020
+  do_disable_spi_fsm           <= '1' when (cmddev=x"1024" and STROBE='1') else '0'; --0x6024
+  do_enable_spi_fsm            <= '1' when (cmddev=x"1028" and STROBE='1') else '0'; --0x6028
+  do_spi_cmd                   <= '1' when (cmddev=x"102C") else '0';                --0x602C
+  do_spi_read                  <= '1' when (cmddev=x"1030") else '0';                --0x6030
+  do_read_readback_fifo_nwords <= '1' when (cmddev=x"1034") else '0';                --0x6034
+  do_read_status               <= '1' when (cmddev=x"1038") else '0';                --0x6034
+  do_read_timer_lsb            <= '1' when (cmddev=x"103C") else '0';                --0x603C
+  do_read_timer_msb            <= '1' when (cmddev=x"1040") else '0';                --0x6040
 
-  --generate strobe_pulse, note STROBE comes from FASTCLK clock domain
-  strobe_meta <= STROBE when rising_edge(SLOWCLK);
-  strobe_q <= strobe_meta when rising_edge(SLOWCLK);
-  strobe_qq <= strobe_q when rising_edge(SLOWCLK);
+  --generate strobe_pulse in SLOWCLK domain, note STROBE comes from FASTCLK clock domain
+  strobe_meta  <= STROBE when rising_edge(SLOWCLK);
+  strobe_q     <= strobe_meta when rising_edge(SLOWCLK);
+  strobe_qq    <= strobe_q when rising_edge(SLOWCLK);
   strobe_pulse <= (not strobe_qq) and strobe_q;
   
-  --handle SPI command command
+  --handle SPI command command (602C)
   spi_cmd_fifo_write_en_cmd <= do_spi_cmd and strobe_pulse;
   spi_cmd_fifo_in_cmd <= INDATA;
   
-  spi_count_proc : process (SLOWCLK)
-  begin
-  if rising_edge(SLOWCLK) then
-    if (do_spi_cmd='1' and strobe_pulse='1') then
-      ncmds_spiport <= ncmds_spiport + 1;
-    else
-      ncmds_spiport <= ncmds_spiport;
-    end if;
-  end if;
-  end process;            
+  --generate SPI FSM signals (6020, 6024, 6028) (TODO: check that no operation (ex. cfg register write) in progress?)
+  SPI_RST  <= do_reset_spi_fsm and strobe_pulse;
+  SPI_DSBL <= do_disable_spi_fsm and strobe_pulse;
+  SPI_ENBL <= do_enable_spi_fsm and strobe_pulse;        
   
-  --handle SPI read command
-  outdata_inner <= std_logic_vector(ncmds_spiport) when (do_ncmds_spiport_read = '1') else
-             std_logic_vector(SPI_NCMDS_SPICTRL) when (do_ncmds_spictrl_read = '1') else
-             std_logic_vector(SPI_NCMDS_SPIINTR) when (do_ncmds_spiintr_read = '1') else
-             spi_read_data; --currently the only output in this module, will fix later
-  
+  --handle RBK FIFO read/word count/timer bits commands
+  outdata_inner <= "00000" & SPI_RBK_WRD_CNT when (do_read_readback_fifo_nwords = '1') else
+                   SPI_STATUS when (do_read_status = '1') else
+                   SPI_TIMER(15 downto 0) when (do_read_timer_lsb = '1') else
+                   SPI_TIMER(31 downto 16) when (do_read_timer_msb = '1') else
+                   spi_read_data;
   OUTDATA <= outdata_inner; --temp, for debugging
              
+  --pop 1 word from FIFO on read command
   spi_read_proc : process (SLOWCLK)
   begin
   if rising_edge(SLOWCLK) then
@@ -246,6 +288,58 @@ begin
     end case;
   end if;
   end process;
+
+
+  --handle const write command
+  const_write_proc : process (SLOWCLK)
+  begin
+  if rising_edge(SLOWCLK) then
+    case const_download_state is
+    when S_IDLE => 
+      if do_const_write='1' then
+        spi_cmd_fifo_write_en_const_dl <= '1';
+        --send CMD to load address 00FE0000
+        spi_cmd_fifo_in_const_dl <= x"1FD7";
+        const_download_state <= S_SET_ADDR_LOWER;
+      else
+        spi_cmd_fifo_write_en_const_dl <= '0';
+        spi_cmd_fifo_in_const_dl <= x"0000";
+        const_download_state <= S_IDLE;
+      end if;
+      
+    when S_SET_ADDR_LOWER =>
+      spi_cmd_fifo_write_en_const_dl <= '1';
+      --load address lower bits
+      spi_cmd_fifo_in_const_dl <= x"0000";
+      const_download_state <= S_ERASE;
+    
+    when S_ERASE =>
+      spi_cmd_fifo_write_en_const_dl <= '1';
+      --send CMD to erase block
+      spi_cmd_fifo_in_const_dl <= x"000A";
+      const_download_state <= S_BUFFER_PROGRAM;
+
+    when S_BUFFER_PROGRAM =>
+      spi_cmd_fifo_write_en_const_dl <= '1';
+      --send CMD to buffer 16 word program
+      spi_cmd_fifo_in_const_dl <= x"01EC";
+      const_download_state <= S_WRITE;
+
+    when S_WRITE =>
+      spi_cmd_fifo_write_en_const_dl <= '1';
+      --send CFG registers as program data
+      spi_cmd_fifo_in_const_dl <= SPI_CONST_REGS(download_const_reg_index);
+      if (download_const_reg_index=15) then
+        download_const_reg_index <= 0;
+        const_download_State <= S_IDLE;
+      else
+        download_const_reg_index <= download_const_reg_index + 1;
+        const_download_state <= S_WRITE;
+      end if;
+
+    end case;
+  end if;
+  end process;
   
   
   --handle CFG read command
@@ -257,7 +351,7 @@ begin
       spi_readback_fifo_read_en_cfg_ul <= '0';
       spi_cfg_ul_pulse_inner <= '0';
       spi_cfg_reg_we_inner <= NREGS;
-      spi_ul_reg_inner <= x"0000";
+      spi_cfg_ul_reg <= x"0000";
       if do_cfg_read='1' then
         spi_cmd_fifo_write_en_cfg_ul <= '1';
         --send CMD to load address 00FE0000
@@ -274,7 +368,7 @@ begin
       spi_readback_fifo_read_en_cfg_ul <= '0';
       spi_cfg_ul_pulse_inner <= '0';
       spi_cfg_reg_we_inner <= NREGS;
-      spi_ul_reg_inner <= x"0000";
+      spi_cfg_ul_reg <= x"0000";
       --load address lower bits
       spi_cmd_fifo_in_cfg_ul <= x"0000";
       cfg_upload_state <= S_READN;
@@ -291,7 +385,7 @@ begin
       spi_readback_fifo_read_en_cfg_ul <= '0';
       spi_cfg_ul_pulse_inner <= '0';
       spi_cfg_reg_we_inner <= NREGS;
-      spi_ul_reg_inner <= x"0000";
+      spi_cfg_ul_reg <= x"0000";
       --wait for spi_ctrl to start reading
       spi_cmd_fifo_in_cfg_ul <= x"0000";
       if (SPI_READ_BUSY='1') then
@@ -304,7 +398,7 @@ begin
         spi_cmd_fifo_write_en_cfg_ul <= '0';
         spi_cfg_ul_pulse_inner <= '0';
         spi_cfg_reg_we_inner <= NREGS;
-        spi_ul_reg_inner <= x"0000";
+        spi_cfg_ul_reg <= x"0000";
         --wait for spi_ctrl to finish reading
         spi_cmd_fifo_in_cfg_ul <= x"0000";
         upload_cfg_reg_index <= 0;
@@ -320,16 +414,16 @@ begin
       spi_cmd_fifo_write_en_cfg_ul <= '0';
       spi_cfg_ul_pulse_inner <= '0';
       spi_cfg_reg_we_inner <= NREGS;
-      spi_ul_reg_inner <= SPI_READBACK_FIFO_OUT;
+      spi_cfg_ul_reg <= SPI_READBACK_FIFO_OUT;
       spi_cmd_fifo_in_cfg_ul <= x"0000";
       upload_cfg_reg_index <= 0;
-      if (readback_fifo_stall_counter=x"0") then
+      if (cfg_readback_fifo_stall_counter=x"0") then
         cfg_upload_state <= S_READBACK;           
-        readback_fifo_stall_counter <= x"1F";
+        cfg_readback_fifo_stall_counter <= x"1F";
         spi_readback_fifo_read_en_cfg_ul <= '1';
       else
         cfg_upload_state <= S_WAIT_READ_STALL;
-        readback_fifo_stall_counter <= readback_fifo_stall_counter - 1;
+        cfg_readback_fifo_stall_counter <= cfg_readback_fifo_stall_counter - 1;
         spi_readback_fifo_read_en_cfg_ul <= '0';
       end if;
   
@@ -339,7 +433,7 @@ begin
       spi_cmd_fifo_in_cfg_ul <= x"0000";
       spi_cfg_ul_pulse_inner <= '1';
       spi_cfg_reg_we_inner <= upload_cfg_reg_index;
-      spi_ul_reg_inner <= SPI_READBACK_FIFO_OUT;
+      spi_cfg_ul_reg <= SPI_READBACK_FIFO_OUT;
       --read values from readback fifo and send to CFG registers
       spi_cmd_fifo_in_cfg_ul <= x"0000";
       if (upload_cfg_reg_index=15) then
@@ -354,38 +448,146 @@ begin
   end if;
   end process;
 
+  --handle CONST read command
+  const_upload_proc : process (SLOWCLK)
+  begin
+  if rising_edge(SLOWCLK) then
+    case const_upload_state is
+    when S_IDLE => 
+      spi_readback_fifo_read_en_const_ul <= '0';
+      spi_const_ul_pulse_inner <= '0';
+      spi_const_reg_we_inner <= NREGS;
+      spi_const_ul_reg <= x"0000";
+      if do_const_read='1' then
+        spi_cmd_fifo_write_en_const_ul <= '1';
+        --send CMD to load address 00FE0000
+        spi_cmd_fifo_in_const_ul <= x"1FD7";
+        const_upload_state <= S_SET_ADDR_LOWER;
+      else
+        spi_cmd_fifo_write_en_const_ul <= '0';
+        spi_cmd_fifo_in_const_ul <= x"0000";
+        const_upload_state <= S_IDLE;
+      end if;
+     
+    when S_SET_ADDR_LOWER =>
+      spi_cmd_fifo_write_en_const_ul <= '1';
+      spi_readback_fifo_read_en_const_ul <= '0';
+      spi_const_ul_pulse_inner <= '0';
+      spi_const_reg_we_inner <= NREGS;
+      spi_const_ul_reg <= x"0000";
+      --load address lower bits
+      spi_cmd_fifo_in_const_ul <= x"0000";
+      const_upload_state <= S_READN;
+     
+    when S_READN =>
+      spi_cmd_fifo_write_en_const_ul <= '1';
+      spi_readback_fifo_read_en_const_ul <= '0';
+      --send CMD to read 16 words
+      spi_cmd_fifo_in_const_ul <= x"01E4";
+      const_upload_state <= S_WAIT_READ_BUSY;
+      
+    when S_WAIT_READ_BUSY =>
+      spi_cmd_fifo_write_en_const_ul <= '0';
+      spi_readback_fifo_read_en_const_ul <= '0';
+      spi_const_ul_pulse_inner <= '0';
+      spi_const_reg_we_inner <= NREGS;
+      spi_const_ul_reg <= x"0000";
+      --wait for spi_ctrl to start reading
+      spi_cmd_fifo_in_const_ul <= x"0000";
+      if (SPI_READ_BUSY='1') then
+        const_upload_state <= S_WAIT_READ_DONE;      
+      else
+        const_upload_state <= S_WAIT_READ_BUSY;
+      end if;
+      
+    when S_WAIT_READ_DONE =>
+        spi_cmd_fifo_write_en_const_ul <= '0';
+        spi_const_ul_pulse_inner <= '0';
+        spi_const_reg_we_inner <= NREGS;
+        spi_const_ul_reg <= x"0000";
+        --wait for spi_ctrl to finish reading
+        spi_cmd_fifo_in_const_ul <= x"0000";
+        upload_const_reg_index <= 0;
+        spi_readback_fifo_read_en_const_ul <= '0';
+        if (SPI_READ_BUSY='1') then
+          const_upload_state <= S_WAIT_READ_STALL;    
+        else
+          const_upload_state <= S_WAIT_READ_DONE;
+        end if;
+        
+    when S_WAIT_READ_STALL => 
+      --need to wait for some reason. FIFO propagation maybe?
+      spi_cmd_fifo_write_en_const_ul <= '0';
+      spi_const_ul_pulse_inner <= '0';
+      spi_const_reg_we_inner <= NREGS;
+      spi_const_ul_reg <= SPI_READBACK_FIFO_OUT;
+      spi_cmd_fifo_in_const_ul <= x"0000";
+      upload_const_reg_index <= 0;
+      if (const_readback_fifo_stall_counter=x"0") then
+        const_upload_state <= S_READBACK;           
+        const_readback_fifo_stall_counter <= x"1F";
+        spi_readback_fifo_read_en_const_ul <= '1';
+      else
+        const_upload_state <= S_WAIT_READ_STALL;
+        const_readback_fifo_stall_counter <= const_readback_fifo_stall_counter - 1;
+        spi_readback_fifo_read_en_const_ul <= '0';
+      end if;
+  
+    when S_READBACK =>
+      spi_cmd_fifo_write_en_const_ul <= '0';
+      spi_readback_fifo_read_en_const_ul <= '1';
+      spi_cmd_fifo_in_const_ul <= x"0000";
+      spi_const_ul_pulse_inner <= '1';
+      spi_const_reg_we_inner <= upload_const_reg_index;
+      spi_const_ul_reg <= SPI_READBACK_FIFO_OUT;
+      --read values from readback fifo and send to CFG registers
+      spi_cmd_fifo_in_const_ul <= x"0000";
+      if (upload_const_reg_index=15) then
+        upload_const_reg_index <= 0;
+        const_upload_State <= S_IDLE;
+      else
+        upload_const_reg_index <= upload_const_reg_index + 1;
+        const_upload_state <= S_READBACK;
+      end if;
+  
+    end case;
+  end if;
+  end process;
+
 
   --multiplex signals to spi_ctrl
   SPI_CMD_FIFO_WRITE_EN <= spi_cmd_fifo_write_en_cmd or spi_cmd_fifo_write_en_cfg_dl or spi_cmd_fifo_write_en_cfg_ul;
-  SPI_CMD_FIFO_IN <= spi_cmd_fifo_in_cmd when (spi_cmd_fifo_write_en_cmd='1') else
-                     spi_cmd_fifo_in_cfg_dl when (spi_cmd_fifo_write_en_cfg_dl='1') else 
-                     spi_cmd_fifo_in_cfg_ul when (spi_cmd_fifo_write_en_cfg_ul='1') else
+  SPI_CMD_FIFO_IN <= spi_cmd_fifo_in_cmd      when (spi_cmd_fifo_write_en_cmd='1') else
+                     spi_cmd_fifo_in_cfg_dl   when (spi_cmd_fifo_write_en_cfg_dl='1') else 
+                     spi_cmd_fifo_in_const_dl when (spi_cmd_fifo_write_en_const_dl='1') else 
+                     spi_cmd_fifo_in_cfg_ul   when (spi_cmd_fifo_write_en_cfg_ul='1') else
+                     spi_cmd_fifo_in_const_ul when (spi_cmd_fifo_write_en_const_ul='1') else
                      x"0000";
-  SPI_READBACK_FIFO_READ_EN <= spi_readback_fifo_read_en_cmd or spi_readback_fifo_read_en_cfg_ul;
-  
+  SPI_READBACK_FIFO_READ_EN <= spi_readback_fifo_read_en_cmd or spi_readback_fifo_read_en_cfg_ul or spi_readback_fifo_read_en_const_ul;
+
   
   --signals to VMECONFREGS
-  SPI_UL_REG <=  spi_ul_reg_inner when (spi_cfg_reg_we_inner /= NREGS) else x"0000";
-  SPI_CONST_BUSY <= '0';
-  SPI_CFG_BUSY <= '0';
-  SPI_CONST_UL_PULSE <= '0'; --never upload CONST REGs
-  SPI_CONST_REG_WE <= NREGS;
-  SPI_CFG_UL_PULSE <= spi_cfg_ul_pulse_inner;
-  SPI_CFG_REG_WE <= spi_cfg_reg_we_inner;
+  SPI_UL_REG         <=  spi_cfg_ul_reg when (spi_cfg_reg_we_inner /= NREGS) else 
+                         spi_const_ul_reg when (spi_const_reg_we_inner /= NREGS) else
+                         x"0000";
+  SPI_CONST_BUSY     <= '0';
+  SPI_CFG_BUSY       <= '0';
+  SPI_CONST_UL_PULSE <= spi_const_ul_pulse_inner;
+  SPI_CONST_REG_WE   <= spi_const_reg_we_inner;
+  SPI_CFG_UL_PULSE   <= spi_cfg_ul_pulse_inner;
+  SPI_CFG_REG_WE     <= spi_cfg_reg_we_inner;
   
-  
-  --TODO: upload CFG registers on reset
+  --TODO: upload registers on reset
   
   -- DTACK: always just issue on second SLOWCLK edge after STROBE
   ce_d_dtack <= strobe_qq and DEVICE;
   FD_D_DTACK : FDCE port map(Q => d_dtack, C => SLOWCLK, CE => ce_d_dtack, CLR => q_dtack, D => '1');
   FD_Q_DTACK : FD port map(Q => q_dtack, C => SLOWCLK, D => d_dtack);
   DTACK    <= q_dtack;
-  
   --FD_D_DTACK : FDCE port map(Q => d_dtack, C => SLOWCLK, CE => ce_d_dtack, CLR => q_dtack, D => '1');
   --FD_Q_DTACK : FD port map(Q => q_dtack, C => SLOWCLK, D => d_dtack);
-  DTACK    <= q_dtack;
 
+  --debugging
   DIAGOUT <= "0" & spi_cmd_fifo_in_cmd(11 downto 0) & q_dtack & spi_cmd_fifo_write_en_cmd & STROBE & strobe_pulse & do_spi_cmd;
 
 end SPI_PORT_Arch;

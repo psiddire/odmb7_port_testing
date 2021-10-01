@@ -6,33 +6,50 @@ use work.Latches_Flipflops.all;
 use ieee.std_logic_1164.all;
 use work.ucsb_types.all;
 
+--! @brief module handling JTAG (slow control) communication to (x)DCFEBs within ODMB VME
+--! @details Supported VME commands:
+--! * W 1Y00 shift Y+1 data bits with no JTAG header or tailer
+--! * W 1Y04 shift Y+1 data bits with JTAG header 
+--! * W 1Y08 shift Y+1 data bits with JTAG tailer
+--! * W 1Y0C shift Y+1 data bits with JTAG header and tailer
+--! * R 1014 read last data bits shifted into TDO register
+--! * W 1018 send JTAG reset pattern
+--! * W 1Y1C identical to W 1Y3C
+--! * W 1020 select (x)DCFEBs; one bit per (x)DCFEB
+--! * R 1024 read selected (x)DCFEBs
+--! * W 1Y30 shift Y+1 instruction bits with no JTAG header or tailer
+--! * W 1Y34 shift Y+1 instruction bits with JTAG header
+--! * W 1Y38 shift Y+1 instruction bits with JTAG tailer
+--! * W 1Y3C shift Y+1 instruction bits with JTAG header and tailer
+--! * W 1Y48 shift Y+1 instruction bits with special JTAG tailer
+--! * W 1Y4C shift Y+1 instruction bits with JTAG header and special JTAG tailer
 entity CFEBJTAG is
   generic (
     NCFEB   : integer range 1 to 7 := 7  -- Number of DCFEBS, 7 for ME1/1, 5
     );
   port (
-    FASTCLK : in std_logic;
-    SLOWCLK : in std_logic;
-    RST     : in std_logic;
+    FASTCLK : in std_logic;                           --! 40 MHz clock. Currently unused.
+    SLOWCLK : in std_logic;                           --! 1.25MHz clock (previously 2.5 MHz clock, but this was too fast for some HD50 cables)
+    RST     : in std_logic;                           --! Firmware soft reset signal.
 
-    DEVICE  : in std_logic;
-    STROBE  : in std_logic;
-    COMMAND : in std_logic_vector(9 downto 0);
-    WRITER  : in std_logic;
+    DEVICE  : in std_logic;                           --! Indicates if this is the selected ODMB VME device.
+    STROBE  : in std_logic;                           --! Strobe signal indicating a VME command is ready.
+    COMMAND : in std_logic_vector(9 downto 0);        --! VME command signal.
+    WRITER  : in std_logic;                           --! Indicates if VME command is a read or write command. Currently unused.
 
-    INDATA  : in  std_logic_vector(15 downto 0);
-    OUTDATA : out std_logic_vector(15 downto 0);
+    INDATA  : in  std_logic_vector(15 downto 0);      --! Input data accompanying VME command.
+    OUTDATA : out std_logic_vector(15 downto 0);      --! Output data to VME backplane.
 
-    DTACK : out std_logic;
+    DTACK : out std_logic;                            --! Data acknowledge, indicates that VME command has been received.
 
-    INITJTAGS : in  std_logic;
-    TCK       : out std_logic_vector(NCFEB downto 1);
-    TDI       : out std_logic;
-    TMS       : out std_logic;
-    FEBTDO    : in  std_logic_vector(NCFEB downto 1);
+    INITJTAGS : in  std_logic;                        --! Signal generated when (x)DCFEBs finish programming to invoke a reset of the JTAG state machine.
+    TCK       : out std_logic_vector(NCFEB downto 1); --! JTAG test clock signal to (x)DCFEBs. One per (x)DCFEB to allow communication with a single board.
+    TDI       : out std_logic;                        --! JTAG test data in signal to (x)DCFEBs.
+    TMS       : out std_logic;                        --! JTAG test mode select signal to (x)DCFEBs.
+    FEBTDO    : in  std_logic_vector(NCFEB downto 1); --! JTAG test data out signal from (x)DCFEBs.
 
-    LED     : out std_logic;
-    DIAGOUT : out std_logic_vector(17 downto 0)
+    LED     : out std_logic;                          --! Debug signals.
+    DIAGOUT : out std_logic_vector(17 downto 0)       --! Debug signals.
     );
 end CFEBJTAG;
 
@@ -58,9 +75,13 @@ architecture CFEBJTAG_Arch of CFEBJTAG is
   
   
   --signals for INITJTAGS and RSTJTAG command
-  signal d1_resetjtag, q1_resetjtag, q2_resetjtag                               : std_logic;
-  signal q3_resetjtag, clr_resetjtag, resetjtag                                 : std_logic;
-  signal okrst, initjtags_q, initjtags_qq, initjtags_qqq                        : std_logic;
+  type reset_jtag_states is (S_RESETJTAG_IDLE, S_RESETJTAG_RESETTING, S_RESETJTAG_DTACK);
+  signal reset_jtag_state : reset_jtag_states := S_RESETJTAG_IDLE;
+  signal resettype                                                              : std_logic;
+  --signal d1_resetjtag, q1_resetjtag, q2_resetjtag                               : std_logic;
+  --signal q3_resetjtag, clr_resetjtag, resetjtag                                 : std_logic;
+  signal resetjtag                                                              : std_logic;
+  --signal okrst, initjtags_q, initjtags_qq, initjtags_qqq                        : std_logic;
   signal clr_resetdone, ceo_resetdone, tc_resetdone                             : std_logic;
   signal qv_resetdone                                                           : std_logic_vector(3 downto 0);
   signal resetdone, q_resetdone                                                 : std_logic;
@@ -164,16 +185,64 @@ begin
 
 
 
-
   -- Handle RSTJTAG command (0x1018) and INITJTAGS upon startup
-  -- resetjtag set 4th clock cycle after INITJTAGS or STROBE
-  -- INITJTAGS comes from odmb_ucsb_v2 when the DCFEBs DONE bits go high
-  d1_resetjtag  <= '1' when ((STROBE = '1' and rstjtag = '1') or INITJTAGS = '1') else '0';
-  FDC_q1resetjtag : FDC port map(D => d1_resetjtag, C => SLOWCLK, CLR => RST, Q => q1_resetjtag);
-  FDC_q2resetjtag : FDC port map(D => q1_resetjtag, C => SLOWCLK, CLR => RST, Q => q2_resetjtag);
-  okrst         <= '1' when (q1_resetjtag = '1' and q2_resetjtag = '1')           else '0';
-  FDC_q3resetjtag : FDCE port map(D => logich, C => SLOWCLK, CE => okrst, CLR => clr_resetjtag, Q => q3_resetjtag);
-  FDC_resetjtag : FDC port map(D => q3_resetjtag, C => SLOWCLK, CLR => clr_resetjtag, Q => resetjtag);
+  -- INITJTAGS comes from odmb_ucsb_v2 when the DCFEBs DONE bits go high - 5 clock cycle pulse
+  process_nword_readback : process(SLOWCLK, RST)
+  begin
+  if (RST='1') then
+    reset_jtag_state <= S_RESETJTAG_IDLE;
+    resetjtag <= '0';
+  elsif (rising_edge(SLOWCLK)) then
+    case reset_jtag_state is
+    
+    when S_RESETJTAG_IDLE =>
+      dtack_rstjtag <= '0';
+      if (STROBE='1' and rstjtag='1') then
+        reset_jtag_state <= S_RESETJTAG_RESETTING;
+        resetjtag <= '1';
+        resettype <= '0';
+      elsif (INITJTAGS='1') then
+        reset_jtag_state <= S_RESETJTAG_RESETTING;   
+        resetjtag <= '1';  
+        resettype <= '1';   
+      else
+        reset_jtag_state <= S_RESETJTAG_IDLE;
+        resetjtag <= '0';
+        resettype <= '0';
+      end if;
+      
+    when S_RESETJTAG_RESETTING => 
+      --wait until reset is finished to issue DTACK
+      dtack_rstjtag <= '0';
+      if (resetdone = '1') then
+        if (resettype = '1') then
+          reset_jtag_state <= S_RESETJTAG_IDLE;
+        else
+          reset_jtag_state <= S_RESETJTAG_DTACK;
+        end if;
+        resetjtag <= '0';
+      else
+        reset_jtag_state <= S_RESETJTAG_RESETTING;   
+        resetjtag <= '1';        
+      end if;
+      
+    when S_RESETJTAG_DTACK => 
+      --hold DTACK until STROBE goes low
+      dtack_rstjtag <= '1';
+      resetjtag <= '0';    
+      if (STROBE='1') then
+        reset_jtag_state <= S_RESETJTAG_DTACK;
+      else
+        reset_jtag_state <= S_RESETJTAG_IDLE;
+      end if;
+      
+    when others =>
+      dtack_rstjtag <= '0';
+      reset_jtag_state <= S_RESETJTAG_IDLE;
+      resetjtag <= '0';
+    end case;
+  end if;
+  end process;
 
   -- Generate RESETDONE 
   -- PULSE2SLOW only works if the signal is 1 CC long in the original clock domain
@@ -182,8 +251,7 @@ begin
   -- resetdone_PULSE  : PULSE2SLOW port map(DOUT => clr_resetdone, CLK_DOUT => SLOWCLK, CLK_DIN => FASTCLK, RST => '0', DIN => clr_resetjtag_pulse);
   clr_resetdone <= '1' when (q_resetdone = '1' or RST = '1')                        else '0';
   CB4CE(SLOWCLK, resetjtag, clr_resetdone, qv_resetdone, qv_resetdone, ceo_resetdone, tc_resetdone); --(C, CE, CLR, Q_in, Q, CEO, TC)
-  resetdone     <= '1' when (qv_resetdone = "1100") else '0';
-  clr_resetjtag <= (resetdone or RST);
+  resetdone     <= '1' when (qv_resetdone = "1011") else '0'; --12 - 1 clock cycles since resetjtag doesn't go low until the next one
   FD_qresetdone : FD port map(D => resetdone, C => SLOWCLK, Q => q_resetdone);
 
   -- Generate TMS when resetjtag=1; pattern is 111110 (recall TCK is half the frequency of SLOWCLK so ce_shihead_tms is only enabled every other SLOWLCK cycle)
@@ -194,13 +262,6 @@ begin
   FDPE_q4resetjtagtms : FDPE port map(D => q3_resetjtag_tms, C => SLOWCLK, CE => ce_resetjtag_tms, PRE => RST, Q => q4_resetjtag_tms);
   FDPE_q5resetjtagtms : FDPE port map(D => q4_resetjtag_tms, C => SLOWCLK, CE => ce_resetjtag_tms, PRE => RST, Q => q5_resetjtag_tms);
   FDPE_q6resetjtagtms : FDPE port map(D => q5_resetjtag_tms, C => SLOWCLK, CE => ce_resetjtag_tms, PRE => RST, Q => q6_resetjtag_tms);
- 
-  -- Generate dtack for RSTJTAG command
-  FDC_initjtagsq : FDC port map(D => INITJTAGS, C => SLOWCLK, CLR => RST, Q => initjtags_q);
-  FDC_initjtagsqq : FDC port map(D => initjtags_q, C => SLOWCLK, CLR => RST, Q => initjtags_qq);
-  FDC_initjtagsqqq : FDC port map(D => initjtags_qq, C => SLOWCLK, CLR => RST, Q => initjtags_qqq);
-  dtack_rstjtag <= resetjtag and (not initjtags_qqq);
-
 
 
 
@@ -229,7 +290,7 @@ begin
   FDC_busy : FDC port map(D => d_busy, C => SLOWCLK, CLR => clr_busy, Q => busy);
   FDC_busyp1 : FDC port map(D => busy, C => SLOWCLK, CLR => RST, Q => busyp1);
   
-  -- Generate dtack for DATASHFT and INSTSHFT commands, 4 cycles after strobe
+  -- Generate dtack for DATASHFT and INSTSHFT commands, at least 4 cycles after strobe when busy goes low
   d_dtack   <= (datashft or instshft);
   ce_dtack  <= not busy;
   clr_dtack <= not STROBE;
@@ -237,7 +298,7 @@ begin
   FDC_q2dtack : FDC port map(D => q1_dtack, C => SLOWCLK, CLR => CLR_dtack, Q => q2_dtack);
   FD_q3dtack : FD port map(D => q2_dtack, C => SLOWCLK, Q => q3_dtack);
   FD_q4dtack : FD port map(D => q3_dtack, C => SLOWCLK, Q => q4_dtack);
-  dtack_shft <= (q1_dtack and q2_dtack and q3_dtack and q4_dtack);
+  dtack_shft <= (q1_dtack and q2_dtack and q3_dtack and q4_dtack and (not busy));
 
 
    

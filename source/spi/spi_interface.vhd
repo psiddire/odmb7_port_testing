@@ -14,8 +14,6 @@ use ieee.numeric_std.all;
 use UNISIM.vcomponents.all;
 use work.ucsb_types.all;
 
--- TODO !!!!!! make nonvolatile conf reg temp volatile for testing
-
 --! @brief Module that directly generates SPI signals for post-startup communication with EPROMS
 entity spi_interface is
   port
@@ -24,14 +22,10 @@ entity spi_interface is
     RST                     : in std_logic; --! Soft reset signal
     ------------------ Signals to FIFO
     WRITE_FIFO_INPUT        : in std_logic_vector(15 downto 0); --! Data to write to programming FIFO
-    WRITE_FIFO_WRITE_ENABLE : in std_logic; --! Write enable for programming FIFO
+    WRITE_FIFO_WRITE_ENABLE : in std_logic;                     --! Write enable for programming FIFO
     ------------------ Address loading signals
     START_ADDRESS           : in std_logic_vector(31 downto 0); --! Address to start operation. Only bottom 3 bytes used
-    START_ADDRESS_VALID     : in std_logic; --! Signal to load address
-    --PAGE_COUNT              : in std_logic_vector(17 downto 0);
-    --PAGE_COUNT_VALID        : in std_logic;
-    --SECTOR_COUNT            : in std_logic_vector(13 downto 0);
-    --SECTOR_COUNT_VALID      : in std_logic;
+    START_ADDRESS_VALID     : in std_logic;                     --! Signal to load address
     ------------------ Commands
     WRITE_NWORDS            : in unsigned(11 downto 0);         --! Number of words to program
     START_WRITE             : in std_logic;                     --! Signal to begin programming
@@ -48,6 +42,10 @@ entity spi_interface is
     START_WRITE_CONFIG      : in std_logic;                     --! Signal to write nonvolatile configuration register
     OUT_WRITE_CONFIG_DONE   : out std_logic;                    --! '1' unless write nonvolatile configuration register in progress
     REGISTER_CONTENTS       : in std_logic_vector(15 downto 0); --! Register contents to be written with write register commands
+    START_READ_REGISTER     : in std_logic_vector(3 downto 0);  --! Signal to start read register, when nonzero, number corresponds to register ID (1-status, 2-flag status, 3-nonvolatile configuration, 4-volatile configuration, 5-extended voltatile configuration)
+    OUT_READ_REGISTER_DONE  : out std_logic;                    --! '1' unless read register in progress
+    OUT_REGISTER            : out std_logic_vector(7 downto 0); --! Contents of register read out
+    OUT_REGISTER_WE         : out std_logic;                     --! Write enable for register
     ------------------ Read output
     OUT_READ_DATA           : out std_logic_vector(15 downto 0); --! Data read out from PROM
     OUT_READ_DATA_VALID     : out std_logic;                     --! Indicates when data from PROM is valid
@@ -132,6 +130,9 @@ END COMPONENT;
   constant  CmdEraseNonvLock   : std_logic_vector(7 downto 0)  := X"E4";
   constant  CmdWriteNonvLock   : std_logic_vector(7 downto 0)  := X"E3";
   constant  CmdWriteNonvConfig : std_logic_vector(7 downto 0)  := X"B1";
+  constant  CmdReadNonvConf    : std_logic_vector(7 downto 0)  := X"B5";
+  constant  CmdReadVolaConf    : std_logic_vector(7 downto 0)  := X"85";
+  constant  CmdReadExteConf    : std_logic_vector(7 downto 0)  := X"65";
 
   ------------- STARTUPE3/SPI signals -------------------- 
   signal spi_miso         : std_logic;
@@ -200,6 +201,17 @@ END COMPONENT;
   signal write_config_cmdcounter       : unsigned(5 downto 0) := "111111";
   signal write_config_cmdreg           : std_logic_vector(39 downto 0) := x"1111111111";
   signal write_config_status_bit_index : std_logic_vector(7 downto 0) := x"00";
+
+  ------------- Read register signals -------------------- 
+  signal read_register_spi_cs_bar      : std_logic := '1';
+  signal read_register_done            : std_logic := '0';
+  signal read_register_type            : std_logic_vector(3 downto 0) := x"0";
+  signal read_register_bit_index       : std_logic_vector(7 downto 0) := x"00";
+  signal read_register_cmdcounter      : unsigned(5 downto 0) := "111111";
+  signal read_register_cmdreg          : std_logic_vector(39 downto 0) := x"1111111111";
+  signal register_inner                : std_logic_vector(7 downto 0) := x"00";
+  signal register_we                   : std_logic := '0';
+  signal read_register_max_index       : std_logic_vector(7 downto 0) := x"00";
 
   --------------- select read command and address -------------------- 
   --signal CmdIndex    : std_logic_vector(3 downto 0) := "0001";  
@@ -290,6 +302,12 @@ END COMPONENT;
   );
   signal write_config_state  : write_config_states := S_WRITE_CONFIG_IDLE;
 
+  type read_register_states is
+  (
+    S_READ_REGISTER_IDLE, S_READ_REGISTER_ASSERT_CS_READ, S_READ_REGISTER_SHIFT_READ
+  );
+  signal read_register_state : read_register_states := S_READ_REGISTER_IDLE;
+
  begin
    
   ----------------------------------------------------------------------------
@@ -350,6 +368,7 @@ END COMPONENT;
       elsif (erase_lock_done = '0') then spi_mosi <= erase_lock_cmdreg(39);
       elsif (write_lock_done = '0') then spi_mosi <= write_lock_cmdreg(39);
       elsif (write_config_done = '0') then spi_mosi <= write_config_cmdreg(39);
+      elsif (read_register_done = '0') then spi_mosi <= read_register_cmdreg(39);
       else 
         case write_state is
           when S_WRITE_SHIFT_DATA =>
@@ -369,6 +388,7 @@ END COMPONENT;
       elsif (erase_lock_done = '0') then spi_cs_bar_input <= erase_lock_spi_cs_bar;
       elsif (write_lock_done = '0') then spi_cs_bar_input <= write_lock_spi_cs_bar;
       elsif (write_config_done = '0') then spi_cs_bar_input <= write_config_spi_cs_bar;
+      elsif (read_register_done = '0') then spi_cs_bar_input <= read_register_spi_cs_bar;
       else spi_cs_bar_input <= write_spi_cs_bar;
       end if;
     end if; --CLK
@@ -419,6 +439,9 @@ OUT_WRITE_DONE <= write_done;
 OUT_UNLOCK_DONE <= erase_lock_done;
 OUT_LOCK_DONE <= write_lock_done;
 OUT_WRITE_CONFIG_DONE <= write_config_done;
+OUT_READ_REGISTER_DONE <= read_register_done;
+OUT_REGISTER <= register_inner;
+OUT_REGISTER_WE <= register_we;
 
 ---------------------------------  PROM READ FSM  ----------------------------------------------
 --CmdSelect <= CmdStatus when CmdIndex = x"1" else
@@ -1009,6 +1032,73 @@ process_write_config : process (CLK)
    end case;  
  end if;  -- Clk
 end process process_write_config;
+
+-------------------------------  READ REGISTER FSM  --------------------------------------------------
+process_read_register : process (CLK)
+  begin
+  if rising_edge(CLK) then
+  case read_register_state is 
+  when S_READ_REGISTER_IDLE =>
+       --when START_READ_REGISTER received, initiate write process
+       read_register_spi_cs_bar <= '1';
+       register_we <= '0';
+       if (START_READ_REGISTER /= x"0") then
+         read_register_done <= '0';
+         read_register_state <= S_READ_REGISTER_ASSERT_CS_READ;
+         read_register_type <= START_READ_REGISTER;
+       else
+         read_register_done <= '1';
+       end if;
+
+  when S_READ_REGISTER_ASSERT_CS_READ =>
+       -- assert CS and prep read register command
+       read_register_spi_cs_bar <= '0';
+       read_register_bit_index <= x"00";
+       read_register_cmdcounter <= "010111"; --24 bits: 8 command + 16 to skip the first cycle (or 2)
+       if (read_register_type = x"1") then
+         read_register_cmdreg <=  CmdStatus & x"00000000";
+         read_register_max_index <= x"07";
+         read_register_state <= S_READ_REGISTER_SHIFT_READ;
+       elsif (read_register_type = x"2") then
+         read_register_cmdreg <=  CmdFLAGStatus & x"00000000";
+         read_register_max_index <= x"07";
+         read_register_state <= S_READ_REGISTER_SHIFT_READ;
+       elsif (read_register_type = x"3") then
+         read_register_cmdreg <=  CmdReadNonvConf & x"00000000";
+         read_register_max_index <= x"07";
+         read_register_state <= S_READ_REGISTER_SHIFT_READ;
+       elsif (read_register_type = x"4") then
+         read_register_cmdreg <=  CmdReadNonvConf & x"00000000";
+         read_register_max_index <= x"0F"; --MSBs for nonvolatile register
+         read_register_state <= S_READ_REGISTER_SHIFT_READ;
+       elsif (read_register_type = x"5") then
+         read_register_cmdreg <=  CmdReadVolaConf & x"00000000";
+         read_register_max_index <= x"07";
+         read_register_state <= S_READ_REGISTER_SHIFT_READ;
+       else
+         read_register_cmdreg <=  CmdReadExteConf & x"00000000";
+         read_register_max_index <= x"07";
+         read_register_state <= S_READ_REGISTER_SHIFT_READ;
+       end if;
+       
+  when S_READ_REGISTER_SHIFT_READ =>
+       --shift read register command and read back 
+       if (read_register_cmdcounter /= 0) then 
+         read_register_cmdcounter <= read_register_cmdcounter - 1;
+         read_register_cmdreg <= read_register_cmdreg(38 downto 0) & '0';
+       else
+         read_register_bit_index <= read_register_bit_index + 1;
+         register_inner <= spi_miso & register_inner(7 downto 1);
+         if (write_config_status_bit_index = read_register_max_index) then 
+           read_register_done <= '1';
+           register_we <= '1';
+           read_register_state <= S_READ_REGISTER_IDLE;
+         end if;
+       end if; --read_register_cmdcounter = 0
+
+  end case;  
+  end if;  -- Clk
+end process process_read_register;
 
 --------------********* misc **************---------------------
 --fifo_unconned(15 downto 0) <= data_to_fifo;
