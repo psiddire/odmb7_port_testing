@@ -149,8 +149,8 @@ entity odmb7_ucsb_dev is
     BCK_PRS_P    : in std_logic; -- B04_RX1_P
     BCK_PRS_N    : in std_logic; -- B04_RX1_N
 
-    -- SPY_TX_P     : out std_logic;        -- output to PC
-    -- SPY_TX_N     : out std_logic;        -- output to PC
+    SPY_TX_P     : out std_logic;        -- output to PC
+    SPY_TX_N     : out std_logic;        -- output to PC
     -- DAQ_TX_P     : out std_logic_vector(4 downto 1); -- B04 TX, output to FED
     -- DAQ_TX_N     : out std_logic_vector(4 downto 1); -- B04 TX, output to FED
 
@@ -395,8 +395,8 @@ architecture Behavioral of odmb7_ucsb_dev is
       DDU_PRBS_RX_EN       : out std_logic_vector(3 downto 0);
       DDU_PRBS_TST_CNT     : out std_logic_vector(15 downto 0);
       DDU_PRBS_ERR_CNT     : in  std_logic_vector(15 downto 0);
-      SPY_PRBS_TX_EN       : out std_logic_vector(0 downto 0);
-      SPY_PRBS_RX_EN       : out std_logic_vector(0 downto 0);
+      SPY_PRBS_TX_EN       : out std_logic;
+      SPY_PRBS_RX_EN       : out std_logic;
       SPY_PRBS_TST_CNT     : out std_logic_vector(15 downto 0);
       SPY_PRBS_ERR_CNT     : in  std_logic_vector(15 downto 0);
       DCFEB_PRBS_FIBER_SEL : out std_logic_vector(3 downto 0);
@@ -486,6 +486,68 @@ architecture Behavioral of odmb7_ucsb_dev is
       CLK   : in std_logic;
       DELAY : in std_logic_vector(5 downto 0);
       DOUT : out std_logic
+      );
+  end component;
+
+  component mgt_spy is
+    port (
+      mgtrefclk       : in  std_logic; -- buffer'ed reference clock signal
+      txusrclk        : out std_logic; -- USRCLK for TX data preparation
+      rxusrclk        : out std_logic; -- USRCLK for RX data readout
+      sysclk          : in  std_logic; -- clock for the helper block, 80 MHz
+      spy_rx_n        : in  std_logic;
+      spy_rx_p        : in  std_logic;
+      spy_tx_n        : out std_logic;
+      spy_tx_p        : out std_logic;
+      txready         : out std_logic; -- Flag for tx reset done
+      rxready         : out std_logic; -- Flag for rx reset done
+      txdata          : in std_logic_vector(15 downto 0);  -- Data to be transmitted
+      txd_valid       : in std_logic;   -- Flag for tx data valid
+      txdiffctrl      : in std_logic_vector(3 downto 0);   -- Controls the TX voltage swing
+      loopback        : in std_logic_vector(2 downto 0);   -- For internal loopback tests
+      rxdata          : out std_logic_vector(15 downto 0);  -- Data received
+      rxd_valid       : out std_logic;   -- Flag for valid data;
+      bad_rx          : out std_logic;   -- Flag for fiber errors;
+      prbs_type       : in  std_logic_vector(3 downto 0);
+      prbs_tx_en      : in  std_logic;
+      prbs_rx_en      : in  std_logic;
+      prbs_tst_cnt    : in  std_logic_vector(15 downto 0);
+      prbs_err_cnt    : out std_logic_vector(15 downto 0);
+      reset           : in  std_logic
+      );
+  end component;
+
+  component mgt_cfeb is
+    generic (
+      NLINK     : integer range 1 to 20 := 7;  -- number of links
+      DATAWIDTH : integer := 16                -- user data width
+      );
+    port (
+      mgtrefclk    : in  std_logic; -- buffer'ed reference clock signal
+      rxusrclk     : out std_logic; -- USRCLK for RX data readout
+      sysclk       : in  std_logic; -- clock for the helper block, 80 MHz
+      daq_rx_n     : in  std_logic_vector(NLINK-1 downto 0);
+      daq_rx_p     : in  std_logic_vector(NLINK-1 downto 0);
+      rxdata_feb1  : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
+      rxdata_feb2  : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
+      rxdata_feb3  : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
+      rxdata_feb4  : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
+      rxdata_feb5  : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
+      rxdata_feb6  : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
+      rxdata_feb7  : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
+      rxd_valid    : out std_logic_vector(NLINK downto 1);   -- Flag for valid data
+      crc_valid    : out std_logic_vector(NLINK downto 1);   -- Flag for valid CRC
+      rxready      : out std_logic;                          -- Flag for rx reset done
+      bad_rx       : out std_logic_vector(NLINK downto 1);   -- Flag for fiber errors
+      kill_rxout   : in  std_logic_vector(NLINK downto 1);   -- Kill DCFEB by no output
+      kill_rxpd    : in  std_logic_vector(NLINK downto 1);   -- Kill bad DCFEB with power down RX
+      fifo_full    : in  std_logic_vector(NLINK downto 1);   -- Flag for FIFO full
+      fifo_afull   : in  std_logic_vector(NLINK downto 1);   -- Flag for FIFO almost full
+      prbs_type    : in  std_logic_vector(3 downto 0);
+      prbs_rx_en   : in  std_logic_vector(NLINK downto 1);
+      prbs_tst_cnt : in  std_logic_vector(15 downto 0);
+      prbs_err_cnt : out std_logic_vector(15 downto 0);
+      reset        : in  std_logic
       );
   end component;
 
@@ -687,12 +749,6 @@ architecture Behavioral of odmb7_ucsb_dev is
   --------------------------------------
   constant SPY_SEL : std_logic := '1';
 
-  --------------------------------------
-  -- MGT signals for SPY channels
-  --------------------------------------
-  constant SPY_NLINK : integer := 1;
-  constant SPYDWIDTH : integer := 16;
-
   signal usrclk_spy_tx : std_logic; -- USRCLK for TX data preparation
   signal usrclk_spy_rx : std_logic; -- USRCLK for RX data readout
   signal spy_rx_n : std_logic;
@@ -700,16 +756,16 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal spy_txready : std_logic; -- Flag for tx reset done
   signal spy_rxready : std_logic; -- Flag for rx reset done
   signal spy_txdata : std_logic_vector(15 downto 0);  -- Data to be transmitted
-  signal spy_txd_valid : std_logic_vector(SPY_NLINK-1 downto 0);   -- Flag for tx data valid
+  signal spy_txd_valid : std_logic;   -- Flag for tx data valid
   signal spy_txdiffctrl : std_logic_vector(3 downto 0);   -- Controls the TX voltage swing
   signal spy_loopback : std_logic_vector(2 downto 0);   -- For internal loopback tests
   signal spy_rxdata : std_logic_vector(15 downto 0);  -- Data received
-  signal spy_rxd_valid : std_logic_vector(SPY_NLINK-1 downto 0);   -- Flag for valid data;
-  signal spy_bad_rx : std_logic_vector(SPY_NLINK-1 downto 0);   -- Flag for fiber errors;
+  signal spy_rxd_valid : std_logic;   -- Flag for valid data;
+  signal spy_bad_rx : std_logic;   -- Flag for fiber errors;
   signal spy_reset : std_logic;
 
-  signal spy_prbs_tx_en : std_logic_vector(SPY_NLINK-1 downto 0);
-  signal spy_prbs_rx_en : std_logic_vector(SPY_NLINK-1 downto 0);
+  signal spy_prbs_tx_en : std_logic;
+  signal spy_prbs_rx_en : std_logic;
   signal spy_prbs_tst_cnt : std_logic_vector(15 downto 0);
   signal spy_prbs_err_cnt : std_logic_vector(15 downto 0) := (others => '0');
 
@@ -720,7 +776,6 @@ architecture Behavioral of odmb7_ucsb_dev is
   constant DDU_NRXLINK : integer := 4;
   constant DDUTXDWIDTH : integer := 16;
   constant DDURXDWIDTH : integer := 16;
-
 
   signal usrclk_ddu_tx : std_logic; -- USRCLK for TX data preparation
   signal usrclk_ddu_rx : std_logic; -- USRCLK for RX data readout
@@ -1306,5 +1361,72 @@ begin
   B04_CS_B <= '1';
   B04_RST_B <= '1';
   SPY_TDIS <= '0';
+
+  -------------------------------------------------------------------------------------------
+  -- Optical ports for the SPY channel
+  -------------------------------------------------------------------------------------------
+  DAQ_SPY_SEL <= SPY_SEL; -- set for constant
+  spy_rx_n <= DAQ_SPY_RX_N when SPY_SEL = '1' else '0';
+  spy_rx_p <= DAQ_SPY_RX_P when SPY_SEL = '1' else '0';
+
+  GTH_DDU : mgt_spy
+    port map (
+      mgtrefclk       => mgtrefclk1_226, -- sourced from the 125 MHz crystal
+      txusrclk        => usrclk_spy_tx,  -- 80 MHz for 1.6 Gb/s with 8b/10b encoding, 62.5 MHz for 1.25 Gb/s
+      rxusrclk        => usrclk_spy_rx,
+      sysclk          => cmsclk,    -- maximum DRP clock frequency 62.5 MHz for 1.25 Gb/s line rate
+      spy_rx_n        => spy_rx_n,
+      spy_rx_p        => spy_rx_p,
+      spy_tx_n        => SPY_TX_N,
+      spy_tx_p        => SPY_TX_P,
+      txready         => spy_txready,
+      rxready         => spy_rxready,
+      txdata          => spy_txdata,
+      txd_valid       => spy_txd_valid,
+      txdiffctrl      => spy_txdiffctrl,
+      loopback        => spy_loopback,
+      rxdata          => spy_rxdata,
+      rxd_valid       => spy_rxd_valid,
+      bad_rx          => spy_bad_rx,
+      prbs_type       => mgt_prbs_type,
+      prbs_tx_en      => spy_prbs_tx_en,
+      prbs_rx_en      => spy_prbs_rx_en,
+      prbs_tst_cnt    => spy_prbs_tst_cnt,
+      prbs_err_cnt    => spy_prbs_err_cnt,
+      reset           => opt_reset
+      );
+
+  GTH_DCFEB : mgt_cfeb
+    generic map (
+      NLINK     => 7,  -- number of links
+      DATAWIDTH => 16  -- user data width
+      )
+    port map (
+      mgtrefclk    => mgtrefclk0_225,
+      rxusrclk     => usrclk_mgtc,
+      sysclk       => sysclk80,
+      daq_rx_n     => DAQ_RX_N(6 downto 0),
+      daq_rx_p     => DAQ_RX_P(6 downto 0),
+      rxdata_feb1  => dcfeb1_data,
+      rxdata_feb2  => dcfeb2_data,
+      rxdata_feb3  => dcfeb3_data,
+      rxdata_feb4  => dcfeb4_data,
+      rxdata_feb5  => dcfeb5_data,
+      rxdata_feb6  => dcfeb6_data,
+      rxdata_feb7  => dcfeb7_data,
+      rxd_valid    => dcfeb_rxd_valid,
+      crc_valid    => dcfeb_crc_valid,
+      rxready      => dcfeb_rxready,
+      bad_rx       => dcfeb_bad_rx,
+      kill_rxout   => kill(7 downto 1),
+      kill_rxpd    => (others => '0'),
+      fifo_full    => dcfeb_datafifo_full,
+      fifo_afull   => dcfeb_datafifo_afull,
+      prbs_type    => mgt_prbs_type,
+      prbs_rx_en   => dcfeb_prbs_rx_en,
+      prbs_tst_cnt => dcfeb_prbs_tst_cnt,
+      prbs_err_cnt => dcfeb_prbs_err_cnt,
+      reset        => opt_reset
+      );
 
 end Behavioral;
