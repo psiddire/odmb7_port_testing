@@ -1,5 +1,5 @@
 # ODMB7 UltraScale FPGA Pinout XDC file
-# ----------------------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 # Location constraints for differential reference clock buffers
 # Outline/section title:
 # - Clock pins
@@ -12,12 +12,13 @@
 # - Optical TX/RX pins
 # - Optical control pins
 # - SYSMON pins
+# - PROM pins
 # - LED pins
-# ----------------------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 
-# ----------------------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 # Clock pins
-# ----------------------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 set_property package_pin     AK17       [get_ports CMS_CLK_FPGA_P]
 set_property package_pin     AK16       [get_ports CMS_CLK_FPGA_N]
 set_property IOSTANDARD      LVDS       [get_ports CMS_CLK_FPGA_P]
@@ -53,9 +54,9 @@ set_property package_pin     M5         [get_ports REF_CLK_5_N]
 set_property package_pin     T6         [get_ports CLK_125_REF_P]
 set_property package_pin     T5         [get_ports CLK_125_REF_N]
 
-# ----------------------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 # Selector/monitor pins unclassified yet
-# ----------------------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 set_property PACKAGE_PIN     U22        [get_ports KUS_TMS]
 set_property IOSTANDARD      LVCMOS18   [get_ports KUS_TMS]
 set_property PACKAGE_PIN     W25        [get_ports KUS_TCK]
@@ -75,9 +76,9 @@ set_property PACKAGE_PIN     L9         [get_ports ODMB_DONE]
 set_property IOSTANDARD      LVCMOS18   [get_ports ODMB_DONE]
 
 
-# ----------------------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 # VME control pins
-# ----------------------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 set_property package_pin     V31        [get_ports VME_DATA[0]]
 set_property IOSTANDARD      LVCMOS18   [get_ports VME_DATA[0]]
 set_property package_pin     W31        [get_ports VME_DATA[1]]
@@ -211,9 +212,9 @@ set_property IOSTANDARD      LVCMOS18   [get_ports KUS_VME_DIR]
 set_property PACKAGE_PIN     AM25       [get_ports VME_DTACK_KUS_B]
 set_property IOSTANDARD      LVCMOS18   [get_ports VME_DTACK_KUS_B]
 
-# ----------------------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 # DCFEB JTAG / HD50 pins
-# ----------------------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 set_property PACKAGE_PIN     F15        [get_ports DCFEB_TCK_P[1]]
 set_property IOSTANDARD      LVDS       [get_ports DCFEB_TCK_P[1]]
 set_property PACKAGE_PIN     F14        [get_ports DCFEB_TCK_N[1]]
@@ -365,9 +366,9 @@ set_property IOSTANDARD      LVDS       [get_ports L1A_MATCH_P[7]]
 set_property PACKAGE_PIN     D11        [get_ports L1A_MATCH_N[7]]
 set_property IOSTANDARD      LVDS       [get_ports L1A_MATCH_N[7]]
 
-# ----------------------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 # CCB communication pins
-# ----------------------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 set_property PACKAGE_PIN     AP24       [get_ports CCB_CMD[0]]
 set_property IOSTANDARD      LVCMOS18   [get_ports CCB_CMD[0]]
 set_property PACKAGE_PIN     AP25       [get_ports CCB_CMD[1]]
@@ -453,9 +454,9 @@ set_property IOSTANDARD      LVCMOS18   [get_ports CCB_HARDRST_B]
 set_property PACKAGE_PIN     AP14       [get_ports CCB_SOFT_RST_B]
 set_property IOSTANDARD      LVCMOS18   [get_ports CCB_SOFT_RST_B]
 
-# ----------------------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 # LVMB control/monitor pins
-# ----------------------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 set_property PACKAGE_PIN     B24        [get_ports LVMB_PON[0]]
 set_property IOSTANDARD      LVCMOS18   [get_ports LVMB_PON[0]]
 set_property PACKAGE_PIN     A24        [get_ports LVMB_PON[1]]
@@ -521,9 +522,9 @@ set_property IOSTANDARD      LVCMOS18   [get_ports MON_LVMB_PON[6]]
 set_property PACKAGE_PIN     C23        [get_ports MON_LVMB_PON[7]]
 set_property IOSTANDARD      LVCMOS18   [get_ports MON_LVMB_PON[7]]
 
-# ----------------------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 # TMB communication pins
-# ----------------------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 set_property PACKAGE_PIN     AJ21       [get_ports OTMB[0]]
 set_property IOSTANDARD      LVCMOS18   [get_ports OTMB[0]]
 set_property PACKAGE_PIN     AK21       [get_ports OTMB[1]]
@@ -650,9 +651,9 @@ set_property IOSTANDARD      LVCMOS18   [get_ports LCT_RQST[1]]
 set_property PACKAGE_PIN     AE17       [get_ports LCT_RQST[2]]
 set_property IOSTANDARD      LVCMOS18   [get_ports LCT_RQST[2]]
 
-# ----------------------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 # Optical TX/RX pins
-# ----------------------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 set_property package_pin     AP2        [get_ports  DAQ_RX_P[0]]
 set_property package_pin     AP1        [get_ports  DAQ_RX_N[0]]
 set_property package_pin     AM2        [get_ports  DAQ_RX_P[1]]
@@ -693,12 +694,12 @@ set_property package_pin     H2         [get_ports  B04_RX_P[3]]
 set_property package_pin     H1         [get_ports  B04_RX_N[3]]
 set_property package_pin     F2         [get_ports  B04_RX_P[4]]
 set_property package_pin     F1         [get_ports  B04_RX_N[4]]
-#set_property package_pin     R4         [get_ports  SPY_TX_P]
-#set_property package_pin     R3         [get_ports  SPY_TX_N]
+set_property package_pin     R4         [get_ports  SPY_TX_P]
+set_property package_pin     R3         [get_ports  SPY_TX_N]
 
-# ----------------------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 # Optical control pins
-# ----------------------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 set_property package_pin     E12        [get_ports DAQ_SPY_SEL]
 set_property IOSTANDARD      LVCMOS18   [get_ports DAQ_SPY_SEL]
 
@@ -756,9 +757,9 @@ set_property IOSTANDARD      LVCMOS18   [get_ports SPY_SD]
 set_property package_pin     E8         [get_ports SPY_TDIS]
 set_property IOSTANDARD      LVCMOS18   [get_ports SPY_TDIS]
 
-# ----------------------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 # SYSMON pins
-# ----------------------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 set_property PACKAGE_PIN     AN8        [get_ports SYSMON_P[0]]
 set_property IOSTANDARD      ANALOG     [get_ports SYSMON_P[0]]
 set_property PACKAGE_PIN     AP8        [get_ports SYSMON_N[0]]
@@ -841,10 +842,9 @@ set_property IOSTANDARD      LVCMOS18   [get_ports ADC_DIN]
 set_property PACKAGE_PIN     AG11       [get_ports ADC_DOUT]
 set_property IOSTANDARD      LVCMOS18   [get_ports ADC_DOUT]
 
-# ----------------------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 # PROM pins bank 65 (bank 0 pins controlled by STARTUPE3 module)
-# ----------------------------------------------------------------------------------------------------------------------
-
+# --------------------------------------------------------------------------
 set_property PACKAGE_PIN     G25        [get_ports PROM_RST_B]
 set_property IOSTANDARD      LVCMOS18   [get_ports PROM_RST_B]
 set_property PACKAGE_PIN     G26        [get_ports PROM_CS2_B]
@@ -858,9 +858,9 @@ set_property IOSTANDARD      LVCMOS18   [get_ports CNFG_DATA[6]]
 set_property PACKAGE_PIN     R22        [get_ports CNFG_DATA[7]]
 set_property IOSTANDARD      LVCMOS18   [get_ports CNFG_DATA[7]]
 
-# ----------------------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 # LED pins
-# ----------------------------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 set_property PACKAGE_PIN     P20        [get_ports LEDS_CFV[0]]
 set_property IOSTANDARD      LVCMOS18   [get_ports LEDS_CFV[0]]
 set_property PACKAGE_PIN     T27        [get_ports LEDS_CFV[1]]
