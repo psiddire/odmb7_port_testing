@@ -120,8 +120,8 @@ entity ODMB_VME is
     MUX_TRIGGER          : out std_logic;
     MUX_LVMB             : out std_logic;
     ODMB_PED             : out std_logic_vector(1 downto 0);
-    ODMB_DATA            : in std_logic_vector(15 downto 0);
-    ODMB_DATA_SEL        : out std_logic_vector(7 downto 0);
+    ODMB_STAT_DATA       : in std_logic_vector(15 downto 0);
+    ODMB_STAT_SEL        : out std_logic_vector(7 downto 0);
 
     --------------------
     -- VMECONFREGS Configuration signals for top level
@@ -337,8 +337,8 @@ architecture Behavioral of ODMB_VME is
       MASK_PLS        : out std_logic;
 
       --exernal registers
-      ODMB_DATA_SEL : out std_logic_vector(7 downto 0);
-      ODMB_DATA     : in  std_logic_vector(15 downto 0)
+      ODMB_STAT_SEL   : out std_logic_vector(7 downto 0);
+      ODMB_STAT_DATA  : in  std_logic_vector(15 downto 0)
       );
   end component;
 
@@ -451,8 +451,8 @@ architecture Behavioral of ODMB_VME is
       FED_PRBS_ERR_CNT : in  std_logic_vector(15 downto 0);
 
       -- PC PRBS signals
-      SPY_PRBS_TX_EN   : out std_logic_vector(0 downto 0);
-      SPY_PRBS_RX_EN   : out std_logic_vector(0 downto 0);
+      SPY_PRBS_TX_EN   : out std_logic;
+      SPY_PRBS_RX_EN   : out std_logic;
       SPY_PRBS_TST_CNT : out std_logic_vector(15 downto 0);
       SPY_PRBS_ERR_CNT : in  std_logic_vector(15 downto 0);
 
@@ -610,7 +610,6 @@ begin
 
   outdata_dev(0) <= (others => '0');
   outdata_dev(5) <= (others => '0');
-  outdata_dev(6) <= (others => '0');
   idx_dev <= to_integer(unsigned(cmd_adrs_inner(15 downto 12)));
   VME_DATA_OUT <= outdata_dev(idx_dev);
 
@@ -751,8 +750,8 @@ begin
       MUX_TRIGGER     => MUX_TRIGGER,
       MUX_LVMB        => MUX_LVMB,
       ODMB_PED        => ODMB_PED,
-      ODMB_DATA_SEL   => ODMB_DATA_SEL,   -- output XY under command R 3XYC, when XY /= 40
-      ODMB_DATA       => ODMB_DATA,       -- input depend on ODMB_DATA_SEL
+      ODMB_STAT_SEL   => ODMB_STAT_SEL,   -- output XY under command R 3XYC, when XY /= 40
+      ODMB_STAT_DATA  => ODMB_STAT_DATA,  -- input depend on ODMB_STAT_SEL
       TXDIFFCTRL      => open,      -- TX voltage swing, W 3110 is disabled: constant output x"8"
       LOOPBACK        => open       -- For internal loopback tests, bbb for W 3100 bbb
       );

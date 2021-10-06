@@ -28,6 +28,22 @@ end alct_otmb_data_gen;
 
 architecture alct_otmb_data_gen_architecture of alct_otmb_data_gen is
 
+  component fifo_l1acnt_gen
+    port (
+      srst : in std_logic;
+      wr_clk : in std_logic;
+      rd_clk : in std_logic;
+      din : in std_logic_vector(17 downto 0);
+      wr_en : in std_logic;
+      rd_en : in std_logic;
+      dout : out std_logic_vector(17 downto 0);
+      full : out std_logic;
+      empty : out std_logic;
+      wr_rst_busy : out std_logic;
+      rd_rst_busy : out std_logic
+      );
+  end component;
+
   type state_type is (IDLE, HEADER, TX_DATA);
 
   signal alct_next_state, alct_current_state : state_type;
@@ -146,114 +162,173 @@ begin
   end process;
 
   PULSE_RESET    : NPULSE2FAST port map(fifo_rst, clk, '0', 5, RST);
-  alct_l1a_cnt_l_fifo : FIFO_DUALCLOCK_MACRO
-    generic map (
-      DEVICE                  => "VIRTEX6",  -- Target Device: "VIRTEX5", "VIRTEX6" 
-      ALMOST_FULL_OFFSET      => X"0080",    -- Sets almost full threshold
-      ALMOST_EMPTY_OFFSET     => X"0080",    -- Sets the almost empty threshold
-      DATA_WIDTH              => 18,  -- Valid values are 1-72 (37-72 only valid when FIFO_SIZE="36Kb")
-      FIFO_SIZE               => "18Kb",     -- Target BRAM, "18Kb" or "36Kb" 
-      FIRST_WORD_FALL_THROUGH => false)  -- Sets the FIFO FWFT to TRUE or FALSE
+  --alct_l1a_cnt_l_fifo : FIFO_DUALCLOCK_MACRO
+  --  generic map (
+  --    DEVICE                  => "VIRTEX6",  -- Target Device: "VIRTEX5", "VIRTEX6" 
+  --    ALMOST_FULL_OFFSET      => X"0080",    -- Sets almost full threshold
+  --    ALMOST_EMPTY_OFFSET     => X"0080",    -- Sets the almost empty threshold
+  --    DATA_WIDTH              => 18,  -- Valid values are 1-72 (37-72 only valid when FIFO_SIZE="36Kb")
+  --    FIFO_SIZE               => "18Kb",     -- Target BRAM, "18Kb" or "36Kb" 
+  --    FIRST_WORD_FALL_THROUGH => false)  -- Sets the FIFO FWFT to TRUE or FALSE
 
-    port map (
-      ALMOSTEMPTY => open,                       -- Output almost empty 
-      ALMOSTFULL  => open,                       -- Output almost full
-      DO          => alct_l1a_cnt_l_fifo_out,    -- Output data
-      EMPTY       => alct_l1a_cnt_l_fifo_empty,  -- Output empty
-      FULL        => alct_l1a_cnt_l_fifo_full,   -- Output full
-      RDCOUNT     => alct_l1a_cnt_l_fifo_rdc,    -- Output read count
-      RDERR       => open,                       -- Output read error
-      WRCOUNT     => alct_l1a_cnt_l_fifo_wrc,    -- Output write count
-      WRERR       => open,                       -- Output write error
-      DI          => l1a_cnt_l_fifo_in,          -- Input data
-      RDCLK       => clk,                        -- Input read clock
-      RDEN        => alct_l1a_cnt_fifo_rd_en,    -- Input read enable
-      RST         => fifo_rst,                        -- Input reset
-      WRCLK       => clk,                        -- Input write clock
-      WREN        => alct_l1a_cnt_fifo_wr_en     -- Input write enable
-      );
+  --  port map (
+  --    ALMOSTEMPTY => open,                       -- Output almost empty 
+  --    ALMOSTFULL  => open,                       -- Output almost full
+  --    DO          => alct_l1a_cnt_l_fifo_out,    -- Output data
+  --    EMPTY       => alct_l1a_cnt_l_fifo_empty,  -- Output empty
+  --    FULL        => alct_l1a_cnt_l_fifo_full,   -- Output full
+  --    RDCOUNT     => alct_l1a_cnt_l_fifo_rdc,    -- Output read count
+  --    RDERR       => open,                       -- Output read error
+  --    WRCOUNT     => alct_l1a_cnt_l_fifo_wrc,    -- Output write count
+  --    WRERR       => open,                       -- Output write error
+  --    DI          => l1a_cnt_l_fifo_in,          -- Input data
+  --    RDCLK       => clk,                        -- Input read clock
+  --    RDEN        => alct_l1a_cnt_fifo_rd_en,    -- Input read enable
+  --    RST         => fifo_rst,                        -- Input reset
+  --    WRCLK       => clk,                        -- Input write clock
+  --    WREN        => alct_l1a_cnt_fifo_wr_en     -- Input write enable
+  --    );
 
-  alct_l1a_cnt_h_fifo : FIFO_DUALCLOCK_MACRO
-    generic map (
-      DEVICE                  => "VIRTEX6",  -- Target Device: "VIRTEX5", "VIRTEX6" 
-      ALMOST_FULL_OFFSET      => X"0080",    -- Sets almost full threshold
-      ALMOST_EMPTY_OFFSET     => X"0080",    -- Sets the almost empty threshold
-      DATA_WIDTH              => 18,  -- Valid values are 1-72 (37-72 only valid when FIFO_SIZE="36Kb")
-      FIFO_SIZE               => "18Kb",     -- Target BRAM, "18Kb" or "36Kb" 
-      FIRST_WORD_FALL_THROUGH => false)  -- Sets the FIFO FWFT to TRUE or FALSE
+  ALCT_L1ACNT_CNT_L_FIFO_I : FIFO_L1ACNT_GEN
+  PORT MAP (
+      WR_CLK => clk,
+      RD_CLK => clk,
+      SRST => fifo_rst,
+      DIN => l1a_cnt_l_fifo_in,
+      WR_EN => alct_l1a_cnt_fifo_wr_en,
+      RD_EN => alct_l1a_cnt_fifo_rd_en,
+      DOUT => alct_l1a_cnt_l_fifo_out,
+      FULL => alct_l1a_cnt_l_fifo_full,
+      EMPTY => alct_l1a_cnt_l_fifo_empty,
+      WR_RST_BUSY => open,
+      RD_RST_BUSY => open 
+  );
 
-    port map (
-      ALMOSTEMPTY => open,                       -- Output almost empty 
-      ALMOSTFULL  => open,                       -- Output almost full
-      DO          => alct_l1a_cnt_h_fifo_out,    -- Output data
-      EMPTY       => alct_l1a_cnt_h_fifo_empty,  -- Output empty
-      FULL        => alct_l1a_cnt_h_fifo_full,   -- Output full
-      RDCOUNT     => alct_l1a_cnt_h_fifo_rdc,    -- Output read count
-      RDERR       => open,                       -- Output read error
-      WRCOUNT     => alct_l1a_cnt_h_fifo_wrc,    -- Output write count
-      WRERR       => open,                       -- Output write error
-      DI          => l1a_cnt_h_fifo_in,          -- Input data
-      RDCLK       => clk,                        -- Input read clock
-      RDEN        => alct_l1a_cnt_fifo_rd_en,    -- Input read enable
-      RST         => fifo_rst,                        -- Input reset
-      WRCLK       => clk,                        -- Input write clock
-      WREN        => alct_l1a_cnt_fifo_wr_en     -- Input write enable
-      );
+  --alct_l1a_cnt_h_fifo : FIFO_DUALCLOCK_MACRO
+  --  generic map (
+  --    DEVICE                  => "VIRTEX6",  -- Target Device: "VIRTEX5", "VIRTEX6" 
+  --    ALMOST_FULL_OFFSET      => X"0080",    -- Sets almost full threshold
+  --    ALMOST_EMPTY_OFFSET     => X"0080",    -- Sets the almost empty threshold
+  --    DATA_WIDTH              => 18,  -- Valid values are 1-72 (37-72 only valid when FIFO_SIZE="36Kb")
+  --    FIFO_SIZE               => "18Kb",     -- Target BRAM, "18Kb" or "36Kb" 
+  --    FIRST_WORD_FALL_THROUGH => false)  -- Sets the FIFO FWFT to TRUE or FALSE
 
-  otmb_l1a_cnt_l_fifo : FIFO_DUALCLOCK_MACRO
-    generic map (
-      DEVICE                  => "VIRTEX6",  -- Target Device: "VIRTEX5", "VIRTEX6" 
-      ALMOST_FULL_OFFSET      => X"0080",    -- Sets almost full threshold
-      ALMOST_EMPTY_OFFSET     => X"0080",    -- Sets the almost empty threshold
-      DATA_WIDTH              => 18,  -- Valid values are 1-72 (37-72 only valid when FIFO_SIZE="36Kb")
-      FIFO_SIZE               => "18Kb",     -- Target BRAM, "18Kb" or "36Kb" 
-      FIRST_WORD_FALL_THROUGH => false)  -- Sets the FIFO FWFT to TRUE or FALSE
+  --  port map (
+  --    ALMOSTEMPTY => open,                       -- Output almost empty 
+  --    ALMOSTFULL  => open,                       -- Output almost full
+  --    DO          => alct_l1a_cnt_h_fifo_out,    -- Output data
+  --    EMPTY       => alct_l1a_cnt_h_fifo_empty,  -- Output empty
+  --    FULL        => alct_l1a_cnt_h_fifo_full,   -- Output full
+  --    RDCOUNT     => alct_l1a_cnt_h_fifo_rdc,    -- Output read count
+  --    RDERR       => open,                       -- Output read error
+  --    WRCOUNT     => alct_l1a_cnt_h_fifo_wrc,    -- Output write count
+  --    WRERR       => open,                       -- Output write error
+  --    DI          => l1a_cnt_h_fifo_in,          -- Input data
+  --    RDCLK       => clk,                        -- Input read clock
+  --    RDEN        => alct_l1a_cnt_fifo_rd_en,    -- Input read enable
+  --    RST         => fifo_rst,                        -- Input reset
+  --    WRCLK       => clk,                        -- Input write clock
+  --    WREN        => alct_l1a_cnt_fifo_wr_en     -- Input write enable
+  --    );
 
-    port map (
-      ALMOSTEMPTY => open,                       -- Output almost empty 
-      ALMOSTFULL  => open,                       -- Output almost full
-      DO          => otmb_l1a_cnt_l_fifo_out,    -- Output data
-      EMPTY       => otmb_l1a_cnt_l_fifo_empty,  -- Output empty
-      FULL        => otmb_l1a_cnt_l_fifo_full,   -- Output full
-      RDCOUNT     => otmb_l1a_cnt_l_fifo_rdc,    -- Output read count
-      RDERR       => open,                       -- Output read error
-      WRCOUNT     => otmb_l1a_cnt_l_fifo_wrc,    -- Output write count
-      WRERR       => open,                       -- Output write error
-      DI          => l1a_cnt_l_fifo_in,          -- Input data
-      RDCLK       => clk,                        -- Input read clock
-      RDEN        => otmb_l1a_cnt_fifo_rd_en,    -- Input read enable
-      RST         => fifo_rst,                        -- Input reset
-      WRCLK       => clk,                        -- Input write clock
-      WREN        => otmb_l1a_cnt_fifo_wr_en     -- Input write enable
-      );
+  ALCT_L1ACNT_CNT_H_FIFO_I : FIFO_L1ACNT_GEN
+  PORT MAP (
+      WR_CLK => clk,
+      RD_CLK => clk,
+      SRST => fifo_rst,
+      DIN => l1a_cnt_h_fifo_in,
+      WR_EN => alct_l1a_cnt_fifo_wr_en,
+      RD_EN => alct_l1a_cnt_fifo_rd_en,
+      DOUT => alct_l1a_cnt_h_fifo_out,
+      FULL => alct_l1a_cnt_h_fifo_full,
+      EMPTY => alct_l1a_cnt_h_fifo_empty,
+      WR_RST_BUSY => open,
+      RD_RST_BUSY => open 
+  );
 
-  otmb_l1a_cnt_h_fifo : FIFO_DUALCLOCK_MACRO
-    generic map (
-      DEVICE                  => "VIRTEX6",  -- Target Device: "VIRTEX5", "VIRTEX6" 
-      ALMOST_FULL_OFFSET      => X"0080",    -- Sets almost full threshold
-      ALMOST_EMPTY_OFFSET     => X"0080",    -- Sets the almost empty threshold
-      DATA_WIDTH              => 18,  -- Valid values are 1-72 (37-72 only valid when FIFO_SIZE="36Kb")
-      FIFO_SIZE               => "18Kb",     -- Target BRAM, "18Kb" or "36Kb" 
-      FIRST_WORD_FALL_THROUGH => false)  -- Sets the FIFO FWFT to TRUE or FALSE
+  --otmb_l1a_cnt_l_fifo : FIFO_DUALCLOCK_MACRO
+  --  generic map (
+  --    DEVICE                  => "VIRTEX6",  -- Target Device: "VIRTEX5", "VIRTEX6" 
+  --    ALMOST_FULL_OFFSET      => X"0080",    -- Sets almost full threshold
+  --    ALMOST_EMPTY_OFFSET     => X"0080",    -- Sets the almost empty threshold
+  --    DATA_WIDTH              => 18,  -- Valid values are 1-72 (37-72 only valid when FIFO_SIZE="36Kb")
+  --    FIFO_SIZE               => "18Kb",     -- Target BRAM, "18Kb" or "36Kb" 
+  --    FIRST_WORD_FALL_THROUGH => false)  -- Sets the FIFO FWFT to TRUE or FALSE
 
-    port map (
-      ALMOSTEMPTY => open,                       -- Output almost empty 
-      ALMOSTFULL  => open,                       -- Output almost full
-      DO          => otmb_l1a_cnt_h_fifo_out,    -- Output data
-      EMPTY       => otmb_l1a_cnt_h_fifo_empty,  -- Output empty
-      FULL        => otmb_l1a_cnt_h_fifo_full,   -- Output full
-      RDCOUNT     => otmb_l1a_cnt_h_fifo_rdc,    -- Output read count
-      RDERR       => open,                       -- Output read error
-      WRCOUNT     => otmb_l1a_cnt_h_fifo_wrc,    -- Output write count
-      WRERR       => open,                       -- Output write error
-      DI          => l1a_cnt_h_fifo_in,          -- Input data
-      RDCLK       => clk,                        -- Input read clock
-      RDEN        => otmb_l1a_cnt_fifo_rd_en,    -- Input read enable
-      RST         => fifo_rst,                        -- Input reset
-      WRCLK       => clk,                        -- Input write clock
-      WREN        => otmb_l1a_cnt_fifo_wr_en     -- Input write enable
-      );
+  --  port map (
+  --    ALMOSTEMPTY => open,                       -- Output almost empty 
+  --    ALMOSTFULL  => open,                       -- Output almost full
+  --    DO          => otmb_l1a_cnt_l_fifo_out,    -- Output data
+  --    EMPTY       => otmb_l1a_cnt_l_fifo_empty,  -- Output empty
+  --    FULL        => otmb_l1a_cnt_l_fifo_full,   -- Output full
+  --    RDCOUNT     => otmb_l1a_cnt_l_fifo_rdc,    -- Output read count
+  --    RDERR       => open,                       -- Output read error
+  --    WRCOUNT     => otmb_l1a_cnt_l_fifo_wrc,    -- Output write count
+  --    WRERR       => open,                       -- Output write error
+  --    DI          => l1a_cnt_l_fifo_in,          -- Input data
+  --    RDCLK       => clk,                        -- Input read clock
+  --    RDEN        => otmb_l1a_cnt_fifo_rd_en,    -- Input read enable
+  --    RST         => fifo_rst,                        -- Input reset
+  --    WRCLK       => clk,                        -- Input write clock
+  --    WREN        => otmb_l1a_cnt_fifo_wr_en     -- Input write enable
+  --    );
 
+  OTMB_L1ACNT_CNT_L_FIFO_I : FIFO_L1ACNT_GEN
+  PORT MAP (
+      WR_CLK => clk,
+      RD_CLK => clk,
+      SRST => fifo_rst,
+      DIN => l1a_cnt_l_fifo_in,
+      WR_EN => otmb_l1a_cnt_fifo_wr_en,
+      RD_EN => otmb_l1a_cnt_fifo_rd_en,
+      DOUT => otmb_l1a_cnt_l_fifo_out,
+      FULL => otmb_l1a_cnt_l_fifo_full,
+      EMPTY => otmb_l1a_cnt_l_fifo_empty,
+      WR_RST_BUSY => open,
+      RD_RST_BUSY => open 
+  );
+
+  --otmb_l1a_cnt_h_fifo : FIFO_DUALCLOCK_MACRO
+  --  generic map (
+  --    DEVICE                  => "VIRTEX6",  -- Target Device: "VIRTEX5", "VIRTEX6" 
+  --    ALMOST_FULL_OFFSET      => X"0080",    -- Sets almost full threshold
+  --    ALMOST_EMPTY_OFFSET     => X"0080",    -- Sets the almost empty threshold
+  --    DATA_WIDTH              => 18,  -- Valid values are 1-72 (37-72 only valid when FIFO_SIZE="36Kb")
+  --    FIFO_SIZE               => "18Kb",     -- Target BRAM, "18Kb" or "36Kb" 
+  --    FIRST_WORD_FALL_THROUGH => false)  -- Sets the FIFO FWFT to TRUE or FALSE
+
+  --  port map (
+  --    ALMOSTEMPTY => open,                       -- Output almost empty 
+  --    ALMOSTFULL  => open,                       -- Output almost full
+  --    DO          => otmb_l1a_cnt_h_fifo_out,    -- Output data
+  --    EMPTY       => otmb_l1a_cnt_h_fifo_empty,  -- Output empty
+  --    FULL        => otmb_l1a_cnt_h_fifo_full,   -- Output full
+  --    RDCOUNT     => otmb_l1a_cnt_h_fifo_rdc,    -- Output read count
+  --    RDERR       => open,                       -- Output read error
+  --    WRCOUNT     => otmb_l1a_cnt_h_fifo_wrc,    -- Output write count
+  --    WRERR       => open,                       -- Output write error
+  --    DI          => l1a_cnt_h_fifo_in,          -- Input data
+  --    RDCLK       => clk,                        -- Input read clock
+  --    RDEN        => otmb_l1a_cnt_fifo_rd_en,    -- Input read enable
+  --    RST         => fifo_rst,                        -- Input reset
+  --    WRCLK       => clk,                        -- Input write clock
+  --    WREN        => otmb_l1a_cnt_fifo_wr_en     -- Input write enable
+  --    );
+
+  OTMB_L1ACNT_CNT_H_FIFO_I : FIFO_L1ACNT_GEN
+  PORT MAP (
+      WR_CLK => clk,
+      RD_CLK => clk,
+      SRST => fifo_rst,
+      DIN => l1a_cnt_h_fifo_in,
+      WR_EN => otmb_l1a_cnt_fifo_wr_en,
+      RD_EN => otmb_l1a_cnt_fifo_rd_en,
+      DOUT => otmb_l1a_cnt_h_fifo_out,
+      FULL => otmb_l1a_cnt_h_fifo_full,
+      EMPTY => otmb_l1a_cnt_h_fifo_empty,
+      WR_RST_BUSY => open,
+      RD_RST_BUSY => open 
+  );
 
 -- FSM 
   alct_tx_start_d <= not alct_l1a_cnt_h_fifo_empty;

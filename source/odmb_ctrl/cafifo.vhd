@@ -15,8 +15,6 @@ use ieee.std_logic_unsigned.all;
 use work.ucsb_types.all;
 use unisim.vcomponents.all;
 use unimacro.vcomponents.all;
---use hdlmacro.hdlmacro.all;
-use work.odmb7_ip_components.all;
 
 entity cafifo is
   generic (
@@ -43,22 +41,15 @@ entity cafifo is
     pop : in std_logic;
 
     eof_data    : in std_logic_vector(NCFEB+2 downto 1);
-    alct_dv     : in std_logic;
-    otmb_dv     : in std_logic;
-    dcfeb0_dv   : in std_logic;
-    --dcfeb0_data : in std_logic_vector(15 downto 0);
-    dcfeb1_dv   : in std_logic;
-    --dcfeb1_data : in std_logic_vector(15 downto 0);
-    dcfeb2_dv   : in std_logic;
-    --dcfeb2_data : in std_logic_vector(15 downto 0);
-    dcfeb3_dv   : in std_logic;
-    --dcfeb3_data : in std_logic_vector(15 downto 0);
-    dcfeb4_dv   : in std_logic;
-    --dcfeb4_data : in std_logic_vector(15 downto 0);
-    dcfeb5_dv   : in std_logic;
-    --dcfeb5_data : in std_logic_vector(15 downto 0);
-    dcfeb6_dv   : in std_logic;
-    --dcfeb6_data : in std_logic_vector(15 downto 0);
+    -- alct_dv     : in std_logic;
+    -- otmb_dv     : in std_logic;
+    -- dcfeb0_dv   : in std_logic;
+    -- dcfeb1_dv   : in std_logic;
+    -- dcfeb2_dv   : in std_logic;
+    -- dcfeb3_dv   : in std_logic;
+    -- dcfeb4_dv   : in std_logic;
+    -- dcfeb5_dv   : in std_logic;
+    -- dcfeb6_dv   : in std_logic;
 
     cafifo_l1a_match : out std_logic_vector(NCFEB+2 downto 1);
     cafifo_l1a_cnt   : out std_logic_vector(23 downto 0);
@@ -83,14 +74,21 @@ end cafifo;
 
 architecture cafifo_architecture of cafifo is
 
-  -- component csp_systemtest_la is
-  --   port (
-  --     CLK     : in    std_logic := 'X';
-  --     DATA    : in    std_logic_vector (399 downto 0);
-  --     TRIG0   : in    std_logic_vector (19 downto 0);
-  --     CONTROL : inout std_logic_vector (35 downto 0)
-  --     );
-  -- end component;
+  component fifo_l1acnt_dav
+    port (
+      clk : in std_logic;
+      srst : in std_logic;
+      din : in std_logic_vector(23 downto 0);
+      wr_en : in std_logic;
+      rd_en : in std_logic;
+      dout : out std_logic_vector(23 downto 0);
+      full : out std_logic;
+      empty : out std_logic;
+      wr_rst_busy : out std_logic;
+      rd_rst_busy : out std_logic
+      );
+  end component;
+
   component ila_2 is
     port (
       clk : in std_logic := '0';
@@ -334,7 +332,7 @@ begin
     l1acnt_dav_fifo_wr_en(dev) <= l1a_match_in_reg(dev);
     l1acnt_dav_fifo_in(dev)    <= l1a_cnt_out;
     --FIFORD       : FD port map(l1acnt_dav_fifo_rd_en(dev), clk, l1acnt_dav_fifo_rd_en_d(dev));
-  L1ACNT_DAV_FIFO_I : L1ACNT_DAV_FIFO
+  L1ACNT_DAV_FIFO_I : fifo_l1acnt_dav
   PORT MAP (
       clk => clk,
       srst => l1acnt_fifo_rst,
@@ -347,35 +345,6 @@ begin
       wr_rst_busy => open,
       rd_rst_busy => open 
   );
-    --
-    -- this fifo is not available for ultrascale
-    --
-    --L1ACNT_DAV_FIFO : FIFO_DUALCLOCK_MACRO
-    --  generic map (
-    --    DEVICE                  => "VIRTEX6",  -- Target Device: "VIRTEX5", "VIRTEX6" 
-    --    ALMOST_FULL_OFFSET      => X"0080",  -- Sets almost full threshold
-    --    ALMOST_EMPTY_OFFSET     => X"0080",  -- Sets the almost empty threshold
-    --    DATA_WIDTH              => 24,  -- Valid values are 1-72 (37-72 only valid when FIFO_SIZE="36Kb")
-    --    FIFO_SIZE               => "18Kb",   -- Target BRAM, "18Kb" or "36Kb" 
-    --    FIRST_WORD_FALL_THROUGH => true)  -- Sets the FIFO FWFT to TRUE or FALSE
-
-    --  port map (
-    --    RDCOUNT     => l1acnt_dav_fifo_rd_cnt(dev),  -- Output read count
-    --    WRCOUNT     => l1acnt_dav_fifo_wr_cnt(dev),  -- Output write count
-    --    EMPTY       => l1acnt_dav_fifo_empty(dev),   -- Output empty
-    --    FULL        => l1acnt_dav_fifo_full(dev),    -- Output full
-    --    ALMOSTEMPTY => open,                         -- Output almost empty 
-    --    ALMOSTFULL  => open,                         -- Output almost full
-    --    RDERR       => open,                         -- Output read error
-    --    WRERR       => open,                         -- Output write error
-    --    WRCLK       => clk,                          -- Input clock
-    --    RDCLK       => clk,                          -- Input clock
-    --    RST         => l1acnt_fifo_rst,              -- Input reset
-    --    WREN        => l1acnt_dav_fifo_wr_en(dev),   -- Input write enable
-    --    DI          => l1acnt_dav_fifo_in(dev),      -- Input data
-    --    RDEN        => l1acnt_dav_fifo_rd_en(dev),   -- Input read enable
-    --    DO          => l1acnt_dav_fifo_out(dev)      -- Output data
-    --    );
   end generate GEN_L1ACNT_DAV;
 
   DAV_LOST_PRO : process(L1ACNT_RST, CLK, cafifo_rden, rd_addr_out, l1a_dav_en, lost_pckt_en)
@@ -600,15 +569,6 @@ begin
   cafifo_prev_next_l1a_match <= l1a_match(prev_rd_addr)(8 downto 1) & l1a_match(next_rd_addr)(8 downto 1);
   cafifo_prev_next_l1a       <= l1a_cnt(prev_rd_addr)(7 downto 0) & l1a_cnt(next_rd_addr)(7 downto 0);
 
--- Chip ScopePro ILA core
---  csp_systemtest_la_pm : csp_systemtest_la
---    port map (
---      CONTROL => CSP_FREE_AGENT_PORT_LA_CTRL,
---      CLK     => CLK,                   -- Good ol' 40MHz clock here
---      DATA    => free_agent_la_data,
---      TRIG0   => free_agent_la_trig
---      );
-
   bad_l1a_lone <= not or_reduce(l1a_match_in_reg) and not lone_in_reg and cafifo_wren;
   bad_rdwr_addr <= '1' when (rd_addr_out /= wr_addr_out and or_reduce(l1a_match(rd_addr_out)) = '0'
                              and cafifo_rden = '0'
@@ -641,10 +601,10 @@ begin
                         & l1a_cnt(prev_rd_addr)(3 downto 0)     -- [66:63]
                         & l1a_cnt(next_rd_addr)(3 downto 0) & l1a_cnt(rd_addr_out)(3 downto 0)  -- [62:55]
                         & EOF_DATA      -- [54:46]
-                        & ALCT_DV & OTMB_DV & dcfeb_dv  -- [45:37]
+                        -- & ALCT_DV & OTMB_DV & dcfeb_dv  -- [45:37]
                         -- & DCFEB3_DATA(15 downto 12) & DCFEB2_DATA(15 downto 12)  -- [36:29]
                         -- & DCFEB1_DATA(15 downto 12) & DCFEB0_DATA(15 downto 12)  -- [28:21]
-                        & x"0000"
+                        & '0' & x"000000"    -- [45:21]
                         & L1A_MATCH_IN & L1A & POP      -- [20:10]
                         & std_logic_vector(to_unsigned(wr_addr_out, 5))  -- [9:5]
                         & std_logic_vector(to_unsigned(rd_addr_out, 5));  -- [4:0]
@@ -652,7 +612,7 @@ begin
   cafifo_wr_addr <= std_logic_vector(to_unsigned(wr_addr_out, cafifo_wr_addr'length));
   cafifo_rd_addr <= std_logic_vector(to_unsigned(rd_addr_out, cafifo_rd_addr'length));
 
-  dcfeb_dv <= dcfeb6_dv & dcfeb5_dv & dcfeb4_dv & dcfeb3_dv & dcfeb2_dv & dcfeb1_dv & dcfeb0_dv;
+  -- dcfeb_dv <= dcfeb6_dv & dcfeb5_dv & dcfeb4_dv & dcfeb3_dv & dcfeb2_dv & dcfeb1_dv & dcfeb0_dv;
 
   -- Generate BX_CNT
   DS_BX0_PUSH : DELAY_SIGNAL port map(DOUT => ccb_bx0_delayed, CLK => CLK, NCYCLES => PUSH_DLY, DIN => CCB_BX0);

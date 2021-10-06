@@ -6,7 +6,7 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use unisim.vcomponents.all;
 
-use work.ucsb_types.all;     -- for switch between sim and synthesis
+use work.Firmware_pkg.all;     -- for switch between sim and synthesis
 
 entity DCFEB_DS_WRAPPER is
   generic (

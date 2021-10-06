@@ -47,14 +47,6 @@ entity TRGCNTRL is
 end TRGCNTRL;
 
 architecture TRGCNTRL_Arch of TRGCNTRL is
-  component LCTDLY is  -- Aligns RAW_LCT with L1A by 2.4 us to 4.8 us
-    port (
-      DOUT  : out std_logic;
-      CLK   : in std_logic;
-      DELAY : in std_logic_vector(5 downto 0);
-      DIN   : in std_logic
-      );
-  end component;
 
   signal DLY_LCT, LCT, LCT_IN : std_logic_vector(NCFEB downto 0);
   signal RAW_L1A_Q, L1A_IN    : std_logic;

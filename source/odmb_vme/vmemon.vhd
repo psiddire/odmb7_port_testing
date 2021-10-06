@@ -59,8 +59,8 @@ entity VMEMON is
     MASK_PLS        : out std_logic;
 
     --exernal registers
-    ODMB_DATA_SEL : out std_logic_vector(7 downto 0);
-    ODMB_DATA     : in  std_logic_vector(15 downto 0)
+    ODMB_STAT_SEL   : out std_logic_vector(7 downto 0);
+    ODMB_STAT_DATA  : in  std_logic_vector(15 downto 0)
     );
 end VMEMON;
 
@@ -185,7 +185,7 @@ begin
 
   -- R 3XYC "Read external registers XY (where XY /= 40)"
   r_odmb_data       <= '1' when ((CMDDEV and x"100C") = x"100C" and CMDDEV /= x"140C" and WRITER = '1') else '0';
-  ODMB_DATA_SEL     <= COMMAND(9 downto 2) when (r_odmb_data = '1') else x"1F";
+  ODMB_STAT_SEL     <= COMMAND(9 downto 2) when (r_odmb_data = '1') else x"1F";
 
   -- Reset command(0x3004 0x3008 0x3010 0x3014)
   -- DCFEB Reprog is asserted for the 2 clock cycles in SLOWCLK after STROBE, others are asserted for 1 cycle in CLK40 1 cycle after STROBE
@@ -304,7 +304,7 @@ begin
              out_test_ped        when (r_test_ped = '1')        else
              out_mask_pls        when (r_mask_pls = '1')        else
              out_mask_l1a        when (r_mask_l1a = '1')        else
-             ODMB_DATA           when (r_odmb_data = '1')       else
+             ODMB_STAT_DATA      when (r_odmb_data = '1')       else
              (others => 'L');
 
   -- DTACK: always just issue on second SLOWCLK edge after STROBE

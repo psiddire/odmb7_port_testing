@@ -218,68 +218,6 @@ end odmb7_ucsb_dev;
 architecture Behavioral of odmb7_ucsb_dev is
   constant NCFEB  : integer range 1 to 7 := 7;  -- Number of DCFEBS, 7 for ODMB7
 
-  component odmb7_data is
-    generic (
-      NCFEB       : integer range 1 to 7 := NCFEB  -- Number of DCFEBS, 7 for ME1/1, 5
-    );
-    port (
-      --
-      CMSCLK              : in std_logic;
-      DDUCLK              : in std_logic;
-      DCFEBCLK            : in std_logic;
-      RESET               : in std_logic;
-      L1ACNT_FIFO_RST     : in std_logic;
-      KILL                : in std_logic_vector(NCFEB+2 downto 1);
-      CAFIFO_L1A          : in std_logic;
-      CAFIFO_L1A_MATCH_IN : in std_logic_vector(NCFEB+2 downto 1);
-      DCFEB_L1A           : in std_logic;
-      DCFEB_L1A_MATCH     : in std_logic_vector(NCFEB downto 1);
-      NWORDS_DUMMY        : in std_logic_vector(15 downto 0);
-
-      DCFEB_TCK           : in std_logic_vector(NCFEB downto 1);
-      DCFEB_TDO           : out std_logic_vector(NCFEB downto 1);
-      DCFEB_TMS           : in std_logic;  
-      DCFEB_TDI           : in std_logic;
-
-      DATAFIFO_MASK       : in std_logic;
-      DCFEB_FIFO_RST      : in std_logic_vector (NCFEB downto 1); -- auto-kill related
-      EOF_DATA            : out std_logic_vector(NCFEB+2 downto 1);
-
-      OTMB_DATA_IN        : in std_logic_vector(17 downto 0);
-      OTMB_FIFO_DV        : out std_logic;
-
-      ALCT_DATA_IN        : in std_logic_vector(17 downto 0);
-      ALCT_FIFO_DV        : out std_logic;
-
-      DCFEB_DV_IN         : in std_logic_vector(NCFEB downto 1);
-      DCFEB1_DATA_IN      : in std_logic_vector(15 downto 0);
-      DCFEB2_DATA_IN      : in std_logic_vector(15 downto 0);
-      DCFEB3_DATA_IN      : in std_logic_vector(15 downto 0);
-      DCFEB4_DATA_IN      : in std_logic_vector(15 downto 0);
-      DCFEB5_DATA_IN      : in std_logic_vector(15 downto 0);
-      DCFEB6_DATA_IN      : in std_logic_vector(15 downto 0);
-      DCFEB7_DATA_IN      : in std_logic_vector(15 downto 0);
-
-      GEN_DCFEB_SEL       : in std_logic;
-
-      OTMB_FIFO_DATA_OUT  : out std_logic_vector(17 downto 0);
-      ALCT_FIFO_DATA_OUT  : out std_logic_vector(17 downto 0);
-
-      DCFEB1_FIFO_OUT     : out std_logic_vector(17 downto 0);
-      DCFEB2_FIFO_OUT     : out std_logic_vector(17 downto 0);
-      DCFEB3_FIFO_OUT     : out std_logic_vector(17 downto 0);
-      DCFEB4_FIFO_OUT     : out std_logic_vector(17 downto 0);
-      DCFEB5_FIFO_OUT     : out std_logic_vector(17 downto 0);
-      DCFEB6_FIFO_OUT     : out std_logic_vector(17 downto 0);
-      DCFEB7_FIFO_OUT     : out std_logic_vector(17 downto 0);
-      DCFEB_DV_OUT        : out std_logic_vector(NCFEB downto 1);
-
-      DATA_FIFO_RE        : in std_logic_vector (NCFEB+2 downto 1);
-      DATA_FIFO_EMPTY     : out std_logic_vector(NCFEB+2 downto 1);
-      DATA_FIFO_HALF_FULL : out std_logic_vector (NCFEB+2 downto 1)
-    );
-  end component;
-
   component odmb_clocking is
     port (
       -- Input ports
@@ -431,8 +369,8 @@ architecture Behavioral of odmb7_ucsb_dev is
       MUX_TRIGGER          : out std_logic;
       MUX_LVMB             : out std_logic;
       ODMB_PED             : out std_logic_vector(1 downto 0);
-      ODMB_DATA            : in std_logic_vector(15 downto 0);
-      ODMB_DATA_SEL        : out std_logic_vector(7 downto 0);
+      ODMB_STAT_DATA       : in std_logic_vector(15 downto 0);
+      ODMB_STAT_SEL        : out std_logic_vector(7 downto 0);
 
       --------------------
       -- VMECONFREGS Configuration signals for top level
@@ -486,7 +424,7 @@ architecture Behavioral of odmb7_ucsb_dev is
       --------------------
       -- Other
       --------------------
-      DIAGOUT     : out std_logic_vector (17 downto 0); -- for debugging
+      DIAGOUT     : out std_logic_vector(17 downto 0); -- for debugging
       RST         : in std_logic;
       PON_RESET   : in std_logic
       );
@@ -504,9 +442,9 @@ architecture Behavioral of odmb7_ucsb_dev is
       DDUCLK       : in std_logic;
       CMSCLK       : in std_logic;
 
-      CCB_CMD      : in  std_logic_vector (5 downto 0);  -- ccbcmnd(5 downto 0) - from J3
+      CCB_CMD      : in  std_logic_vector(5 downto 0);  -- ccbcmnd(5 downto 0) - from J3
       CCB_CMD_S    : in  std_logic;       -- ccbcmnd(6) - from J3
-      CCB_DATA     : in  std_logic_vector (7 downto 0);  -- ccbdata(7 downto 0) - from J3
+      CCB_DATA     : in  std_logic_vector(7 downto 0);  -- ccbdata(7 downto 0) - from J3
       CCB_DATA_S   : in  std_logic;       -- ccbdata(8) - from J3
       CCB_BX0_B    : in  std_logic;       -- bx0 - from J3
       CCB_BXRST_B  : in  std_logic;       -- bxrst - from J3
@@ -539,16 +477,16 @@ architecture Behavioral of odmb7_ucsb_dev is
       PEDESTAL_OTMB   : in  std_logic;
 
       --------------------
-      -- TRGCNTRL 
+      -- TRGCNTRL
       --------------------
       RAW_L1A       : in std_logic;
-      RAWLCT        : in std_logic_vector (NCFEB downto 0);
+      RAWLCT        : in std_logic_vector(7 downto 0);
 
       --------------------
-      -- DAV 
+      -- DAV
       --------------------
-      OTMB_DAV : in std_logic;            
-      ALCT_DAV : in std_logic;            
+      OTMB_DAV : in std_logic;
+      ALCT_DAV : in std_logic;
 
       --------------------
       -- To/From DCFEBs (FF-EMU-MOD)
@@ -568,24 +506,13 @@ architecture Behavioral of odmb7_ucsb_dev is
       KILL        : in std_logic_vector(NCFEB+2 downto 1);
       LCT_ERR     : out std_logic;            -- To an LED in the original design
 
-      BX_DLY        : in integer range 0 to 4095;
+      BX_DLY      : in integer range 0 to 4095;
       L1ACNT_RST  : in std_logic;
       BXCNT_RST   : in std_logic;
       RST         : in std_logic;
-  
-      EOF_DATA     : in std_logic_vector(NCFEB+2 downto 1);
-  
-      -- From ALCT,OTMB,DCFEBs to CAFIFO
-      ALCT_DV     : in std_logic;
-      OTMB_DV     : in std_logic;
-      DCFEB0_DV   : in std_logic;
-      DCFEB1_DV   : in std_logic;
-      DCFEB2_DV   : in std_logic;
-      DCFEB3_DV   : in std_logic;
-      DCFEB4_DV   : in std_logic;
-      DCFEB5_DV   : in std_logic;
-      DCFEB6_DV   : in std_logic;
-  
+
+      EOF_DATA    : in std_logic_vector(NCFEB+2 downto 1);
+
       EXT_DCFEB_L1A_CNT7 : out std_logic_vector(23 downto 0);
       DCFEB_L1A_DAV7     : out std_logic;
       CAFIFO_PREV_NEXT_L1A_MATCH : out std_logic_vector(15 downto 0);
@@ -594,43 +521,109 @@ architecture Behavioral of odmb7_ucsb_dev is
       CAFIFO_DEBUG               : out std_logic_vector(15 downto 0);
       CAFIFO_WR_ADDR             : out std_logic_vector(7 downto 0);
       CAFIFO_RD_ADDR             : out std_logic_vector(7 downto 0);
-  
+
       -- From CAFIFO to Data FIFOs
       CAFIFO_L1A           : out std_logic;
-      CAFIFO_L1A_MATCH_IN  : out std_logic_vector(NCFEB+2 downto 1);  -- From TRGCNTRL to CAFIFO to generate Data  
-      CAFIFO_L1A_MATCH_OUT : out std_logic_vector(NCFEB+2 downto 1);  -- From CAFIFO to CONTROL  
+      CAFIFO_L1A_MATCH_IN  : out std_logic_vector(NCFEB+2 downto 1);  -- From TRGCNTRL to CAFIFO to generate Data
+      CAFIFO_L1A_MATCH_OUT : out std_logic_vector(NCFEB+2 downto 1);  -- From CAFIFO to CONTROL
       CAFIFO_L1A_CNT       : out std_logic_vector(23 downto 0);
       CAFIFO_L1A_DAV       : out std_logic_vector(NCFEB+2 downto 1);
       CAFIFO_BX_CNT        : out std_logic_vector(11 downto 0);
-  
+
       -- From GigaLinks
       DDU_DATA       : out std_logic_vector(15 downto 0);
       DDU_DATA_VALID : out std_logic;
-  
-      -- For headers/trailers
-      AUTOKILLED_DCFEBS  : in std_logic_vector(NCFEB downto 1);
-        
-      -- From/To Data FIFOs
-      DATA_FIFO_RE : out std_logic_vector(NCFEB+2 downto 1);
-      DATA_FIFO_OE : out std_logic_vector(NCFEB+2 downto 1);
-  
-      FIFO_OUT : in std_logic_vector(15 downto 0);
-      FIFO_EOF : in std_logic;
-  
-      FIFO_EMPTY   : in std_logic_vector(NCFEB+2 downto 1);  -- emptyf*(7 DOWNTO 1) - from FIFOs
-      FIFO_HALF_FULL : in std_logic_vector(NCFEB+2 downto 1);  -- 
 
-      GA : in std_logic_vector(4 downto 0);
-      CRATEID       : in std_logic_vector(7 downto 0)
+      -- For headers/trailers
+      GA             : in std_logic_vector(4 downto 0);
+      CRATEID        : in std_logic_vector(7 downto 0);
+      AUTOKILLED_DCFEBS  : in std_logic_vector(NCFEB downto 1);
+
+      -- From/To Data FIFOs
+      FIFO_RE_B      : out std_logic_vector(NCFEB+2 downto 1);
+      FIFO_OE_B      : out std_logic_vector(NCFEB+2 downto 1);
+      FIFO_DOUT      : in std_logic_vector(17 downto 0);
+      -- FIFO_EOF       : in std_logic;
+      FIFO_EMPTY     : in std_logic_vector(NCFEB+2 downto 1);  -- emptyf*(7 DOWNTO 1) - from FIFOs
+      FIFO_HALF_FULL : in std_logic_vector(NCFEB+2 downto 1)  --
+
       );
   end component;
 
-  component LCTDLY is  -- Aligns RAW_LCT with L1A by 2.4 us to 4.8 us
+  component odmb_data is
+    generic (
+      NCFEB       : integer range 1 to 7 := NCFEB  -- Number of DCFEBS, 7 for ME1/1, 5
+    );
     port (
-      DOUT  : out std_logic;
-      CLK   : in std_logic;
-      DELAY : in std_logic_vector(5 downto 0);
-      DIN   : in std_logic
+      CMSCLK              : in std_logic;
+      DDUCLK              : in std_logic;
+      DCFEBCLK            : in std_logic;
+      RESET               : in std_logic;
+      L1ACNT_RST          : in std_logic;
+      KILL                : in std_logic_vector(NCFEB+2 downto 1);
+      CAFIFO_L1A          : in std_logic;
+      CAFIFO_L1A_MATCH_IN : in std_logic_vector(NCFEB+2 downto 1);
+      DCFEB_L1A           : in std_logic;
+      DCFEB_L1A_MATCH     : in std_logic_vector(NCFEB downto 1);
+      NWORDS_DUMMY        : in std_logic_vector(15 downto 0);
+
+      DCFEB_TCK           : in std_logic_vector(NCFEB downto 1);
+      DCFEB_TDO           : out std_logic_vector(NCFEB downto 1);
+      DCFEB_TMS           : in std_logic;
+      DCFEB_TDI           : in std_logic;
+
+      DCFEB_FIFO_RST      : in std_logic_vector (NCFEB downto 1); -- auto-kill related
+      EOF_DATA            : out std_logic_vector(NCFEB+2 downto 1);
+      INTO_FIFO_DAV       : out std_logic_vector(NCFEB+2 downto 1);
+
+      OTMB_DATA_IN        : in std_logic_vector(17 downto 0);
+      ALCT_DATA_IN        : in std_logic_vector(17 downto 0);
+
+      DCFEB_DATA_IN       : in t_twobyte_arr(NCFEB downto 1);
+      DCFEB_DAV_IN        : in std_logic_vector(NCFEB downto 1);
+
+      GEN_DCFEB_SEL       : in std_logic;
+
+      FIFO_RE_B           : in std_logic_vector(NCFEB+2 downto 1);
+      FIFO_OE_B           : in std_logic_vector(NCFEB+2 downto 1);
+      FIFO_DOUT           : out std_logic_vector(17 downto 0);
+      FIFO_EMPTY          : out std_logic_vector(NCFEB+2 downto 1);
+      FIFO_HALF_FULL      : out std_logic_vector(NCFEB+2 downto 1)
+    );
+  end component;
+
+  component odmb_status is
+    generic (
+      NCFEB            : integer range 1 to 7 := 7  -- Number of DCFEBS, 7 for ME1/1, 5
+      );
+    port (
+      ODMB_STAT_SEL    : in  std_logic_vector(7 downto 0);
+      ODMB_STAT_DATA   : out std_logic_vector(15 downto 0);
+
+      CMSCLK           : in std_logic;
+      DDUCLK           : in std_logic;
+      DCFEBCLK         : in std_logic;
+
+      DCFEB_CRC_VALID  : in std_logic_vector(NCFEB downto 1);
+      DCFEB_RXD_VALID  : in std_logic_vector(NCFEB downto 1);
+      DCFEB_BAD_RX     : in std_logic_vector(NCFEB downto 1);
+      RAW_LCT          : in std_logic_vector(NCFEB downto 0);
+      ALCT_DAV         : in std_logic;
+      OTMB_DAV         : in std_logic;
+      RAW_L1A          : in std_logic;
+      DCFEB_L1A        : in std_logic;
+
+      EOF_DATA         : in std_logic_vector(NCFEB+2 downto 1);
+      FIFO_RE_B        : in std_logic_vector(NCFEB+2 downto 1);
+      INTO_FIFO_DAV    : in std_logic_vector(NCFEB+2 downto 1);
+      CAFIFO_L1A_MATCH : in std_logic_vector(NCFEB+2 downto 1);
+      CAFIFO_L1A_DAV   : in std_logic_vector(NCFEB+2 downto 1);
+
+      CAFIFO_L1A_CNT   : in std_logic_vector(23 downto 0);
+      CAFIFO_BX_CNT    : in std_logic_vector(11 downto 0);
+
+      L1ACNT_RST       : in std_logic;
+      RESET            : in std_logic  --! Global reset
       );
   end component;
 
@@ -673,13 +666,7 @@ architecture Behavioral of odmb7_ucsb_dev is
       sysclk       : in  std_logic; -- clock for the helper block, 80 MHz
       daq_rx_n     : in  std_logic_vector(NLINK-1 downto 0);
       daq_rx_p     : in  std_logic_vector(NLINK-1 downto 0);
-      rxdata_feb1  : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
-      rxdata_feb2  : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
-      rxdata_feb3  : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
-      rxdata_feb4  : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
-      rxdata_feb5  : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
-      rxdata_feb6  : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
-      rxdata_feb7  : out std_logic_vector(DATAWIDTH-1 downto 0);  -- Data received
+      rxdata_cfeb  : out t_twobyte_arr(NLINK downto 1);
       rxd_valid    : out std_logic_vector(NLINK downto 1);   -- Flag for valid data
       crc_valid    : out std_logic_vector(NLINK downto 1);   -- Flag for valid CRC
       rxready      : out std_logic;                          -- Flag for rx reset done
@@ -755,6 +742,7 @@ architecture Behavioral of odmb7_ucsb_dev is
   --------------------------------------
   signal reset_pulse        : std_logic := '0';
   signal reset_pulse_q      : std_logic := '0';
+  signal l1acnt_rst         : std_logic := '0';
   signal l1acnt_rst_meta    : std_logic := '0';
   signal l1acnt_rst_sync    : std_logic := '0';
   signal l1a_reset_pulse    : std_logic := '0';
@@ -865,17 +853,6 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal test_ped : std_logic := '0';
 
   --------------------------------------
-  -- ODMB status signals
-  --------------------------------------
-  -- Counter arrays
-  signal goodcrc_cnt         : t_twobyte_arr(NCFEB downto 1);
-  signal dcfeb_bad_rx_cnt    : t_twobyte_arr(NCFEB downto 1);
-  signal dcfeb_dvalid_cnt    : t_twobyte_arr(NCFEB downto 1); -- replacement for cafifo dav count
-
-  signal into_cafifo_dav_cnt : t_twobyte_arr(NCFEB+2 downto 1);
-  signal l1a_match_cnt       : t_twobyte_arr(NCFEB+2 downto 1);
-
-  --------------------------------------
   -- Reset signals
   --------------------------------------
   signal fw_reset        : std_logic := '0';
@@ -957,13 +934,7 @@ architecture Behavioral of odmb7_ucsb_dev is
   -- MGT signals for DCFEB RX channels
   --------------------------------------
   signal usrclk_mgtc : std_logic;
-  signal dcfeb1_data : std_logic_vector(15 downto 0);  -- Data received
-  signal dcfeb2_data : std_logic_vector(15 downto 0);  -- Data received
-  signal dcfeb3_data : std_logic_vector(15 downto 0);  -- Data received
-  signal dcfeb4_data : std_logic_vector(15 downto 0);  -- Data received
-  signal dcfeb5_data : std_logic_vector(15 downto 0);  -- Data received
-  signal dcfeb6_data : std_logic_vector(15 downto 0);  -- Data received
-  signal dcfeb7_data : std_logic_vector(15 downto 0);  -- Data received
+  signal dcfeb_rxdata : t_twobyte_arr(NCFEB downto 1);  -- Data received
   signal dcfeb_rxd_valid : std_logic_vector(NCFEB downto 1);   -- Flag for valid data;
   signal dcfeb_crc_valid : std_logic_vector(NCFEB downto 1);   -- Flag for valid data;
   signal dcfeb_bad_rx : std_logic_vector(NCFEB downto 1);   -- Flag for fiber errors;
@@ -1016,26 +987,17 @@ architecture Behavioral of odmb7_ucsb_dev is
   --------------------------------------
   -- DAQ related signals
   --------------------------------------
-  signal odmb_data        : std_logic_vector(15 downto 0) := (others => '0');
-  signal odmb_data_sel    : std_logic_vector(7 downto 0) := (others => '0');
+  signal odmb_status_data : std_logic_vector(15 downto 0) := (others => '0');
+  signal odmb_status_sel  : std_logic_vector(7 downto 0) := (others => '0');
   signal bxcnt_rst        : std_logic := '0';
-  signal l1acnt_rst       : std_logic := '0';
-  signal l1acnt_fifo_rst  : std_logic := '0';
   signal ccb_l1acnt_rst   : std_logic := '0';
   signal ccb_l1acnt_rst_q : std_logic := '0';
   signal ccb_bxrst_b_q    : std_logic := '0';
-  signal datafifo_mask    : std_logic;
   signal cafifo_l1a       : std_logic := '0';
   signal cafifo_l1a_match_in : std_logic_vector(NCFEB+2 downto 1);
   signal cafifo_l1a_match_out : std_logic_vector(NCFEB+2 downto 1);
   signal dcfeb_fifo_rst   : std_logic_vector(NCFEB downto 1);
-  signal alct_data_valid  : std_logic;
-  signal alct_fifo_data_valid  : std_logic;
-  signal alct_fifo_data_out    : std_logic_vector(17 downto 0);
-  signal otmb_data_valid  : std_logic;
-  signal otmb_fifo_data_valid  : std_logic;
-  signal otmb_fifo_data_out    : std_logic_vector(17 downto 0);
-  signal dcfeb_data_valid : std_logic_vector(NCFEB downto 1);
+
   signal cafifo_prev_next_l1a_match : std_logic_vector(15 downto 0);
   signal cafifo_prev_next_l1a       : std_logic_vector(15 downto 0);
   signal cafifo_debug, control_debug : std_logic_vector(15 downto 0);
@@ -1045,35 +1007,23 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal cafifo_l1a_dav       : std_logic_vector(NCFEB+2 downto 1);
   signal cafifo_bx_cnt        : std_logic_vector(11 downto 0);
 
-  type dcfeb_data_type is array (NCFEB downto 1) of std_logic_vector(15 downto 0);
-  type dcfeb_data_type_ext is array (NCFEB downto 1) of std_logic_vector(17 downto 0);
-  signal dcfeb_fifo_out   : dcfeb_data_type_ext;
+  -- signal data_fifo_out       : t_devdata_arr(NCFEB+2 downto 1);
+  -- signal data_fifo_dav       : std_logic_vector(NCFEB+2 downto 1);
 
-  signal dcfeb1_fifo_out   : std_logic_vector(17 downto 0);
-  signal dcfeb2_fifo_out   : std_logic_vector(17 downto 0);
-  signal dcfeb3_fifo_out   : std_logic_vector(17 downto 0);
-  signal dcfeb4_fifo_out   : std_logic_vector(17 downto 0);
-  signal dcfeb5_fifo_out   : std_logic_vector(17 downto 0);
-  signal dcfeb6_fifo_out   : std_logic_vector(17 downto 0);
-  signal dcfeb7_fifo_out   : std_logic_vector(17 downto 0);
+  signal eof_data       : std_logic_vector(NCFEB+2 downto 1);
+  signal into_fifo_dav  : std_logic_vector(NCFEB+2 downto 1);
+  signal fifo_half_full : std_logic_vector(NCFEB+2 downto 1);
+  signal fifo_empty     : std_logic_vector(NCFEB+2 downto 1);
 
-  signal eof_data         : std_logic_vector(NCFEB+2 downto 1);
-  signal data_fifo_half_full         : std_logic_vector(NCFEB+2 downto 1);
-  signal data_fifo_empty         : std_logic_vector(NCFEB+2 downto 1);
-
-  signal fifo_out         : std_logic_vector(15 downto 0);
-  signal fifo_eof         : std_logic;
-
-  signal data_fifo_oe   : std_logic_vector(NCFEB+2 downto 1) := (others => '0');
-  signal data_fifo_re   : std_logic_vector(NCFEB+2 downto 1) := (others => '0');
-  signal data_fifo_re_b : std_logic_vector(NCFEB+2 downto 1) := (others => '1');
+  signal fifo_dout : std_logic_vector(17 downto 0);
+  signal fifo_oe_b : std_logic_vector(NCFEB+2 downto 1) := (others => '1');
+  signal fifo_re_b : std_logic_vector(NCFEB+2 downto 1) := (others => '1');
 
   signal ddu_data                : std_logic_vector(15 downto 0);
   signal ddu_data_valid, ddu_eof : std_logic;
 
   -- for TRGCNTRL
   constant push_dly    : integer := 63;  -- It needs to be > alct/otmb_push_dly
-  constant push_dlyp4  : integer := push_dly+4;  -- push_dly+4
   signal alct_push_dly : integer range 0 to 63;
   signal otmb_push_dly : integer range 0 to 63;
   signal test_otmb_dav, test_alct_dav              : std_logic := '0';
@@ -1083,20 +1033,22 @@ begin
   -------------------------------------------------------------------------------------------
   -- Constant driver for selector/reset pins for board to work
   -------------------------------------------------------------------------------------------
-  -- KUS_DL_SEL <= '1';
   FPGA_SEL <= '0';
   RST_CLKS_B <= '1';
 
   -------------------------------------------------------------------------------------------
-  -- Handle incoming data from OTMB/ALCT/DCFEBs 
+  -- Handle incoming data from OTMB/ALCT/DCFEBs
   -------------------------------------------------------------------------------------------
-  u_data : odmb7_data
+  MBD : odmb_data
+    generic map (
+      NCFEB => NCFEB
+      )
     port map (
       CMSCLK              => cmsclk,
       DDUCLK              => usrclk_spy_tx,
       DCFEBCLK            => usrclk_mgtc,
       RESET               => reset,
-      L1ACNT_FIFO_RST     => l1acnt_fifo_rst,
+      L1ACNT_RST          => l1acnt_rst,
       KILL                => kill,
       CAFIFO_L1A          => cafifo_l1a, -- from cafifo.vhd
       CAFIFO_L1A_MATCH_IN => cafifo_l1a_match_in, -- from cafifo.vhd
@@ -1106,50 +1058,31 @@ begin
 
       DCFEB_TCK           => dcfeb_tck,
       DCFEB_TDO           => gen_dcfeb_tdo,
-      DCFEB_TMS           => dcfeb_tms,  
+      DCFEB_TMS           => dcfeb_tms,
       DCFEB_TDI           => dcfeb_tdi,
 
-      DATAFIFO_MASK       => datafifo_mask,
       DCFEB_FIFO_RST      => "0000000", -- auto-kill related
       EOF_DATA            => eof_data,
+      INTO_FIFO_DAV       => into_fifo_dav,
 
       OTMB_DATA_IN        => OTMB(17 downto 0),
       ALCT_DATA_IN        => OTMB(35 downto 18),
+      DCFEB_DATA_IN       => dcfeb_rxdata,
+      DCFEB_DAV_IN        => dcfeb_rxd_valid,
 
-      DCFEB_DV_IN         => dcfeb_rxd_valid,
-      DCFEB1_DATA_IN      => dcfeb1_data,
-      DCFEB2_DATA_IN      => dcfeb2_data,
-      DCFEB3_DATA_IN      => dcfeb3_data,
-      DCFEB4_DATA_IN      => dcfeb4_data,
-      DCFEB5_DATA_IN      => dcfeb5_data,
-      DCFEB6_DATA_IN      => dcfeb6_data,
-      DCFEB7_DATA_IN      => dcfeb7_data,
+      GEN_DCFEB_SEL       => odmb_ctrl_reg(7),
 
-      GEN_DCFEB_SEL       => odmb_ctrl_reg(7), 
-
-      OTMB_FIFO_DATA_OUT  => otmb_fifo_data_out,
-      OTMB_FIFO_DV        => otmb_fifo_data_valid,
-      ALCT_FIFO_DATA_OUT  => alct_fifo_data_out,
-      ALCT_FIFO_DV        => alct_fifo_data_valid,
-
-      DCFEB1_FIFO_OUT     => dcfeb1_fifo_out,
-      DCFEB2_FIFO_OUT     => dcfeb2_fifo_out,
-      DCFEB3_FIFO_OUT     => dcfeb3_fifo_out,
-      DCFEB4_FIFO_OUT     => dcfeb4_fifo_out,
-      DCFEB5_FIFO_OUT     => dcfeb5_fifo_out,
-      DCFEB6_FIFO_OUT     => dcfeb6_fifo_out,
-      DCFEB7_FIFO_OUT     => dcfeb7_fifo_out,
-      DCFEB_DV_OUT        => dcfeb_data_valid,
-
-      DATA_FIFO_RE        => data_fifo_re,
-      DATA_FIFO_EMPTY     => data_fifo_empty,
-      DATA_FIFO_HALF_FULL => data_fifo_half_full
+      FIFO_RE_B           => fifo_re_b,
+      FIFO_OE_B           => fifo_oe_b,
+      FIFO_DOUT           => fifo_dout,
+      FIFO_EMPTY          => fifo_empty,
+      FIFO_HALF_FULL      => fifo_half_full
       );
 
   -------------------------------------------------------------------------------------------
   -- Handle clock synthesizer signals and generate clocks
   -------------------------------------------------------------------------------------------
-  u_clocking : odmb_clocking
+  MBK : odmb_clocking
     port map (
       CMS_CLK_FPGA_P => CMS_CLK_FPGA_P,
       CMS_CLK_FPGA_N => CMS_CLK_FPGA_N,
@@ -1207,16 +1140,16 @@ begin
   vme_dir <= not vme_dir_b;
   KUS_VME_OE_B <= vme_oe_b;
 
-  GEN_VMEOUT_16 : for I in 0 to 15 generate
+  GEN_VMEIO_16 : for I in 0 to 15 generate
   begin
     VME_BUF : IOBUF port map(O => vme_data_in_buf(I), IO => VME_DATA(I), I => vme_data_out_buf(I), T => vme_dir_b);
-  end generate GEN_VMEOUT_16;
+  end generate GEN_VMEIO_16;
 
   -------------------------------------------------------------------------------------------
   -- Handle PPIB/DCFEB signals
   -------------------------------------------------------------------------------------------
 
-  PPIB_OUT_EN_B <= '0';
+  PPIB_OUT_EN_B <= '0'; -- always enable
   -- Handle DCFEB I/O buffers
   OB_DCFEB_TMS: OBUFDS port map (I => dcfeb_tms, O => DCFEB_TMS_P, OB => DCFEB_TMS_N);
   OB_DCFEB_TDI: OBUFDS port map (I => dcfeb_tdi, O => DCFEB_TDI_P, OB => DCFEB_TDI_N);
@@ -1261,9 +1194,6 @@ begin
       l1acnt_rst_sync <= l1acnt_rst_meta;
     end if;
   end process;
-
-  L1ARESETPULSE : RESET_FIFO generic map(10)
-    port map(FIFO_RST => l1acnt_fifo_rst, FIFO_MASK => datafifo_mask, CLK => cmsclk, IN_RST => l1acnt_rst);
 
   pre_bc0    <= test_bc0 or ccb_bx0_q;
   masked_l1a <= '0' when mask_l1a(0) = '1' else odmbctrl_l1a;
@@ -1358,28 +1288,19 @@ begin
   -------------------------------------------------------------------------------------------
   LCTDLY_GTRG : LCTDLY port map(DOUT => test_l1a, CLK => cmsclk, DELAY => lct_l1a_dly, DIN => test_lct);
 
-  --raw_l1a <= test_l1a;
-  raw_lct <= (others => '1') when (test_lct = '1') else RAWLCT; 
-  raw_l1a <= '1' when test_l1a = '1' else
-             not ccb_l1a_b;
-  --           tc_l1a when (testctrl_sel = '1') else
-
-  --raw_lct <= (others => '1') when test_pb_lct = '1' else
-  --           tc_lct when (testctrl_sel = '1') else
-  --           rawlct;
-
+  raw_lct <= (others => '1') when (test_lct = '1') else RAWLCT;
+  raw_l1a <= '1' when test_l1a = '1' else not CCB_L1A_B;
+             --tc_l1a when (testctrl_sel = '1') else
 
   otmb_push_dly_p1 <= otmb_push_dly + 1;
   alct_push_dly_p1 <= alct_push_dly + 1;
   DS_OTMB_PUSH : DELAY_SIGNAL generic map (64)port map(DOUT=>test_otmb_dav, CLK=>cmsclk, NCYCLES=>otmb_push_dly_p1, DIN=>test_l1a);
   DS_ALCT_PUSH : DELAY_SIGNAL generic map (64)port map(DOUT=>test_alct_dav, CLK=>cmsclk, NCYCLES=>alct_push_dly_p1, DIN=>test_l1a);
 
-  int_alct_dav <= '1' when test_alct_dav = '1' else
+  int_alct_dav <= '1' when test_alct_dav = '1' else LEGACY_ALCT_DAV;
                   --tc_alct_dav when (testctrl_sel = '1') else
-                  LEGACY_ALCT_DAV;
-  int_otmb_dav <= '1' when test_otmb_dav = '1' else
+  int_otmb_dav <= '1' when test_otmb_dav = '1' else OTMB_DAV;
                   --tc_otmb_dav when (testctrl_sel = '1') else
-                  OTMB_DAV;
 
   -------------------------------------------------------------------------------------------
   -- Handle Internal configuration signals
@@ -1435,110 +1356,6 @@ begin
                  opt_rst_reg;
   opt_reset <= opt_rst_reg(31) or pon_reset or mgt_reset;  -- Optical reset
 
-
-  -------------------------------------------------------------------------------------------
-  -- ODMB status signal generations
-  -------------------------------------------------------------------------------------------
-
-  -- TODO: unfinished counting to be filled
-  DCFEB_RXSTAT_CNT : for dev in 1 to NCFEB generate
-  begin
-    C_GODDCRC_CNT : COUNT_EDGES port map(COUNT => goodcrc_cnt(dev), CLK => usrclk_mgtc, RST => reset, DIN => dcfeb_crc_valid(dev));
-    C_DVALID_CNT  : COUNT_EDGES port map(COUNT => dcfeb_dvalid_cnt(dev), CLK => usrclk_mgtc, RST => reset, DIN => dcfeb_rxd_valid(dev));
-    C_BAD_RX_CNT  : COUNT_EDGES port map(COUNT => dcfeb_bad_rx_cnt(dev), CLK => usrclk_mgtc, RST => reset, DIN => dcfeb_bad_rx(dev));
-  end generate DCFEB_RXSTAT_CNT;
-
-  -------------------------------------------------------------------------------------------
-  -- DAQ signals 
-  -------------------------------------------------------------------------------------------
-
-  dcfeb_fifo_out(7) <= dcfeb7_fifo_out;
-  dcfeb_fifo_out(6) <= dcfeb6_fifo_out;
-  dcfeb_fifo_out(5) <= dcfeb5_fifo_out;
-  dcfeb_fifo_out(4) <= dcfeb4_fifo_out;
-  dcfeb_fifo_out(3) <= dcfeb3_fifo_out;
-  dcfeb_fifo_out(2) <= dcfeb2_fifo_out;
-  dcfeb_fifo_out(1) <= dcfeb1_fifo_out;
-
-  GENFIFORE : for index in 1 to NCFEB+2 generate
-  begin
-    data_fifo_re(index) <= datafifo_mask and not data_fifo_re_b(index);
-  end generate GENFIFORE;
-  
-  -- FIFO MUX
-  fifo_out <= dcfeb_fifo_out(1)(15 downto 0)  when data_fifo_oe = "111111110" else
-              dcfeb_fifo_out(2)(15 downto 0)  when data_fifo_oe = "111111101" else
-              dcfeb_fifo_out(3)(15 downto 0)  when data_fifo_oe = "111111011" else
-              dcfeb_fifo_out(4)(15 downto 0)  when data_fifo_oe = "111110111" else
-              dcfeb_fifo_out(5)(15 downto 0)  when data_fifo_oe = "111101111" else
-              dcfeb_fifo_out(6)(15 downto 0)  when data_fifo_oe = "111011111" else
-              dcfeb_fifo_out(7)(15 downto 0)  when data_fifo_oe = "110111111" else
-              otmb_fifo_data_out(15 downto 0) when data_fifo_oe = "101111111" else
-              alct_fifo_data_out(15 downto 0) when data_fifo_oe = "011111111" else
-              (others => 'Z');
-
-  fifo_eof <= dcfeb_fifo_out(1)(17)  when data_fifo_oe = "111111110" else
-              dcfeb_fifo_out(2)(17)  when data_fifo_oe = "111111101" else
-              dcfeb_fifo_out(3)(17)  when data_fifo_oe = "111111011" else
-              dcfeb_fifo_out(4)(17)  when data_fifo_oe = "111110111" else
-              dcfeb_fifo_out(5)(17)  when data_fifo_oe = "111101111" else
-              dcfeb_fifo_out(6)(17)  when data_fifo_oe = "111011111" else
-              dcfeb_fifo_out(7)(17)  when data_fifo_oe = "110111111" else
-              otmb_fifo_data_out(17) when data_fifo_oe = "101111111" else
-              alct_fifo_data_out(17) when data_fifo_oe = "011111111" else
-              '0';
-
-  -------------------------------------------------------------------------------------------
-  -- Handle data readout
-  -------------------------------------------------------------------------------------------
-
-  odmb_status_pro : process (odmb_data_sel, VME_GAP_B, VME_GA_B)
-  begin
-
-    case odmb_data_sel is
-
-      when x"02" => odmb_data <= cafifo_debug;  --cafifo_empty & cafifo_full & cafifo_state_slv & timeout_state_1
-      when x"03" => odmb_data <= cafifo_prev_next_l1a;
-      when x"04" => odmb_data <= cafifo_prev_next_l1a_match;
-      when x"05" => odmb_data <= control_debug;  --'0' & dev_cnt_svl & '0' & hdr_tail_cnt_svl & current_state_svl;
-      --debug register
-      when x"06" => odmb_data <= x"7E57";
-
-      when x"20" => odmb_data <= "0000000000" & VME_GAP_B & VME_GA_B;
-
-      when x"3A" => odmb_data <= "00000000" & cafifo_l1a_cnt(23 downto 16);
-      when x"3B" => odmb_data <= cafifo_l1a_cnt(15 downto 0);
-      when x"3C" => odmb_data <= "0000" & cafifo_bx_cnt;
-      when x"3D" => odmb_data <= cafifo_rd_addr & cafifo_wr_addr;
-      when x"3E" => odmb_data <= "0000000" & cafifo_l1a_match_in;
-
-      -- FIXME: Use dcfeb_dvalid_cnt in place of into_cafifo_dav_cnt for now
-      when x"41" => odmb_data <= dcfeb_dvalid_cnt(1);
-      when x"42" => odmb_data <= dcfeb_dvalid_cnt(2);
-      when x"43" => odmb_data <= dcfeb_dvalid_cnt(3);
-      when x"44" => odmb_data <= dcfeb_dvalid_cnt(4);
-      when x"45" => odmb_data <= dcfeb_dvalid_cnt(5);
-      when x"46" => odmb_data <= dcfeb_dvalid_cnt(6);
-      when x"47" => odmb_data <= dcfeb_dvalid_cnt(7);
-                    -- when x"48" => odmb_data <= into_cafifo_dav_cnt(8);
-                    -- when x"49" => odmb_data <= into_cafifo_dav_cnt(9);
-
-      when x"5A" => odmb_data <= ccb_cmd_reg;
-      when x"5B" => odmb_data <= ccb_data_reg;
-      when x"5C" => odmb_data <= ccb_other_reg;
-      when x"5D" => odmb_data <= ccb_rsv_reg;
-
-      when x"61" => odmb_data <= goodcrc_cnt(1);
-      when x"62" => odmb_data <= goodcrc_cnt(2);
-      when x"63" => odmb_data <= goodcrc_cnt(3);
-      when x"64" => odmb_data <= goodcrc_cnt(4);
-      when x"65" => odmb_data <= goodcrc_cnt(5);
-      when x"66" => odmb_data <= goodcrc_cnt(6);
-      when x"67" => odmb_data <= goodcrc_cnt(7);
-
-      when others => odmb_data <= (others => '1');
-    end case;
-  end process;
 
   -------------------------------------------------------------------------------------------
   -- Sub-modules
@@ -1597,7 +1414,7 @@ begin
       LVMB_SDOUT  => lvmb_sdout,
 
       OTMB        => OTMB,
-      RAWLCT      => RAWLCT(6 downto 0),
+      RAWLCT      => RAWLCT,
       OTMB_DAV    => OTMB_DAV,
       ALCT_DAV    => LEGACY_ALCT_DAV,
       OTMB_FF_CLK => OTMB_FF_CLK,
@@ -1620,8 +1437,8 @@ begin
       MUX_TRIGGER => odmb_ctrl_reg(9),
       MUX_LVMB => odmb_ctrl_reg(10),
       ODMB_PED => odmb_ctrl_reg(14 downto 13),
-      ODMB_DATA => odmb_data,
-      ODMB_DATA_SEL => odmb_data_sel,
+      ODMB_STAT_DATA => odmb_status_data,
+      ODMB_STAT_SEL => odmb_status_sel,
 
       LCT_L1A_DLY      => lct_l1a_dly,
       CABLE_DLY        => cable_dly,
@@ -1675,14 +1492,14 @@ begin
       DDUCLK    => usrclk_spy_tx,
       CMSCLK    => cmsclk,
 
-      CCB_CMD      => ccb_cmd, 
-      CCB_CMD_S    => ccb_cmd_s, 
-      CCB_DATA     => ccb_data, 
-      CCB_DATA_S   => ccb_data_s, 
-      CCB_BX0_B    => ccb_bx0_b, 
-      CCB_BXRST_B  => ccb_bx_rst_b, 
-      CCB_L1ARST_B => ccb_l1a_rst_b, 
-      CCB_CLKEN    => ccb_clken, 
+      CCB_CMD      => ccb_cmd,
+      CCB_CMD_S    => ccb_cmd_s,
+      CCB_DATA     => ccb_data,
+      CCB_DATA_S   => ccb_data_s,
+      CCB_BX0_B    => ccb_bx0_b,
+      CCB_BXRST_B  => ccb_bx_rst_b,
+      CCB_L1ARST_B => ccb_l1a_rst_b,
+      CCB_CLKEN    => ccb_clken,
 
       TEST_CCBINJ => test_inj,
       TEST_CCBPLS => test_pls,
@@ -1718,21 +1535,12 @@ begin
       KILL => "000000000",
       LCT_ERR => open,            -- To an LED in the original design
 
-      BX_DLY      => bx_dly,
+      BX_DLY     => bx_dly,
       L1ACNT_RST => l1acnt_rst,
       BXCNT_RST  => bxcnt_rst,
-      RST     => reset,
+      RST        => reset,
 
-      EOF_DATA    => eof_data,
-      ALCT_DV     => alct_fifo_data_valid,
-      OTMB_DV     => otmb_fifo_data_valid,
-      DCFEB0_DV   => dcfeb_data_valid(1),
-      DCFEB1_DV   => dcfeb_data_valid(2),
-      DCFEB2_DV   => dcfeb_data_valid(3),
-      DCFEB3_DV   => dcfeb_data_valid(4),
-      DCFEB4_DV   => dcfeb_data_valid(5),
-      DCFEB5_DV   => dcfeb_data_valid(6),
-      DCFEB6_DV   => dcfeb_data_valid(7),
+      EOF_DATA   => eof_data,
 
       EXT_DCFEB_L1A_CNT7         => open,
       DCFEB_L1A_DAV7             => open,
@@ -1746,30 +1554,64 @@ begin
       CAFIFO_L1A           => cafifo_l1a,
       CAFIFO_L1A_MATCH_IN  => cafifo_l1a_match_in,
       CAFIFO_L1A_MATCH_OUT => cafifo_l1a_match_out,
-      CAFIFO_L1A_CNT       => cafifo_l1a_cnt, 
-      CAFIFO_L1A_DAV       => cafifo_l1a_dav, 
-      CAFIFO_BX_CNT        => cafifo_bx_cnt, 
+      CAFIFO_L1A_CNT       => cafifo_l1a_cnt,
+      CAFIFO_L1A_DAV       => cafifo_l1a_dav,
+      CAFIFO_BX_CNT        => cafifo_bx_cnt,
 
       -- To GigaLinks
-      DDU_DATA            => ddu_data, 
-      DDU_DATA_VALID      => ddu_data_valid, 
-  
+      DDU_DATA            => ddu_data,
+      DDU_DATA_VALID      => ddu_data_valid,
+
       -- For headers/trailers
+      GA => vme_ga_b,
+      CRATEID => crateid,
       AUTOKILLED_DCFEBS  => "0000000",
-        
+
       -- From/To Data FIFOs
-      DATA_FIFO_RE => data_fifo_re_b,
-      DATA_FIFO_OE => data_fifo_oe,
-  
-      FIFO_OUT => fifo_out,
-      FIFO_EOF => fifo_eof,
-  
-      FIFO_EMPTY   => data_fifo_empty,  -- emptyf*(7 DOWNTO 1) - from FIFOs
-      FIFO_HALF_FULL => data_fifo_half_full,  -- 
+      FIFO_RE_B  => fifo_re_b,
+      FIFO_OE_B  => fifo_oe_b,
+      FIFO_DOUT  => fifo_dout,
+      -- FIFO_EOF => fifo_eof,
+      FIFO_EMPTY   => fifo_empty,  -- emptyf*(7 DOWNTO 1) - from FIFOs
+      FIFO_HALF_FULL => fifo_half_full
+      );
 
-      GA               => vme_ga_b,
-      CRATEID => crateid
 
+  -------------------------------------------------------------------------------------------
+  -- Constant driver for firefly selector/reset pins
+  -------------------------------------------------------------------------------------------
+
+  MBS : odmb_status
+    generic map (
+      NCFEB => NCFEB
+      )
+    port map (
+      ODMB_STAT_SEL    => odmb_status_sel,
+      ODMB_STAT_DATA   => odmb_status_data,
+
+      CMSCLK           => cmsclk,
+      DDUCLK           => usrclk_spy_tx,
+      DCFEBCLK         => usrclk_mgtc,
+
+      DCFEB_CRC_VALID  => dcfeb_crc_valid,
+      DCFEB_RXD_VALID  => dcfeb_rxd_valid,
+      DCFEB_BAD_RX     => dcfeb_bad_rx,
+      RAW_LCT          => raw_lct,
+      OTMB_DAV         => int_otmb_dav,
+      ALCT_DAV         => int_alct_dav,
+      RAW_L1A          => raw_l1a,
+      DCFEB_L1A        => odmbctrl_l1a,
+
+      EOF_DATA         => eof_data,
+      FIFO_RE_B        => fifo_re_b,
+      INTO_FIFO_DAV    => into_fifo_dav,
+      CAFIFO_L1A_MATCH => cafifo_l1a_match_in,
+      CAFIFO_L1A_DAV   => cafifo_l1a_dav,
+      CAFIFO_L1A_CNT   => cafifo_l1a_cnt,
+      CAFIFO_BX_CNT    => cafifo_bx_cnt,
+
+      L1ACNT_RST       => l1acnt_rst,
+      RESET            => reset
       );
 
   -------------------------------------------------------------------------------------------
@@ -1832,13 +1674,7 @@ begin
       sysclk       => sysclk80,
       daq_rx_n     => DAQ_RX_N(6 downto 0),
       daq_rx_p     => DAQ_RX_P(6 downto 0),
-      rxdata_feb1  => dcfeb1_data,
-      rxdata_feb2  => dcfeb2_data,
-      rxdata_feb3  => dcfeb3_data,
-      rxdata_feb4  => dcfeb4_data,
-      rxdata_feb5  => dcfeb5_data,
-      rxdata_feb6  => dcfeb6_data,
-      rxdata_feb7  => dcfeb7_data,
+      rxdata_cfeb  => dcfeb_rxdata,
       rxd_valid    => dcfeb_rxd_valid,
       crc_valid    => dcfeb_crc_valid,
       rxready      => dcfeb_rxready,

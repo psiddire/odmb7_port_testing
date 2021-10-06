@@ -18,6 +18,7 @@ package ucsb_types is
 
   -- For various counter
   type t_twobyte_arr is array (integer range <>) of std_logic_vector(15 downto 0);
+  type t_devdata_arr is array (integer range <>) of std_logic_vector(17 downto 0);
   type t_fourbyte_arr is array (integer range <>) of std_logic_vector(31 downto 0);
 
   ---- Flag for synthesis/simulation
@@ -28,6 +29,15 @@ package ucsb_types is
                                       -- synthesis translate_on
                                       ;
   constant in_synthesis : BOOLEAN := not in_simulation;
+
+  component LCTDLY is  -- Aligns RAW_LCT with L1A by 2.4 us to 4.8 us
+    port (
+      DOUT  : out std_logic;
+      CLK   : in std_logic;
+      DELAY : in std_logic_vector(5 downto 0);
+      DIN   : in std_logic
+      );
+  end component;
 
   component RESET_FIFO is
     generic (
@@ -217,8 +227,6 @@ package ucsb_types is
       DIN : in std_logic
       );
   end component;
-
-  
 
 end ucsb_types;
 

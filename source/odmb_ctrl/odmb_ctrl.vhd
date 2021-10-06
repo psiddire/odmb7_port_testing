@@ -94,22 +94,15 @@ entity ODMB_CTRL is
     EOF_DATA     : in std_logic_vector(NCFEB+2 downto 1);
 
     -- From ALCT,OTMB,DCFEBs to CAFIFO
-    ALCT_DV     : in std_logic;
-    OTMB_DV     : in std_logic;
-    DCFEB0_DV   : in std_logic;
-    --DCFEB0_DATA : in std_logic_vector(15 downto 0);
-    DCFEB1_DV   : in std_logic;
-    --DCFEB1_DATA : in std_logic_vector(15 downto 0);
-    DCFEB2_DV   : in std_logic;
-    --DCFEB2_DATA : in std_logic_vector(15 downto 0);
-    DCFEB3_DV   : in std_logic;
-    --DCFEB3_DATA : in std_logic_vector(15 downto 0);
-    DCFEB4_DV   : in std_logic;
-    --DCFEB4_DATA : in std_logic_vector(15 downto 0);
-    DCFEB5_DV   : in std_logic;
-    --DCFEB5_DATA : in std_logic_vector(15 downto 0);
-    DCFEB6_DV   : in std_logic;
-    --DCFEB6_DATA : in std_logic_vector(15 downto 0);
+    -- ALCT_DV     : in std_logic;
+    -- OTMB_DV     : in std_logic;
+    -- DCFEB0_DV   : in std_logic;
+    -- DCFEB1_DV   : in std_logic;
+    -- DCFEB2_DV   : in std_logic;
+    -- DCFEB3_DV   : in std_logic;
+    -- DCFEB4_DV   : in std_logic;
+    -- DCFEB5_DV   : in std_logic;
+    -- DCFEB6_DV   : in std_logic;
 
     EXT_DCFEB_L1A_CNT7 : out std_logic_vector(23 downto 0);
     DCFEB_L1A_DAV7     : out std_logic;
@@ -139,13 +132,10 @@ entity ODMB_CTRL is
     AUTOKILLED_DCFEBS  : in std_logic_vector(NCFEB downto 1);
       
     -- From/To Data FIFOs
-    DATA_FIFO_RE : out std_logic_vector(NCFEB+2 downto 1);
-    DATA_FIFO_OE : out std_logic_vector(NCFEB+2 downto 1);
-
-    FIFO_OUT : in std_logic_vector(15 downto 0);
-    FIFO_EOF : in std_logic;
-
-    FIFO_EMPTY   : in std_logic_vector(NCFEB+2 downto 1);  -- emptyf*(7 DOWNTO 1) - from FIFOs
+    FIFO_RE_B      : out std_logic_vector(NCFEB+2 downto 1);
+    FIFO_OE_B      : out std_logic_vector(NCFEB+2 downto 1);
+    FIFO_DOUT      : in std_logic_vector(17 downto 0);
+    FIFO_EMPTY     : in std_logic_vector(NCFEB+2 downto 1);  -- emptyf*(7 DOWNTO 1) - from FIFOs
     FIFO_HALF_FULL : in std_logic_vector(NCFEB+2 downto 1)  -- 
     );
 end ODMB_CTRL;
@@ -242,22 +232,15 @@ architecture Behavioral of ODMB_CTRL is
       pop : in std_logic;
 
       eof_data    : in std_logic_vector(NCFEB+2 downto 1);
-      alct_dv     : in std_logic;
-      otmb_dv     : in std_logic;
-      dcfeb0_dv   : in std_logic;
-      --dcfeb0_data : in std_logic_vector(15 downto 0);
-      dcfeb1_dv   : in std_logic;
-      --dcfeb1_data : in std_logic_vector(15 downto 0);
-      dcfeb2_dv   : in std_logic;
-      --dcfeb2_data : in std_logic_vector(15 downto 0);
-      dcfeb3_dv   : in std_logic;
-      --dcfeb3_data : in std_logic_vector(15 downto 0);
-      dcfeb4_dv   : in std_logic;
-      --dcfeb4_data : in std_logic_vector(15 downto 0);
-      dcfeb5_dv   : in std_logic;
-      --dcfeb5_data : in std_logic_vector(15 downto 0);
-      dcfeb6_dv   : in std_logic;
-      --dcfeb6_data : in std_logic_vector(15 downto 0);
+      -- alct_dv     : in std_logic;
+      -- otmb_dv     : in std_logic;
+      -- dcfeb0_dv   : in std_logic;
+      -- dcfeb1_dv   : in std_logic;
+      -- dcfeb2_dv   : in std_logic;
+      -- dcfeb3_dv   : in std_logic;
+      -- dcfeb4_dv   : in std_logic;
+      -- dcfeb5_dv   : in std_logic;
+      -- dcfeb6_dv   : in std_logic;
 
       cafifo_l1a_match : out std_logic_vector(NCFEB+2 downto 1);
       cafifo_l1a_cnt   : out std_logic_vector(23 downto 0);
@@ -517,23 +500,15 @@ begin
 
       eof_data => eof_data,
 
-
-      alct_dv     => alct_dv,
-      otmb_dv     => otmb_dv,
-      dcfeb0_dv   => dcfeb0_dv,
-      --dcfeb0_data => dcfeb0_data,
-      dcfeb1_dv   => dcfeb1_dv,
-      --dcfeb1_data => dcfeb1_data,
-      dcfeb2_dv   => dcfeb2_dv,
-      --dcfeb2_data => dcfeb2_data,
-      dcfeb3_dv   => dcfeb3_dv,
-      --dcfeb3_data => dcfeb3_data,
-      dcfeb4_dv   => dcfeb4_dv,
-      --dcfeb4_data => dcfeb4_data,
-      dcfeb5_dv   => dcfeb5_dv,
-      --dcfeb5_data => dcfeb5_data,
-      dcfeb6_dv   => dcfeb6_dv,
-      --dcfeb6_data => dcfeb6_data,
+      -- alct_dv     => FIFO_DAV(NCFEB+2),
+      -- otmb_dv     => FIFO_DAV(NCFEB+1),
+      -- dcfeb0_dv   => FIFO_DAV(1),
+      -- dcfeb1_dv   => FIFO_DAV(2),
+      -- dcfeb2_dv   => FIFO_DAV(3),
+      -- dcfeb3_dv   => FIFO_DAV(4),
+      -- dcfeb4_dv   => FIFO_DAV(5),
+      -- dcfeb5_dv   => FIFO_DAV(6),
+      -- dcfeb6_dv   => FIFO_DAV(7),
 
       cafifo_l1a_match => cafifo_l1a_match_out_inner,
       cafifo_l1a_cnt   => cafifo_l1a_cnt_out,
@@ -573,14 +548,14 @@ begin
       DAV  => ddu_data_valid_inner,
 
       -- to Data FIFOs
-      OEFIFO_B  => data_fifo_oe,
-      RENFIFO_B => data_fifo_re,
+      OEFIFO_B  => FIFO_OE_B,
+      RENFIFO_B => FIFO_RE_B,
 
       -- from Data FIFOs
       FIFO_HALF_FULL => fifo_half_full,
       FFOR_B         => fifo_empty,
-      DATAIN         => fifo_out(15 downto 0),
-      DATAIN_LAST    => fifo_eof,
+      DATAIN         => FIFO_DOUT(15 downto 0),
+      DATAIN_LAST    => FIFO_DOUT(17),
 
       -- From JTAGCOM
       JOEF => joef,       -- from LOADFIFO

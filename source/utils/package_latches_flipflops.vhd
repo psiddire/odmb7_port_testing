@@ -180,14 +180,6 @@ package Latches_Flipflops is
     signal DELAY : in std_logic_vector(2 downto 0);
     signal DOUT       : out std_logic);
   -----------------------------------------------------------------------------
-  procedure LCTDLY (
-    signal DIN       : in  std_logic;
-    signal CLK      : in  std_logic;
-    signal DELAY : in std_logic_vector(5 downto 0);
-    signal XL1ADLY : in std_logic_vector(1 downto 0);
-    signal L1FD : in std_logic_vector(3 downto 0);
-    signal DOUT       : out std_logic);
-  -----------------------------------------------------------------------------
   procedure PUSHDLY (
     signal DIN       : in  std_logic;
     signal CLK      : in  std_logic;
@@ -803,19 +795,6 @@ end SRL16;
   end TMPLCTDLY;
 
 -------------------------------------------------------------------------------
-
-  procedure LCTDLY (
-    signal DIN       : in  std_logic;
-    signal CLK      : in  std_logic;
-    signal DELAY : in std_logic_vector(5 downto 0);
-    signal XL1ADLY : in std_logic_vector(1 downto 0);
-    signal L1FD : in std_logic_vector(3 downto 0);
-    signal DOUT       : out std_logic) is
-  begin
-    DOUT <= DIN after 100 ps;
-  end LCTDLY;
-
-  -------------------------------------------------------------------------------
 
   procedure PUSHDLY (
     signal DIN       : in  std_logic;

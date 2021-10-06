@@ -18,8 +18,8 @@ use ieee.std_logic_misc.all;
 
 entity mgt_cfeb is
   generic (
-    NLINK     : integer range 1 to 20 := 7;  --! Number of links, same as number of DCFEBs
-    DATAWIDTH : integer := 16                --! User data width of the deserialized DCFEB data
+    NLINK     : integer range 1 to 7 := 7;   --! Number of links, same as number of DCFEBs
+    DATAWIDTH : integer range 16 to 16 := 16 --! Data width of the deserialized DCFEB data
     );
   port (
     -- Clocks
@@ -32,13 +32,7 @@ entity mgt_cfeb is
     daq_rx_p    : in  std_logic_vector(NLINK-1 downto 0); --! Connected to differential optical input signals
 
     -- Receiver signals
-    rxdata_feb1 : out std_logic_vector(DATAWIDTH-1 downto 0);  --! Data received by link1
-    rxdata_feb2 : out std_logic_vector(DATAWIDTH-1 downto 0);  --! Data received by link2
-    rxdata_feb3 : out std_logic_vector(DATAWIDTH-1 downto 0);  --! Data received by link3
-    rxdata_feb4 : out std_logic_vector(DATAWIDTH-1 downto 0);  --! Data received by link4
-    rxdata_feb5 : out std_logic_vector(DATAWIDTH-1 downto 0);  --! Data received by link5
-    rxdata_feb6 : out std_logic_vector(DATAWIDTH-1 downto 0);  --! Data received by link6
-    rxdata_feb7 : out std_logic_vector(DATAWIDTH-1 downto 0);  --! Data received by link7
+    rxdata_cfeb : out t_twobyte_arr(NLINK downto 1);      --! Data received by link with fixed data width
     rxd_valid   : out std_logic_vector(NLINK downto 1);   --! Flag for valid data
     crc_valid   : out std_logic_vector(NLINK downto 1);   --! Flag for valid CRC check
     bad_rx      : out std_logic_vector(NLINK downto 1);   --! Flag for fiber errors
@@ -212,9 +206,9 @@ architecture Behavioral of mgt_cfeb is
   signal reset_rxd_ch : std_logic_vector(NLINK-1 downto 0);
   signal rxready_int : std_logic;
 
-  type t_rxd_arr is array (integer range <>) of std_logic_vector(DATAWIDTH-1 downto 0);
-  signal rxdata_i_ch  : t_rxd_arr(NLINK-1 downto 0); -- rx userdata out of mgt wrapper
-  signal rxdata_o_ch  : t_rxd_arr(NLINK-1 downto 0); -- delayed signal from rx_frame_proc
+  -- type t_rxd_arr is array (integer range <>) of std_logic_vector(DATAWIDTH-1 downto 0);
+  signal rxdata_i_ch  : t_twobyte_arr(NLINK-1 downto 0); -- rx userdata out of mgt wrapper
+  signal rxdata_o_ch  : t_twobyte_arr(NLINK-1 downto 0); -- delayed signal from rx_frame_proc
 
   -- Preset constants
   signal rx8b10ben_int : std_logic_vector(NLINK-1 downto 0) := (others => '1');
@@ -246,15 +240,7 @@ begin
   ---------------------------------------------------------------------------------------------------------------------
   -- User data ports, shift by 1 between the channel numbers and the cfeb numbers
   ---------------------------------------------------------------------------------------------------------------------
-  RXDATA_FEB1 <= rxdata_o_ch(0);
-  RXDATA_FEB2 <= rxdata_o_ch(1);
-  RXDATA_FEB3 <= rxdata_o_ch(2);
-  RXDATA_FEB4 <= rxdata_o_ch(3);
-  RXDATA_FEB5 <= rxdata_o_ch(4);
-  u_mgt_port_assign_7 : if NLINK >= 7 generate
-    RXDATA_FEB6 <= rxdata_o_ch(5);
-    RXDATA_FEB7 <= rxdata_o_ch(6);
-  end generate;
+  RXDATA_CFEB <= rxdata_o_ch;
 
   RXD_VALID <= rxd_valid_ch and (not KILL_RXOUT) when rxready_int = '1' else (others => '0');
   CRC_VALID <= crc_valid_ch and (not KILL_RXOUT) when rxready_int = '1' else (others => '0');

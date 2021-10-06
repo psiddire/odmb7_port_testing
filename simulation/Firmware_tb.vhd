@@ -322,56 +322,53 @@ begin
 
   -- generate clock in simulation
   process
-    -- constant clk_period_by_2 : time := 1.666 ns;
-    constant clk_period_by_2 : time := 12.5 ns;
+    constant clk40_period_by_2 : time := 12.5 ns;
   begin
     while 1=1 loop
       cms_clk_fpga_p <= '0';
-      cms_clk_fpga_n <= '1';
-      wait for clk_period_by_2;
+      wait for clk40_period_by_2;
       cms_clk_fpga_p <= '1';
-      cms_clk_fpga_n <= '0';
-      wait for clk_period_by_2;
+      wait for clk40_period_by_2;
     end loop;
   end process;
 
-  ibufg_i : IBUFGDS
-    port map (
-      I => cms_clk_fpga_p,
-      IB => cms_clk_fpga_n,
-      O => sysclk --clk_in_buf
-      );
+  process
+    constant clk160_period_by_2 : time := 3.125 ns;
+  begin
+    while 1=1 loop
+      sysclk160_p <= '0';
+      wait for clk160_period_by_2;
+      sysclk160_p <= '1';
+      wait for clk160_period_by_2;
+    end loop;
+  end process;
 
-  ClockManager_i : clockManager_sim
-    port map(
-      --CLK_IN40 => clk_in_buf,
-      CLK_IN40 => sysclk,
-      CLK_OUT10 => sysclk10,
-      CLK_OUT80 => sysclk80,
-      CLK_OUT160 => sysclk160,
-      CLK_OUT125 => sysclk125
-      );
+  process
+    constant clk80_period_by_2 : time := 6.25 ns;
+  begin
+    while 1=1 loop
+      sysclk80_p <= '0';
+      wait for clk80_period_by_2;
+      sysclk80_p <= '1';
+      wait for clk80_period_by_2;
+    end loop;
+  end process;
 
-  obufds_clk80 : OBUFDS
-    port map (
-      O => sysclk80_p,
-      OB => sysclk80_n,
-      I => sysclk80
-      );
+  process
+    constant clk125_period_by_2 : time := 4 ns;
+  begin
+    while 1=1 loop
+      sysclk125_p <= '0';
+      wait for clk125_period_by_2;
+      sysclk125_p <= '1';
+      wait for clk125_period_by_2;
+    end loop;
+  end process;
 
-  obufds_clk125 : OBUFDS
-    port map (
-      O => sysclk125_p,
-      OB => sysclk125_n,
-      I => sysclk125
-      );
-
-  obufds_clk160 : OBUFDS
-    port map (
-      O => sysclk160_p,
-      OB => sysclk160_n,
-      I => sysclk160
-      );
+  cms_clk_fpga_n <= not cms_clk_fpga_p;
+  sysclk80_n <= not sysclk80_p;
+  sysclk125_n <= not sysclk125_p;
+  sysclk160_n <= not sysclk160_p;
 
   -- Input LUTs
   lut_input1_i: lut_input1
