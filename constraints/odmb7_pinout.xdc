@@ -12,6 +12,7 @@
 # - Optical TX/RX pins
 # - Optical control pins
 # - SYSMON pins
+# - PROM pins
 # - LED pins
 # --------------------------------------------------------------------------
 
@@ -675,14 +676,14 @@ set_property package_pin     T2         [get_ports  DAQ_RX_P[10]]
 set_property package_pin     T1         [get_ports  DAQ_RX_N[10]]
 set_property package_pin     P2         [get_ports  DAQ_SPY_RX_P]
 set_property package_pin     P1         [get_ports  DAQ_SPY_RX_N]
-set_property package_pin     N4         [get_ports  DAQ_TX_P[1]]
-set_property package_pin     N3         [get_ports  DAQ_TX_N[1]]
-set_property package_pin     L4         [get_ports  DAQ_TX_P[2]]
-set_property package_pin     L3         [get_ports  DAQ_TX_N[2]]
-set_property package_pin     J4         [get_ports  DAQ_TX_P[3]]
-set_property package_pin     J3         [get_ports  DAQ_TX_N[3]]
-set_property package_pin     G4         [get_ports  DAQ_TX_P[4]]
-set_property package_pin     G3         [get_ports  DAQ_TX_N[4]]
+#set_property package_pin     N4         [get_ports  DAQ_TX_P[1]]
+#set_property package_pin     N3         [get_ports  DAQ_TX_N[1]]
+#set_property package_pin     L4         [get_ports  DAQ_TX_P[2]]
+#set_property package_pin     L3         [get_ports  DAQ_TX_N[2]]
+#set_property package_pin     J4         [get_ports  DAQ_TX_P[3]]
+#set_property package_pin     J3         [get_ports  DAQ_TX_N[3]]
+#set_property package_pin     G4         [get_ports  DAQ_TX_P[4]]
+#set_property package_pin     G3         [get_ports  DAQ_TX_N[4]]
 set_property package_pin     M2         [get_ports  BCK_PRS_P]
 set_property package_pin     M1         [get_ports  BCK_PRS_N]
 set_property package_pin     K2         [get_ports  B04_RX_P[2]]
@@ -838,6 +839,22 @@ set_property PACKAGE_PIN     AF10       [get_ports ADC_DIN]
 set_property IOSTANDARD      LVCMOS18   [get_ports ADC_DIN]
 set_property PACKAGE_PIN     AG11       [get_ports ADC_DOUT]
 set_property IOSTANDARD      LVCMOS18   [get_ports ADC_DOUT]
+
+# --------------------------------------------------------------------------
+# PROM pins bank 65 (bank 0 pins controlled by STARTUPE3 module)
+# --------------------------------------------------------------------------
+set_property PACKAGE_PIN     G25        [get_ports PROM_RST_B]
+set_property IOSTANDARD      LVCMOS18   [get_ports PROM_RST_B]
+set_property PACKAGE_PIN     G26        [get_ports PROM_CS2_B]
+set_property IOSTANDARD      LVCMOS18   [get_ports PROM_CS2_B]
+set_property PACKAGE_PIN     M20        [get_ports CNFG_DATA[4]]
+set_property IOSTANDARD      LVCMOS18   [get_ports CNFG_DATA[4]]
+set_property PACKAGE_PIN     L20        [get_ports CNFG_DATA[5]]
+set_property IOSTANDARD      LVCMOS18   [get_ports CNFG_DATA[5]]
+set_property PACKAGE_PIN     R21        [get_ports CNFG_DATA[6]]
+set_property IOSTANDARD      LVCMOS18   [get_ports CNFG_DATA[6]]
+set_property PACKAGE_PIN     R22        [get_ports CNFG_DATA[7]]
+set_property IOSTANDARD      LVCMOS18   [get_ports CNFG_DATA[7]]
 
 # --------------------------------------------------------------------------
 # LED pins

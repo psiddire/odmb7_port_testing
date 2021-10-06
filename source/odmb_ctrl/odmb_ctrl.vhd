@@ -232,15 +232,6 @@ architecture Behavioral of ODMB_CTRL is
       pop : in std_logic;
 
       eof_data    : in std_logic_vector(NCFEB+2 downto 1);
-      -- alct_dv     : in std_logic;
-      -- otmb_dv     : in std_logic;
-      -- dcfeb0_dv   : in std_logic;
-      -- dcfeb1_dv   : in std_logic;
-      -- dcfeb2_dv   : in std_logic;
-      -- dcfeb3_dv   : in std_logic;
-      -- dcfeb4_dv   : in std_logic;
-      -- dcfeb5_dv   : in std_logic;
-      -- dcfeb6_dv   : in std_logic;
 
       cafifo_l1a_match : out std_logic_vector(NCFEB+2 downto 1);
       cafifo_l1a_cnt   : out std_logic_vector(23 downto 0);

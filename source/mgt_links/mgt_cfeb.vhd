@@ -19,7 +19,7 @@ use ieee.std_logic_misc.all;
 entity mgt_cfeb is
   generic (
     NLINK     : integer range 1 to 7 := 7;   --! Number of links, same as number of DCFEBs
-    DATAWIDTH : integer range 16 to 16 := 16 --! Data width of the deserialized DCFEB data
+    DATAWIDTH : integer range 16 to 16 := 16 --! User data width of the deserialized DCFEB data
     );
   port (
     -- Clocks
@@ -136,13 +136,13 @@ architecture Behavioral of mgt_cfeb is
       );
   end component;
 
-  -- Temporary debugging
-  component ila_2 is
-    port (
-      clk : in std_logic := '0';
-      probe0 : in std_logic_vector(383 downto 0) := (others=> '0')
-      );
-  end component;
+  -- -- Temporary debugging
+  -- component ila_2 is
+  --   port (
+  --     clk : in std_logic := '0';
+  --     probe0 : in std_logic_vector(383 downto 0) := (others=> '0')
+  --     );
+  -- end component;
 
   -- Synchronize the latched link down reset input and the VIO-driven signal into the free-running clock domain
   -- signals passed to wizard
@@ -206,7 +206,6 @@ architecture Behavioral of mgt_cfeb is
   signal reset_rxd_ch : std_logic_vector(NLINK-1 downto 0);
   signal rxready_int : std_logic;
 
-  -- type t_rxd_arr is array (integer range <>) of std_logic_vector(DATAWIDTH-1 downto 0);
   signal rxdata_i_ch  : t_twobyte_arr(NLINK-1 downto 0); -- rx userdata out of mgt wrapper
   signal rxdata_o_ch  : t_twobyte_arr(NLINK-1 downto 0); -- delayed signal from rx_frame_proc
 
@@ -392,7 +391,7 @@ begin
   ila_data_rx(359 downto 353) <= kill_rxpd;
   ila_data_rx(360)            <= reset;
 
-  -- mgt_cfeb_ila_inst : ila_cfeb
+  -- mgt_cfeb_ila_inst : ila_2
   --   port map(
   --     clk => gtwiz_userclk_rx_usrclk2_int,
   --     probe0 => ila_data_rx

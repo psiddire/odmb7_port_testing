@@ -6,31 +6,32 @@ use ieee.std_logic_misc.all;
 library unisim;
 use unisim.vcomponents.all;
 
+--! @brief ODMB7 clock management module
 entity odmb_clocking is
   port (
     --------------------
     -- Input ports
     --------------------
-    CMS_CLK_FPGA_P : in std_logic;      -- system clock: 40.07897 MHz
-    CMS_CLK_FPGA_N : in std_logic;      -- system clock: 40.07897 MHz
-    GP_CLK_6_P : in std_logic;          -- clock synthesizer ODIV6: 80 MHz
-    GP_CLK_6_N : in std_logic;          -- clock synthesizer ODIV6: 80 MHz
-    GP_CLK_7_P : in std_logic;          -- clock synthesizer ODIV7: 80 MHz
-    GP_CLK_7_N : in std_logic;          -- clock synthesizer ODIV7: 80 MHz
-    REF_CLK_1_P : in std_logic;         -- refclk0 to 224
-    REF_CLK_1_N : in std_logic;         -- refclk0 to 224
-    REF_CLK_2_P : in std_logic;         -- refclk0 to 227
-    REF_CLK_2_N : in std_logic;         -- refclk0 to 227
-    REF_CLK_3_P : in std_logic;         -- refclk0 to 226
-    REF_CLK_3_N : in std_logic;         -- refclk0 to 226
-    REF_CLK_4_P : in std_logic;         -- refclk0 to 225
-    REF_CLK_4_N : in std_logic;         -- refclk0 to 225
-    REF_CLK_5_P : in std_logic;         -- refclk1 to 227
-    REF_CLK_5_N : in std_logic;         -- refclk1 to 227
-    CLK_125_REF_P : in std_logic;       -- refclk1 to 226
-    CLK_125_REF_N : in std_logic;       -- refclk1 to 226
-    EMCCLK : in std_logic;              -- Low frequency, 133 MHz for SPI programing clock
-    LF_CLK : in std_logic;              -- Low frequency, 10 kHz
+    CMS_CLK_FPGA_P : in std_logic;      --! system clock: 40.07897 MHz
+    CMS_CLK_FPGA_N : in std_logic;      --! system clock: 40.07897 MHz
+    GP_CLK_6_P : in std_logic;          --! clock synthesizer ODIV6: 80 MHz
+    GP_CLK_6_N : in std_logic;          --! clock synthesizer ODIV6: 80 MHz
+    GP_CLK_7_P : in std_logic;          --! clock synthesizer ODIV7: 80 MHz
+    GP_CLK_7_N : in std_logic;          --! clock synthesizer ODIV7: 80 MHz
+    REF_CLK_1_P : in std_logic;         --! refclk0 to 224
+    REF_CLK_1_N : in std_logic;         --! refclk0 to 224
+    REF_CLK_2_P : in std_logic;         --! refclk0 to 227
+    REF_CLK_2_N : in std_logic;         --! refclk0 to 227
+    REF_CLK_3_P : in std_logic;         --! refclk0 to 226
+    REF_CLK_3_N : in std_logic;         --! refclk0 to 226
+    REF_CLK_4_P : in std_logic;         --! refclk0 to 225
+    REF_CLK_4_N : in std_logic;         --! refclk0 to 225
+    REF_CLK_5_P : in std_logic;         --! refclk1 to 227
+    REF_CLK_5_N : in std_logic;         --! refclk1 to 227
+    CLK_125_REF_P : in std_logic;       --! refclk1 to 226
+    CLK_125_REF_N : in std_logic;       --! refclk1 to 226
+    EMCCLK : in std_logic;              --! Low frequency, 133 MHz for SPI programing clock
+    LF_CLK : in std_logic;              --! Low frequency, 10 kHz
 
     --------------------
     -- Output clocks

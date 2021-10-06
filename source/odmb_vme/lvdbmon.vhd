@@ -13,8 +13,6 @@ use unisim.vcomponents.all;
 
 entity LVDBMON is  
   port (
-    CSP_LVMB_LA_CTRL : inout std_logic_vector(35 downto 0);
-
     SLOWCLK   : in std_logic;
     RST       : in std_logic;
     PON_RESET : in std_logic;           -- Power on reset

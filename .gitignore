@@ -13,6 +13,13 @@ odmb7_project/ip
 odmb7_project/odmb_project
 TestBench_odmb7
 
+project/odmb7_ucsb_dev.cache
+project/odmb7_ucsb_dev.hw
+project/odmb7_ucsb_dev.ip_user_files
+project/odmb7_ucsb_dev.runs
+project/odmb7_ucsb_dev.sim
+project/odmb7_ucsb_dev.srcs
+
 testbench/ip/xcku040-ffva1156-2-e/lut_input1/
 !testbench/ip/xcku040-ffva1156-2-e/lut_input1/*xci
 
