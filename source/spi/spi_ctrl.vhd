@@ -137,12 +137,12 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
     );
   end component;
   
-  component ila_spi
-  port (
-    clk : in std_logic;
-    probe0 : in std_logic_vector(511 downto 0)
-    );
-  end component;
+  -- component ila_spi
+  -- port (
+  --   clk : in std_logic;
+  --   probe0 : in std_logic_vector(511 downto 0)
+  --   );
+  -- end component;
 
   --CMD FIFO signals
   signal cmd_fifo_empty   : std_logic := '1';
@@ -246,11 +246,12 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
 
 begin
 
-  ila_spi_i : ila_spi
-    PORT MAP (
-      clk => CLK40,
-      probe0 => ila_probe
-    );
+  -- ila_spi_i : ila_spi
+  --   PORT MAP (
+  --     clk => CLK40,
+  --     probe0 => ila_probe
+  --   );
+
   ila_probe(0) <= CMD_FIFO_WRITE_EN;
   ila_probe(16 downto 1) <= CMD_FIFO_IN;
   ila_probe(32 downto 17) <= cmd_fifo_out;

@@ -211,7 +211,6 @@ entity odmb7_ucsb_dev is
     --------------------------------
     SYSMON_P      : in std_logic_vector(15 downto 0);      --! Current monitoring analog signals from monitor ICs to SYSTEM_MON in VME module. Connected to bank 64.
     SYSMON_N      : in std_logic_vector(15 downto 0);      --! Current monitoring analog signals from monitor ICs to SYSTEM_MON in VME module. Connected to bank 64.
-
     ADC_CS_B      : out std_logic_vector(4 downto 0);      --! SPI chip select signals to voltage monitor ADCs used by SYSTEM_MON in VME module. Connected to bank 64.
     ADC_DIN       : out std_logic;                         --! SPI input signal to voltage monitor ADCs used by SYSTEM_MON in VME module. Connected to bank 64.
     ADC_SCK       : out std_logic;                         --! SPI clock signal to voltage monitor ADCs used by SYSTEM_MON in VME module. Connected to bank 64.
@@ -341,7 +340,7 @@ architecture Behavioral of odmb7_ucsb_dev is
       ODMB_TDI    : out std_logic;
       ODMB_TDO    : in  std_logic;
       ODMB_SEL    : out std_logic;
-      ODMB_INITJTAG : in std_logic;   -- TODO: where does this fit in
+      ODMB_INITJTAG : in std_logic;
 
       --------------------
       -- From/To LVMB: ODMB & ODMB7 design, ODMB5 to be seen
@@ -537,8 +536,6 @@ architecture Behavioral of odmb7_ucsb_dev is
 
       EOF_DATA    : in std_logic_vector(NCFEB+2 downto 1);
 
-      EXT_DCFEB_L1A_CNT7 : out std_logic_vector(23 downto 0);
-      DCFEB_L1A_DAV7     : out std_logic;
       CAFIFO_PREV_NEXT_L1A_MATCH : out std_logic_vector(15 downto 0);
       CAFIFO_PREV_NEXT_L1A       : out std_logic_vector(15 downto 0);
       CONTROL_DEBUG              : out std_logic_vector(15 downto 0);
@@ -646,7 +643,15 @@ architecture Behavioral of odmb7_ucsb_dev is
       CAFIFO_L1A_CNT   : in std_logic_vector(23 downto 0);
       CAFIFO_BX_CNT    : in std_logic_vector(11 downto 0);
 
+      CCB_CMD_BXEV     : in  std_logic_vector(7 downto 0);
+      CCB_CMD_S        : in  std_logic;       -- ccbcmnd(6) - from J3
+      CCB_DATA         : in  std_logic_vector(7 downto 0);  -- ccbdata(7 downto 0) - from J3
+      CCB_DATA_S       : in  std_logic;       -- ccbdata(8) - from J3
+      CCB_RSV          : in  std_logic_vector(10 downto 0);
+      CCB_OTHER        : in  std_logic_vector(10 downto 0);
+
       L1ACNT_RST       : in std_logic;
+      PON_RESET        : in std_logic;
       RESET            : in std_logic  --! Global reset
       );
   end component;
@@ -823,16 +828,9 @@ architecture Behavioral of odmb7_ucsb_dev is
   --------------------------------------
   -- CCB production test signals
   --------------------------------------
-
   signal ccb_cmd_bxev    : std_logic_vector(7 downto 0) := (others => '0');
-  signal ccb_cmd_reg     : std_logic_vector(15 downto 0) := (others => '0');
-  signal ccb_data_reg    : std_logic_vector(15 downto 0) := (others => '0');
-  signal ccb_rsv         : std_logic_vector(15 downto 0) := (others => '0');
-  signal ccb_other       : std_logic_vector(15 downto 0) := (others => '0');
-  signal ccb_rsv_reg     : std_logic_vector(15 downto 0) := (others => '0');
-  signal ccb_other_reg   : std_logic_vector(15 downto 0) := (others => '0');
-  signal ccb_rsv_reg_b   : std_logic_vector(15 downto 0) := (others => '0');
-  signal ccb_other_reg_b : std_logic_vector(15 downto 0) := (others => '0');
+  signal ccb_rsv         : std_logic_vector(10 downto 0) := (others => '0');
+  signal ccb_other       : std_logic_vector(10 downto 0) := (others => '0');
 
   --------------------------------------
   -- LVMB signals
@@ -1353,26 +1351,14 @@ begin
   -------------------------------------------------------------------------------------------
   -- Handle CCB production test
   -------------------------------------------------------------------------------------------
-
   -- Unused
   CCB_L1A_RLS <= '0';
 
   -- From CCB - for production tests
   ccb_cmd_bxev <= CCB_CMD & CCB_EVCNTRES_B & CCB_BX_RST_B;
-  GEN_CCB : for index in 0 to 7 generate
-    FDCMD : FDC port map(Q => ccb_cmd_reg(index), C => CCB_CMD_S, CLR => reset, D => ccb_cmd_bxev(index));
-    FDDAT : FDC port map(Q => ccb_data_reg(index), C => CCB_DATA_S, CLR => reset, D => CCB_DATA(index));
-  end generate GEN_CCB;
-
-  ccb_rsv   <= "00000" & CCB_CRSV(3 downto 0) & CCB_DRSV(1 downto 0) & CCB_RSVO(4 downto 0);
-  ccb_other <= "00000" & CCB_CAL(2 downto 0) & CCB_BX0_B & CCB_BX_RST_B & CCB_L1A_RST_B & CCB_L1A_B
-               & CCB_CLKEN & CCB_EVCNTRES_B & CCB_CMD_S & CCB_DATA_S;
-  GEN_CCB_FD : for index in 0 to 15 generate
-    FDOTHER : FDC port map(Q => ccb_other_reg(index), C => ccb_other(index), CLR => reset, D => ccb_other_reg_b(index));
-    FDRSV   : FDC port map(Q => ccb_rsv_reg(index), C => ccb_rsv(index), CLR => reset, D => ccb_rsv_reg_b(index));
-    ccb_other_reg_b(index) <= not ccb_other_reg(index);
-    ccb_rsv_reg_b(index)   <= not ccb_rsv_reg(index);
-  end generate GEN_CCB_FD;
+  ccb_rsv      <= CCB_CRSV(3 downto 0) & CCB_DRSV(1 downto 0) & CCB_RSVO(4 downto 0);
+  ccb_other    <= CCB_CAL(2 downto 0) & CCB_BX0_B & CCB_BX_RST_B & CCB_L1A_RST_B & CCB_L1A_B
+                  & CCB_CLKEN & CCB_EVCNTRES_B & CCB_CMD_S & CCB_DATA_S;
 
   -------------------------------------------------------------------------------------------
   -- Handle reset signals
@@ -1485,8 +1471,8 @@ begin
 
       LCT_L1A_DLY      => lct_l1a_dly,
       CABLE_DLY        => cable_dly,
-      OTMB_PUSH_DLY    => OTMB_PUSH_DLY,
-      ALCT_PUSH_DLY    => ALCT_PUSH_DLY,
+      OTMB_PUSH_DLY    => otmb_push_dly,
+      ALCT_PUSH_DLY    => alct_push_dly,
       BX_DLY           => bx_dly,
       INJ_DLY          => inj_dly,
       EXT_DLY          => ext_dly,
@@ -1557,8 +1543,8 @@ begin
       INJ_DLY     => inj_dly,
       EXT_DLY     => ext_dly,
       CALLCT_DLY  => callct_dly,
-      OTMB_PUSH_DLY => OTMB_PUSH_DLY,
-      ALCT_PUSH_DLY => ALCT_PUSH_DLY,
+      OTMB_PUSH_DLY => otmb_push_dly,
+      ALCT_PUSH_DLY => alct_push_dly,
       PUSH_DLY      => push_dly,
 
       CAL_MODE => odmb_ctrl_reg(0),
@@ -1566,7 +1552,7 @@ begin
       PEDESTAL_OTMB => odmb_ctrl_reg(14),
 
       RAW_L1A => raw_l1a,
-      RAWLCT => raw_lct,
+      RAWLCT  => raw_lct,
 
       OTMB_DAV => int_otmb_dav,         -- lctdav1 - from J4
       ALCT_DAV => int_alct_dav,         -- lctdav2 - from J4
@@ -1580,7 +1566,7 @@ begin
       OTMB_DAV_SYNC_OUT => open,
 
       DIAGOUT => open,
-      KILL => "000000000",
+      KILL    => kill,
       LCT_ERR => open,            -- To an LED in the original design
 
       BX_DLY     => bx_dly,
@@ -1590,8 +1576,6 @@ begin
 
       EOF_DATA   => eof_data,
 
-      EXT_DCFEB_L1A_CNT7         => open,
-      DCFEB_L1A_DAV7             => open,
       CAFIFO_PREV_NEXT_L1A_MATCH => cafifo_prev_next_l1a_match,
       CAFIFO_PREV_NEXT_L1A       => cafifo_prev_next_l1a,
       CONTROL_DEBUG              => control_debug,
@@ -1658,7 +1642,15 @@ begin
       CAFIFO_L1A_CNT   => cafifo_l1a_cnt,
       CAFIFO_BX_CNT    => cafifo_bx_cnt,
 
+      CCB_CMD_BXEV     => ccb_cmd_bxev,
+      CCB_CMD_S        => CCB_CMD_S,
+      CCB_DATA         => CCB_DATA,
+      CCB_DATA_S       => CCB_DATA_S,
+      CCB_RSV          => ccb_rsv,
+      CCB_OTHER        => ccb_other,
+
       L1ACNT_RST       => l1acnt_rst,
+      PON_RESET        => pon_reset,
       RESET            => reset
       );
 

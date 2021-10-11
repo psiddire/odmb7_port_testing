@@ -18,29 +18,28 @@ use unimacro.vcomponents.all;
 
 entity cafifo is
   generic (
-    NCFEB        : integer range 1 to 7   := 7;  -- Number of DCFEBS, 7 in the final design
+    NCFEB       : integer range 1 to 7   := 7;  -- Number of DCFEBS, 7 in the final design
     CAFIFO_SIZE : integer range 1 to 128 := 128  -- Number of CAFIFO words
     );
   port(
 
     --CSP_FREE_AGENT_PORT_LA_CTRL : inout std_logic_vector(35 downto 0);
-    CLK                         : in    std_logic;
-    DDUCLK                      : in    std_logic;
-    L1ACNT_RST                  : in    std_logic;
-    BXCNT_RST                   : in    std_logic;
+    CLK        : in std_logic;
+    DDUCLK     : in std_logic;
+    L1ACNT_RST : in std_logic;
+    BXCNT_RST  : in std_logic;
 
-    BC0     : in std_logic;
-    CCB_BX0 : in std_logic;
-    BXRST   : in std_logic;
-    BX_DLY  : in integer range 0 to 4095;
-    PUSH_DLY  : in integer range 0 to 63;
+    BC0        : in std_logic;
+    CCB_BX0    : in std_logic;
+    BXRST      : in std_logic;
+    BX_DLY     : in integer range 0 to 4095;
+    PUSH_DLY   : in integer range 0 to 63;
 
     l1a          : in std_logic;
     l1a_match_in : in std_logic_vector(NCFEB+2 downto 1);
 
-    pop : in std_logic;
-
-    eof_data    : in std_logic_vector(NCFEB+2 downto 1);
+    pop          : in std_logic;
+    eof_data     : in std_logic_vector(NCFEB+2 downto 1);
 
     cafifo_l1a_match : out std_logic_vector(NCFEB+2 downto 1);
     cafifo_l1a_cnt   : out std_logic_vector(23 downto 0);
@@ -48,9 +47,6 @@ entity cafifo is
     cafifo_bx_cnt    : out std_logic_vector(11 downto 0);
     cafifo_lost_pckt : out std_logic_vector(NCFEB+2 downto 1);
     cafifo_lone      : out std_logic;
-
-    ext_dcfeb_l1a_cnt7 : out std_logic_vector(23 downto 0);
-    dcfeb_l1a_dav7     : out std_logic;
 
     cafifo_prev_next_l1a_match : out std_logic_vector(15 downto 0);
     cafifo_prev_next_l1a       : out std_logic_vector(15 downto 0);
@@ -123,9 +119,6 @@ architecture cafifo_architecture of cafifo is
   type l1a_array_type is array (CAFIFO_SIZE-1 downto 0) of std_logic_vector(NCFEB+2 downto 1);
   signal l1a_match          : l1a_array_type;
   signal l1a_dav, lost_pckt : l1a_array_type := ((others => (others => '0')));
-
-  type wrd_cnt_array_type is array (NCFEB+2 downto 1) of std_logic_vector(8 downto 0);
-  signal l1acnt_dav_fifo_rd_cnt, l1acnt_dav_fifo_wr_cnt : wrd_cnt_array_type;
 
   signal l1acnt_dav_fifo_empty, l1acnt_dav_fifo_full  : std_logic_vector(NCFEB+2 downto 1);
   signal l1acnt_dav_fifo_wr_en, l1acnt_dav_fifo_rd_en : std_logic_vector(NCFEB+2 downto 1);
@@ -208,21 +201,21 @@ begin
   FDLONED      : FD port map(Q => lone_in_reg_d, C => CLK, D => lone_in);
   FDLONE       : FD port map(Q => lone_in_reg, C => CLK, D => lone_in_reg_d);
   GEN_L1AM_REG : for dev in 1 to NCFEB+2 generate
-    FDL1AMD       : FD port map(Q => l1a_match_in_reg_d(dev), C=> CLK, D => l1a_match_in(dev));
-    FDL1AM        : FD port map(Q => l1a_match_in_reg(dev), C => CLK, D => l1a_match_in_reg_d(dev));
-    CF_L1AM_FD    : FDC port map(Q => current_l1a_match_d(dev), C => clk, CLR => L1ACNT_RST, D => current_l1a_match(dev));
-    CF_L1AM_FDD   : FDC port map(Q => current_l1a_match_dd(dev), C => clk, CLR => L1ACNT_RST, D => current_l1a_match_d(dev));
-    CF_L1AM_CROSS : CROSSCLOCK port map(DOUT => CAFIFO_L1A_MATCH(dev), CLK_DOUT => dduclk, CLK_DIN => clk, RST => L1ACNT_RST, DIN => current_l1a_match_dd(dev));
-    CF_DAV_CROSS  : CROSSCLOCK port map(DOUT => CAFIFO_L1A_DAV(dev), CLK_DOUT => dduclk, CLK_DIN => clk, RST => L1ACNT_RST, DIN => current_l1a_dav(dev));
-    CF_LOST_CROSS : CROSSCLOCK port map(DOUT => CAFIFO_LOST_PCKT(dev), CLK_DOUT => dduclk, CLK_DIN => clk, RST => L1ACNT_RST, DIN => current_lost_pckt(dev));
+    FDL1AMD       : FD port map(Q => l1a_match_in_reg_d(dev), C => CLK, D => l1a_match_in(dev));
+    FDL1AM        : FD port map(Q => l1a_match_in_reg(dev),   C => CLK, D => l1a_match_in_reg_d(dev));
+    CF_L1AM_FD    : FDC port map(Q => current_l1a_match_d(dev),  C => CLK, CLR => L1ACNT_RST, D => current_l1a_match(dev));
+    CF_L1AM_FDD   : FDC port map(Q => current_l1a_match_dd(dev), C => CLK, CLR => L1ACNT_RST, D => current_l1a_match_d(dev));
+    CF_L1AM_CROSS : CROSSCLOCK port map(DOUT => CAFIFO_L1A_MATCH(dev), CLK_DOUT => DDUCLK, CLK_DIN => CLK, RST => L1ACNT_RST, DIN => current_l1a_match_dd(dev));
+    CF_DAV_CROSS  : CROSSCLOCK port map(DOUT => CAFIFO_L1A_DAV(dev),   CLK_DOUT => DDUCLK, CLK_DIN => CLK, RST => L1ACNT_RST, DIN => current_l1a_dav(dev));
+    CF_LOST_CROSS : CROSSCLOCK port map(DOUT => CAFIFO_LOST_PCKT(dev), CLK_DOUT => DDUCLK, CLK_DIN => CLK, RST => L1ACNT_RST, DIN => current_lost_pckt(dev));
   end generate GEN_L1AM_REG;
   GEN_BX_REG : for dev in 0 to 11 generate
     FDL1AMD     : FD port map(Q => bx_cnt_out_reg_d(dev), C => CLK, D => bx_cnt_out(dev));
-    FDL1AM      : FD port map(Q => bx_cnt_out_reg(dev), C => CLK, D => bx_cnt_out_reg_d(dev));
-    CF_BX_CROSS : CROSSCLOCK port map(DOUT => CAFIFO_BX_CNT(dev), CLK_DOUT => dduclk, CLK_DIN => clk, RST => L1ACNT_RST, DIN => current_bx_cnt(dev));
+    FDL1AM      : FD port map(Q => bx_cnt_out_reg(dev),   C => CLK, D => bx_cnt_out_reg_d(dev));
+    CF_BX_CROSS : CROSSCLOCK port map(DOUT => CAFIFO_BX_CNT(dev), CLK_DOUT => DDUCLK, CLK_DIN => CLK, RST => L1ACNT_RST, DIN => current_bx_cnt(dev));
   end generate GEN_BX_REG;
   GEN_L1A_REG : for dev in 0 to 23 generate
-    CF_L1A_CROSS : CROSSCLOCK port map(DOUT => CAFIFO_L1A_CNT(dev), CLK_DOUT => dduclk, CLK_DIN => clk, RST => L1ACNT_RST, DIN => current_l1a_cnt(dev));
+    CF_L1A_CROSS : CROSSCLOCK port map(DOUT => CAFIFO_L1A_CNT(dev), CLK_DOUT => DDUCLK, CLK_DIN => CLK, RST => L1ACNT_RST, DIN => current_l1a_cnt(dev));
   end generate GEN_L1A_REG;
 
   current_l1a_match <= l1a_match(rd_addr_out);
@@ -232,9 +225,9 @@ begin
   current_l1a_dav   <= l1a_dav(rd_addr_out);
   current_lost_pckt <= lost_pckt(rd_addr_out);
 
-  CF_LONE_FD    : FDC port map(Q => current_lone_d, C => clk, CLR => L1ACNT_RST, D => current_lone);
-  CF_LONE_FDD   : FDC port map(Q => current_lone_dd, C => clk, CLR => L1ACNT_RST, D => current_lone_d);
-  CF_LONE_CROSS : CROSSCLOCK port map(DOUT => CAFIFO_LONE, CLK_DOUT => dduclk, CLK_DIN => clk, RST => L1ACNT_RST, DIN => current_lone_dd);
+  CF_LONE_FD    : FDC port map(Q => current_lone_d, C => CLK, CLR => L1ACNT_RST, D => current_lone);
+  CF_LONE_FDD   : FDC port map(Q => current_lone_dd, C => CLK, CLR => L1ACNT_RST, D => current_lone_d);
+  CF_LONE_CROSS : CROSSCLOCK port map(DOUT => CAFIFO_LONE, CLK_DOUT => DDUCLK, CLK_DIN => CLK, RST => L1ACNT_RST, DIN => current_lone_dd);
 
 -------------------- L1A Counter        --------------------
 
@@ -318,7 +311,7 @@ begin
 
 --------------------------- GENERATE DAVS and LOSTS  -------------------------------
 
-  L1ARESETPULSE  : NPULSE2SAME port map(DOUT => l1acnt_fifo_rst, CLK_DOUT => clk, RST => '0', NPULSE => 5, DIN => l1acnt_rst);
+  L1ARESETPULSE  : NPULSE2SAME port map(DOUT => l1acnt_fifo_rst, CLK_DOUT => CLK, RST => '0', NPULSE => 5, DIN => l1acnt_rst);
   GEN_L1ACNT_DAV : for dev in 1 to NCFEB+2 generate
     l1acnt_dav_fifo_wr_en(dev) <= l1a_match_in_reg(dev);
     l1acnt_dav_fifo_in(dev)    <= l1a_cnt_out;
@@ -608,16 +601,16 @@ begin
   -- Generate BX_CNT
   DS_BX0_PUSH : DELAY_SIGNAL port map(DOUT => ccb_bx0_delayed, CLK => CLK, NCYCLES => PUSH_DLY, DIN => CCB_BX0);
   bx_cnt_clr <= BC0 or BXRST or ccb_bx0_delayed;
-  bx_default <= nbx_dmb_odmb + bx_dly when bx_dly < nbx_lhc_orbit-nbx_dmb_odmb else
-                nbx_dmb_odmb + bx_dly - nbx_lhc_orbit when bx_dly < nbx_lhc_orbit else
-                nbx_dmb_odmb;  -- bx_dly set to 0 if greater than nbx_lhc_orbit
+  -- bx_default <= NBX_DMB_ODMB + BX_DLY when NBX_DMB_ODMB + BX_DLY < NBX_LHC_ORBIT else
+  --               NBX_DMB_ODMB + BX_DLY - NBX_LHC_ORBIT when BX_DLY < NBX_LHC_ORBIT else
+  --               NBX_DMB_ODMB;  -- bx_dly set to 0 if greater than nbx_lhc_orbit
   bx_cnt_proc : process (CLK, bx_cnt_clr)
   begin
     if rising_edge(CLK) then
       if bx_cnt_clr = '1' then
---        bx_cnt_int <= bx_default;
+        -- bx_cnt_int <= bx_default;
         bx_cnt_int <= 0;
-      elsif bx_cnt_int = nbx_lhc_orbit-1 then
+      elsif bx_cnt_int = NBX_LHC_ORBIT-1 then
         bx_cnt_int <= 0;
       else
         bx_cnt_int <= bx_cnt_int + 1;

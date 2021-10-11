@@ -435,32 +435,46 @@ begin
   -------------------------------------------------------------------------------------------
 
   -- Use for loop to decode one-hot code of variable length (may not be the most efficient way)
-  l_fifo_out : process (FIFO_OE_B)
-  begin
-    FIFO_DOUT <= (others => '0');
-    for i in 1 to NCFEB loop
-      if (FIFO_OE_B(i) = '0') then
-        FIFO_DOUT <= dcfeb_fifo_out(I);
-      end if;
-    end loop;
-    if (FIFO_OE_B(NCFEB+1) = '0') then
-      FIFO_DOUT <= otmb_fifo_data_out;
-    end if;
-    if (FIFO_OE_B(NCFEB+2) = '0') then
-      FIFO_DOUT <= alct_fifo_data_out;
-    end if;
-  end process;
+  -- l_fifo_out : process (FIFO_OE_B)
+  -- begin
+  --   FIFO_DOUT <= (others => '0');
+  --   for i in 1 to NCFEB loop
+  --     if (FIFO_OE_B(i) = '0') then
+  --       FIFO_DOUT <= dcfeb_fifo_out(I);
+  --     end if;
+  --   end loop;
+  --   if (FIFO_OE_B(NCFEB+1) = '0') then
+  --     FIFO_DOUT <= otmb_fifo_data_out;
+  --   end if;
+  --   if (FIFO_OE_B(NCFEB+2) = '0') then
+  --     FIFO_DOUT <= alct_fifo_data_out;
+  --   end if;
+  -- end process;
 
-  -- fifo_data <= dcfeb_fifo_out(1)  when FIFO_OE_B = "111111110" else
-  --              dcfeb_fifo_out(2)  when FIFO_OE_B = "111111101" else
-  --              dcfeb_fifo_out(3)  when FIFO_OE_B = "111111011" else
-  --              dcfeb_fifo_out(4)  when FIFO_OE_B = "111110111" else
-  --              dcfeb_fifo_out(5)  when FIFO_OE_B = "111101111" else
-  --              dcfeb_fifo_out(6)  when FIFO_OE_B = "111011111" else
-  --              dcfeb_fifo_out(7)  when FIFO_OE_B = "110111111" else
-  --              otmb_fifo_data_out when FIFO_OE_B = "101111111" else
-  --              alct_fifo_data_out when FIFO_OE_B = "011111111" else
-  --              (others => '0');
+  u_dout_assign_7 : if NCFEB = 7 generate
+    FIFO_DOUT <= dcfeb_fifo_out(1)  when FIFO_OE_B = "111111110" else
+                 dcfeb_fifo_out(2)  when FIFO_OE_B = "111111101" else
+                 dcfeb_fifo_out(3)  when FIFO_OE_B = "111111011" else
+                 dcfeb_fifo_out(4)  when FIFO_OE_B = "111110111" else
+                 dcfeb_fifo_out(5)  when FIFO_OE_B = "111101111" else
+                 dcfeb_fifo_out(6)  when FIFO_OE_B = "111011111" else
+                 dcfeb_fifo_out(7)  when FIFO_OE_B = "110111111" else
+                 otmb_fifo_data_out when FIFO_OE_B = "101111111" else
+                 alct_fifo_data_out when FIFO_OE_B = "011111111" else
+                 (others => '0');
+  end generate;
+
+  u_dout_assign_5 : if NCFEB = 5 generate
+    FIFO_DOUT <= dcfeb_fifo_out(1)  when FIFO_OE_B = "1111110" else
+                 dcfeb_fifo_out(2)  when FIFO_OE_B = "1111101" else
+                 dcfeb_fifo_out(3)  when FIFO_OE_B = "1111011" else
+                 dcfeb_fifo_out(4)  when FIFO_OE_B = "1110111" else
+                 dcfeb_fifo_out(5)  when FIFO_OE_B = "1101111" else
+                 otmb_fifo_data_out when FIFO_OE_B = "1011111" else
+                 alct_fifo_data_out when FIFO_OE_B = "0111111" else
+                 (others => '0');
+  end generate;
+
   -- fifo_empty <= alct_fifo_empty & otmb_fifo_empty & dcfeb_fifo_empty;
 
 end ODMB_DATA_ARCH;

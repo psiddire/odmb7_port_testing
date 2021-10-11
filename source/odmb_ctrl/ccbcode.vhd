@@ -58,14 +58,12 @@ architecture CCBCODE_arch of CCBCODE is
   signal PLSINJEN_1 : std_logic;
   signal PLSINJEN_RST : std_logic;
   signal PLSINJEN_INV : std_logic;
-  signal BX0_1 : std_logic;
-  signal BXRST_1 : std_logic;
-  signal CLKEN_1 : std_logic;
-  signal L1ARST_1 : std_logic;
+  signal BX0_B : std_logic;
+  signal BXRST_B : std_logic;
+  signal CLKEN_B : std_logic;
+  signal L1ARST_B : std_logic;
 
   signal LOGICH : std_logic := '1';
-
-  signal cmsclk_b : std_logic := '0';
 
   -- commands implemented in this architecture
   -- 111110 ---> generate BC0
@@ -78,25 +76,24 @@ architecture CCBCODE_arch of CCBCODE is
 
 begin
 
-  cmsclk_b <= not cmsclk;
   -- generate RSTDATA replace with the following (apparently NOT used)
---  RSTDATA <= '1' when (CCB_CMD_S = '0' and CCB_DATA(7 downto 1) = "1010101") else '0';
+  -- RSTDATA <= '1' when (CCB_CMD_S = '0' and CCB_DATA(7 downto 1) = "1010101") else '0';
 
   -- generate BC0
   BC0_CMD <= '1' when (CCB_CMD_S = '0' and CCB_CMD(5 downto 0) = "111110") else '0';
   BC0_GEN: FDC port map (Q => BC0_INNER, C => CMSCLK, CLR => BC0_RST, D => BC0_CMD);
-  BC0_RST_GEN : FD_1 port map (Q => BC0_RST, C => CMSCLK_B, D => BC0_INNER);
+  BC0_RST_GEN : FD_1 port map (Q => BC0_RST, C => CMSCLK, D => BC0_INNER);
   BC0 <= BC0_INNER;
   
   -- generate START_TRG command
   START_TRG_CMD <= '1' when (CCB_CMD_S = '0' and   CCB_CMD(5 downto 0) = "111001") else '0';
   START_TRG_GEN : FDC port map (Q => START_TRG_INNER, C => CMSCLK, CLR => START_TRG_RST,  D => START_TRG_CMD);
-  START_TRG_RST_GEN : FD_1 port map (Q => START_TRG_RST, C => CMSCLK_B, D => START_TRG_INNER);
+  START_TRG_RST_GEN : FD_1 port map (Q => START_TRG_RST, C => CMSCLK, D => START_TRG_INNER);
 
   -- generate STOP_TRG command
   STOP_TRG_CMD <= '1' when (CCB_CMD_S = '0' and   CCB_CMD(5 downto 0) = "111000") else '0';
   STOP_TRG_GEN : FDC port map (Q => STOP_TRG_INNER, C => CMSCLK, CLR => STOP_TRG_RST,  D => STOP_TRG_CMD);
-  STOP_TRG_RST_GEN : FD_1 port map (Q => STOP_TRG_RST, C => CMSCLK_B, D => STOP_TRG_INNER);
+  STOP_TRG_RST_GEN : FD_1 port map (Q => STOP_TRG_RST, C => CMSCLK, D => STOP_TRG_INNER);
 
   -- generate L1ASRST
   L1ASRST_CMD <= '1' when (CCB_CMD(5 downto 0) = "111100" and CCB_CMD_S = '0') else '0';
@@ -121,15 +118,15 @@ begin
   
   TTCCAL <= TTCCAL_INNER;
   
-  -- generate BX0, BXRST, CLKENA, L1ARST
-  BX0_GEN : FD port map(Q => BX0_1  , C => CMSCLK  , D => CCB_BX0_B  );
-  BXRST_GEN: FD port map(Q => BXRST_1 , C => CMSCLK, D => CCB_BXRST_B );
-  CLKEN_GEN : FD port map(Q => CLKEN_1, C => CMSCLK, D => CCB_CLKEN);
-  L1ARST_GEN : FD port map(Q => L1ARST_1, C => CMSCLK, D => CCB_L1ARST_B);
+  -- generate BX0, BXRST, CLKENA, L1ARST latch
+  BX0_IFD    : FD port map(Q => BX0_B,    C => CMSCLK, D => CCB_BX0_B);
+  BXRST_IFD  : FD port map(Q => BXRST_B,  C => CMSCLK, D => CCB_BXRST_B);
+  CLKEN_IFD  : FD port map(Q => CLKEN_B,  C => CMSCLK, D => CCB_CLKEN);
+  L1ARST_IFD : FD port map(Q => L1ARST_B, C => CMSCLK, D => CCB_L1ARST_B);
 
-  BX0    <= not BX0_1;
-  BXRST  <= not BXRST_1;
-  CLKEN <= not CLKEN_1;
-  L1ARST <= not L1ARST_1;
+  BX0    <= not BX0_B;
+  BXRST  <= not BXRST_B;
+  CLKEN  <= not CLKEN_B;
+  L1ARST <= not L1ARST_B;
 
 end CCBCODE_arch;

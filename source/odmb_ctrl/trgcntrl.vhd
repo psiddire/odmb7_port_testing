@@ -51,7 +51,7 @@ architecture TRGCNTRL_Arch of TRGCNTRL is
   signal DLY_LCT, LCT, LCT_IN : std_logic_vector(NCFEB downto 0);
   signal RAW_L1A_Q, L1A_IN    : std_logic;
   signal L1A                  : std_logic;
-  type   LCT_TYPE is array (NCFEB downto 0) of std_logic_vector(4 downto 0);
+  type   LCT_TYPE is array (NCFEB downto 1) of std_logic_vector(4 downto 0);
   signal LCT_Q                : LCT_TYPE;
   signal LCT_ERR_D            : std_logic;
   signal L1A_MATCH            : std_logic_vector(NCFEB downto 1);

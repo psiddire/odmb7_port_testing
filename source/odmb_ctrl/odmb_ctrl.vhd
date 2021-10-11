@@ -79,6 +79,7 @@ entity ODMB_CTRL is
 
     ALCT_DAV_SYNC_OUT : out std_logic;
     OTMB_DAV_SYNC_OUT : out std_logic;
+
     --------------------
     -- Other
     --------------------
@@ -86,26 +87,13 @@ entity ODMB_CTRL is
     KILL        : in std_logic_vector(NCFEB+2 downto 1);
     LCT_ERR     : out std_logic;            -- To an LED in the original design
 
-    BX_DLY        : in integer range 0 to 4095;
+    BX_DLY      : in integer range 0 to 4095;
     L1ACNT_RST  : in std_logic;
     BXCNT_RST   : in std_logic;
     RST         : in std_logic;
 
-    EOF_DATA     : in std_logic_vector(NCFEB+2 downto 1);
+    EOF_DATA    : in std_logic_vector(NCFEB+2 downto 1);
 
-    -- From ALCT,OTMB,DCFEBs to CAFIFO
-    -- ALCT_DV     : in std_logic;
-    -- OTMB_DV     : in std_logic;
-    -- DCFEB0_DV   : in std_logic;
-    -- DCFEB1_DV   : in std_logic;
-    -- DCFEB2_DV   : in std_logic;
-    -- DCFEB3_DV   : in std_logic;
-    -- DCFEB4_DV   : in std_logic;
-    -- DCFEB5_DV   : in std_logic;
-    -- DCFEB6_DV   : in std_logic;
-
-    EXT_DCFEB_L1A_CNT7 : out std_logic_vector(23 downto 0);
-    DCFEB_L1A_DAV7     : out std_logic;
     CAFIFO_PREV_NEXT_L1A_MATCH : out std_logic_vector(15 downto 0);
     CAFIFO_PREV_NEXT_L1A       : out std_logic_vector(15 downto 0);
     CONTROL_DEBUG              : out std_logic_vector(15 downto 0);
@@ -229,9 +217,8 @@ architecture Behavioral of ODMB_CTRL is
       l1a          : in std_logic;
       l1a_match_in : in std_logic_vector(NCFEB+2 downto 1);
 
-      pop : in std_logic;
-
-      eof_data    : in std_logic_vector(NCFEB+2 downto 1);
+      pop          : in std_logic;
+      eof_data     : in std_logic_vector(NCFEB+2 downto 1);
 
       cafifo_l1a_match : out std_logic_vector(NCFEB+2 downto 1);
       cafifo_l1a_cnt   : out std_logic_vector(23 downto 0);
@@ -239,9 +226,6 @@ architecture Behavioral of ODMB_CTRL is
       cafifo_bx_cnt    : out std_logic_vector(11 downto 0);
       cafifo_lost_pckt : out std_logic_vector(NCFEB+2 downto 1);
       cafifo_lone      : out std_logic;
-
-      ext_dcfeb_l1a_cnt7 : out std_logic_vector(23 downto 0);
-      dcfeb_l1a_dav7     : out std_logic;
 
       cafifo_prev_next_l1a_match : out std_logic_vector(15 downto 0);
       cafifo_prev_next_l1a       : out std_logic_vector(15 downto 0);
@@ -357,11 +341,7 @@ architecture Behavioral of ODMB_CTRL is
   signal cal_gtrg     : std_logic;
 
   -- CCBCODE outputs
-  signal bx0                       : std_logic;
-  signal l1arst                    : std_logic;
-  signal clken                     : std_logic;
   signal bc0                       : std_logic;
-  signal l1asrst                   : std_logic;
   signal ttccal                    : std_logic_vector(2 downto 0);
 
   -- internal signals
@@ -479,27 +459,17 @@ begin
       l1acnt_rst => l1acnt_rst,
       bxcnt_rst  => bxcnt_rst,
 
-      BC0     => bc0,
-      CCB_BX0 => ccb_bx0,
-      BXRST   => ccb_bxrst,
-      BX_DLY  => BX_DLY,
-      PUSH_DLY      => push_dly,
+      BC0        => bc0,
+      CCB_BX0    => ccb_bx0,
+      BXRST      => ccb_bxrst,
+      BX_DLY     => BX_DLY,
+      PUSH_DLY   => push_dly,
 
       pop          => cafifo_pop,
       l1a          => cafifo_push,
       l1a_match_in => cafifo_l1a_match_in_inner(NCFEB+2 downto 1),
 
-      eof_data => eof_data,
-
-      -- alct_dv     => FIFO_DAV(NCFEB+2),
-      -- otmb_dv     => FIFO_DAV(NCFEB+1),
-      -- dcfeb0_dv   => FIFO_DAV(1),
-      -- dcfeb1_dv   => FIFO_DAV(2),
-      -- dcfeb2_dv   => FIFO_DAV(3),
-      -- dcfeb3_dv   => FIFO_DAV(4),
-      -- dcfeb4_dv   => FIFO_DAV(5),
-      -- dcfeb5_dv   => FIFO_DAV(6),
-      -- dcfeb6_dv   => FIFO_DAV(7),
+      eof_data     => eof_data,
 
       cafifo_l1a_match => cafifo_l1a_match_out_inner,
       cafifo_l1a_cnt   => cafifo_l1a_cnt_out,
@@ -507,9 +477,6 @@ begin
       cafifo_bx_cnt    => cafifo_bx_cnt_out,
       cafifo_lost_pckt => cafifo_lost_pckt_out,
       cafifo_lone      => cafifo_lone,
-
-      ext_dcfeb_l1a_cnt7 => ext_dcfeb_l1a_cnt7,
-      dcfeb_l1a_dav7     => dcfeb_l1a_dav7,
 
       cafifo_prev_next_l1a_match => cafifo_prev_next_l1a_match,
       cafifo_prev_next_l1a       => cafifo_prev_next_l1a,
@@ -578,30 +545,33 @@ begin
 
   CCBCODE_PM : CCBCODE
     port map(
-      CCB_CMD      => ccb_cmd,
-      CCB_CMD_S    => ccb_cmd_s,
-      CCB_DATA     => ccb_data,
-      CCB_DATA_S   => ccb_data_s,
-      CMSCLK       => cmsclk,
-      CCB_BXRST_B  => ccb_bxrst_b,
-      CCB_BX0_B    => ccb_bx0_b,
-      CCB_L1ARST_B => ccb_l1arst_b,
-      CCB_CLKEN    => ccb_clken,
-      BX0          => bx0,
-      BXRST        => bxrst,
-      L1ARST       => l1arst,
-      CLKEN        => clken,
+      CCB_CMD      => CCB_CMD,
+      CCB_CMD_S    => CCB_CMD_S,
+      CCB_DATA     => CCB_DATA,
+      CCB_DATA_S   => CCB_DATA_S,
+      CMSCLK       => CMSCLK,
+      CCB_BXRST_B  => CCB_BXRST_B,
+      CCB_BX0_B    => CCB_BX0_B,
+      CCB_L1ARST_B => CCB_L1ARST_B,
+      CCB_CLKEN    => CCB_CLKEN,
+
+      BX0          => open,
+      BXRST        => open,
+      L1ARST       => open,
+      CLKEN        => open,
       BC0          => bc0,
-      L1ASRST      => l1asrst,
-      TTCCAL       => ttccal
+      L1ASRST      => open,
+      TTCCAL       => ttccal -- to be connected
       );
 
-  cafifo_l1a_match_in  <= cafifo_l1a_match_in_inner(NCFEB+2 downto 1);
-  cafifo_l1a_match_out <= cafifo_l1a_match_out_inner;
-  cafifo_l1a_dav       <= cafifo_l1a_dav_out;
-  cafifo_l1a_cnt       <= cafifo_l1a_cnt_out;
-  cafifo_bx_cnt        <= cafifo_bx_cnt_out;
+  CAFIFO_L1A           <= cafifo_push;
+  CAFIFO_L1A_MATCH_IN  <= cafifo_l1a_match_in_inner(NCFEB+2 downto 1);
+  CAFIFO_L1A_MATCH_OUT <= cafifo_l1a_match_out_inner;
+  CAFIFO_L1A_DAV       <= cafifo_l1a_dav_out;
+  CAFIFO_L1A_CNT       <= cafifo_l1a_cnt_out;
+  CAFIFO_BX_CNT        <= cafifo_bx_cnt_out;
 
+  ccb_bx0 <= not ccb_bx0_b;
   ccb_bxrst <= not ccb_bxrst_b;
   control_debug <= control_debug_full(15 downto 0);
 
@@ -629,13 +599,13 @@ begin
   ila_data1(109 downto 105) <= control_debug_full(25 downto 21); -- dev_cnt_svl
   ila_data1(110)            <= control_debug_full(32);           -- q_datain_last
 
-  ila_data2(119 downto 0) <= control_debug_full(135 downto 16);
-
   ila_odmb_ctrl_inst1 : ila_1
     port map(
       clk => DDUCLK,
       probe0 => ila_data1
       );
+
+  ila_data2(119 downto 0) <= control_debug_full(135 downto 16);
 
   -- ila_odmb_ctrl_inst2 : ila_2
   --   port map(

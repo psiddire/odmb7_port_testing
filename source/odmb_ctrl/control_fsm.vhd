@@ -141,7 +141,6 @@ architecture CONTROL_arch of CONTROL_FSM is
   signal dav_inner, dav_d                 : std_logic                     := '0';
   signal dout_inner, dout_d               : std_logic_vector(15 downto 0) := (others => '0');
   signal oefifo_b_inner, renfifo_b_inner  : std_logic_vector(NCFEB+2 downto 1);
-  signal renfifo_b_d                      : std_logic_vector(NCFEB+2 downto 1);
   signal fifo_pop_inner, eof_inner, eof_d : std_logic                     := '0';
   signal d_fifo_pop_inner                 : std_logic                     := '0';
 

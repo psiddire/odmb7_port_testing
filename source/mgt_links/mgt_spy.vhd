@@ -15,8 +15,7 @@ use ieee.std_logic_misc.all;
 
 entity mgt_spy is
   generic (
-    NLINK : integer range 1 to 20 := 1;  --! Number of links
-    DATAWIDTH : integer := 16            --! User data width
+    DATAWIDTH : integer := 16    --! User data width
     );
   port (
     -- Clocks
@@ -43,13 +42,13 @@ entity mgt_spy is
 
     -- Receiver signals
     rxdata      : out std_logic_vector(DATAWIDTH-1 downto 0); --! Data received
-    rxd_valid   : out std_logic_vector(NLINK-1 downto 0);     --! Flag for valid data
-    bad_rx      : out std_logic_vector(NLINK-1 downto 0);     --! Flag for fiber errors
+    rxd_valid   : out std_logic;                              --! Flag for valid data
+    bad_rx      : out std_logic;                              --! Flag for fiber errors
 
     -- PRBS signals
     prbs_type    : in  std_logic_vector(3 downto 0);          --! Select the PRBS pattern
-    prbs_tx_en   : in  std_logic_vector(NLINK-1 downto 0);    --! Enable PRBS check for the individual TX
-    prbs_rx_en   : in  std_logic_vector(NLINK-1 downto 0);    --! Enable PRBS check for the individual RX
+    prbs_tx_en   : in  std_logic;                             --! Enable PRBS check for the individual TX
+    prbs_rx_en   : in  std_logic;                             --! Enable PRBS check for the individual RX
     prbs_tst_cnt : in  std_logic_vector(15 downto 0);         --! TODO: Total PRBS test bits count
     prbs_err_cnt : out std_logic_vector(15 downto 0);         --! TODO: PRBS bit error count
 
@@ -59,6 +58,7 @@ entity mgt_spy is
 end mgt_spy;
 
 architecture Behavioral of mgt_spy is
+  constant NLINK : integer range 1 to 20 := 1;  --! Number of links
 
   --------------------------------------------------------------------------
   -- Component declaration for the GTH transceiver container
@@ -188,8 +188,8 @@ architecture Behavioral of mgt_spy is
   signal ch0_rxchariscomma : std_logic_vector(DATAWIDTH/8-1 downto 0);
   signal ch0_codevalid : std_logic_vector(DATAWIDTH/8-1 downto 0);
 
-  signal rxd_valid_int : std_logic_vector(NLINK-1 downto 0);
-  signal bad_rx_int : std_logic_vector(NLINK-1 downto 0);
+  signal rxd_valid_int : std_logic;
+  signal bad_rx_int : std_logic;
   signal rxready_int : std_logic;
 
   -- GT control
@@ -241,7 +241,7 @@ begin
   ch0_rxnotintable <= rxctrl3_int(DATAWIDTH/8-1 downto 0);
 
   ch0_codevalid <= not (ch0_rxnotintable or ch0_rxdisperr); -- May need to sync the input signals
-  bad_rx_int(0) <= not (rxbyteisaligned_int(0) and (not rxbyterealign_int(0)));
+  bad_rx_int <= not (rxbyteisaligned_int(0) and (not rxbyterealign_int(0)));
 
   BAD_RX <= bad_rx_int;
 
@@ -252,7 +252,7 @@ begin
   -- RXDATA is valid only when it's been deemed aligned, recognized 8B/10B pattern and does not contain a K-character.
   -- The RXVALID port is not explained in UG576, so it's not used.
   -- RXD_VALID(0) <= '1' when (rxready_int = '1' and bad_rx_int(0) = '0' and and_reduce(ch0_codevalid) = '1' and or_reduce(ch0_rxchariscomma) = '0') else '0';
-  rxd_valid_int(0) <= '1' when (rxready_int = '1' and bad_rx_int(0) = '0' and and_reduce(ch0_codevalid) = '1' and or_reduce(ch0_rxchariscomma) = '0') else '0';
+  rxd_valid_int <= '1' when (rxready_int = '1' and bad_rx_int = '0' and and_reduce(ch0_codevalid) = '1' and or_reduce(ch0_rxchariscomma) = '0') else '0';
 
   RXD_VALID <= rxd_valid_int;
 
@@ -284,8 +284,8 @@ begin
   loopback_int <= LOOPBACK;
 
   rxprbscntreset_int <= (others => RESET);
-  rxprbssel_int(3 downto 0) <= PRBS_TYPE when PRBS_RX_EN(0) = '1' else x"0";
-  txprbssel_int(3 downto 0) <= PRBS_TYPE when PRBS_TX_EN(0) = '1' else x"0";
+  rxprbssel_int(3 downto 0) <= PRBS_TYPE when PRBS_RX_EN = '1' else x"0";
+  txprbssel_int(3 downto 0) <= PRBS_TYPE when PRBS_TX_EN = '1' else x"0";
 
   -- For GTH core configurations which utilize the transceiver channel CPLL, the drpclk_in port must be driven by
   -- the free-running clock at the exact frequency specified during core customization, for reliable bring-up
@@ -362,8 +362,8 @@ begin
 
   ila_data_rx(15 downto 0)    <= gtwiz_userdata_rx_int;
   ila_data_rx(17 downto 16)   <= ch0_codevalid;
-  ila_data_rx(20)             <= bad_rx_int(0);
-  ila_data_rx(21)             <= rxd_valid_int(0);
+  ila_data_rx(20)             <= bad_rx_int;
+  ila_data_rx(21)             <= rxd_valid_int;
   ila_data_rx(22)             <= rxbyteisaligned_int(0);
   ila_data_rx(23)             <= rxbyterealign_int(0);
   ila_data_rx(25 downto 24)   <= ch0_rxcharisk;

@@ -231,20 +231,20 @@ begin
   --    WREN        => alct_l1a_cnt_fifo_wr_en     -- Input write enable
   --    );
 
-  ALCT_L1ACNT_CNT_H_FIFO_I : FIFO_L1ACNT_GEN
-  PORT MAP (
-      WR_CLK => clk,
-      RD_CLK => clk,
-      SRST => fifo_rst,
-      DIN => l1a_cnt_h_fifo_in,
-      WR_EN => alct_l1a_cnt_fifo_wr_en,
-      RD_EN => alct_l1a_cnt_fifo_rd_en,
-      DOUT => alct_l1a_cnt_h_fifo_out,
-      FULL => alct_l1a_cnt_h_fifo_full,
-      EMPTY => alct_l1a_cnt_h_fifo_empty,
-      WR_RST_BUSY => open,
-      RD_RST_BUSY => open 
-  );
+  -- ALCT_L1ACNT_CNT_H_FIFO_I : FIFO_L1ACNT_GEN
+  -- PORT MAP (
+  --     WR_CLK => clk,
+  --     RD_CLK => clk,
+  --     SRST => fifo_rst,
+  --     DIN => l1a_cnt_h_fifo_in,
+  --     WR_EN => alct_l1a_cnt_fifo_wr_en,
+  --     RD_EN => alct_l1a_cnt_fifo_rd_en,
+  --     DOUT => alct_l1a_cnt_h_fifo_out,
+  --     FULL => alct_l1a_cnt_h_fifo_full,
+  --     EMPTY => alct_l1a_cnt_h_fifo_empty,
+  --     WR_RST_BUSY => open,
+  --     RD_RST_BUSY => open 
+  -- );
 
   --otmb_l1a_cnt_l_fifo : FIFO_DUALCLOCK_MACRO
   --  generic map (
@@ -315,20 +315,20 @@ begin
   --    WREN        => otmb_l1a_cnt_fifo_wr_en     -- Input write enable
   --    );
 
-  OTMB_L1ACNT_CNT_H_FIFO_I : FIFO_L1ACNT_GEN
-  PORT MAP (
-      WR_CLK => clk,
-      RD_CLK => clk,
-      SRST => fifo_rst,
-      DIN => l1a_cnt_h_fifo_in,
-      WR_EN => otmb_l1a_cnt_fifo_wr_en,
-      RD_EN => otmb_l1a_cnt_fifo_rd_en,
-      DOUT => otmb_l1a_cnt_h_fifo_out,
-      FULL => otmb_l1a_cnt_h_fifo_full,
-      EMPTY => otmb_l1a_cnt_h_fifo_empty,
-      WR_RST_BUSY => open,
-      RD_RST_BUSY => open 
-  );
+  -- OTMB_L1ACNT_CNT_H_FIFO_I : FIFO_L1ACNT_GEN
+  -- PORT MAP (
+  --     WR_CLK => clk,
+  --     RD_CLK => clk,
+  --     SRST => fifo_rst,
+  --     DIN => l1a_cnt_h_fifo_in,
+  --     WR_EN => otmb_l1a_cnt_fifo_wr_en,
+  --     RD_EN => otmb_l1a_cnt_fifo_rd_en,
+  --     DOUT => otmb_l1a_cnt_h_fifo_out,
+  --     FULL => otmb_l1a_cnt_h_fifo_full,
+  --     EMPTY => otmb_l1a_cnt_h_fifo_empty,
+  --     WR_RST_BUSY => open,
+  --     RD_RST_BUSY => open 
+  -- );
 
 -- FSM 
   alct_tx_start_d <= not alct_l1a_cnt_h_fifo_empty;

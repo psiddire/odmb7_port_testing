@@ -73,12 +73,12 @@ architecture SPI_PORT_Arch of SPI_PORT is
   --                                               x"D3B7", x"D3B7", x"00FF", x"0100",
   --                                               x"FFFC", x"FFFD", x"FFFE", x"FFFF");
   
-  component ila_spi
-  port (
-    clk : in std_logic;
-    probe0 : in std_logic_vector(511 downto 0)
-    );
-  end component;
+  -- component ila_spi
+  -- port (
+  --   clk : in std_logic;
+  --   probe0 : in std_logic_vector(511 downto 0)
+  --   );
+  -- end component;
   
   --CFG register download signals
   type cfg_download_states is (S_IDLE, S_SET_ADDR_LOWER, S_ERASE, S_BUFFER_PROGRAM, S_WRITE);
@@ -155,12 +155,12 @@ architecture SPI_PORT_Arch of SPI_PORT is
 
 begin
 
-  --debug
-  ila_spi_port_i : ila_spi
-  PORT MAP (
-    clk => CLK,
-    probe0 => ila_probe
-  );
+  -- --debug
+  -- ila_spi_port_i : ila_spi
+  -- PORT MAP (
+  --   clk => CLK,
+  --   probe0 => ila_probe
+  -- );
   ila_probe(0) <= DEVICE;
   ila_probe(1) <= STROBE;
   ila_probe(3 downto 2) <= "00";

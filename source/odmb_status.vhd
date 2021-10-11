@@ -39,7 +39,15 @@ entity odmb_status is
     CAFIFO_L1A_CNT      : in std_logic_vector(23 downto 0);
     CAFIFO_BX_CNT       : in std_logic_vector(11 downto 0);
 
+    CCB_CMD_BXEV        : in  std_logic_vector(7 downto 0);
+    CCB_CMD_S           : in  std_logic;       -- ccbcmnd(6) - from J3
+    CCB_DATA            : in  std_logic_vector(7 downto 0);  -- ccbdata(7 downto 0) - from J3
+    CCB_DATA_S          : in  std_logic;       -- ccbdata(8) - from J3
+    CCB_RSV             : in  std_logic_vector(10 downto 0);
+    CCB_OTHER           : in  std_logic_vector(10 downto 0);
+
     L1ACNT_RST          : in std_logic;
+    PON_RESET           : in std_logic;
     RESET               : in std_logic  --! Global reset
     );
 end odmb_status;
@@ -72,6 +80,15 @@ architecture ODMB_STATUS_ARCH of odmb_status is
   signal cafifo_l1a_dav_data   : std_logic_vector(15 downto 0) := (others => '0');
 
   signal dcfeb_l1a_cnt         : std_logic_vector(15 downto 0);
+  signal unsync_l1a_cnt        : std_logic_vector(15 downto 0);
+
+  -- CCB production test signals
+  signal ccb_cmd_reg     : std_logic_vector(15 downto 0) := (others => '0');
+  signal ccb_data_reg    : std_logic_vector(15 downto 0) := (others => '0');
+  signal ccb_rsv_reg     : std_logic_vector(15 downto 0) := (others => '0');
+  signal ccb_other_reg   : std_logic_vector(15 downto 0) := (others => '0');
+  signal ccb_rsv_reg_b   : std_logic_vector(15 downto 0) := (others => '0');
+  signal ccb_other_reg_b : std_logic_vector(15 downto 0) := (others => '0');
 
 begin
 
@@ -158,7 +175,6 @@ begin
       when x"3C" => odmb_data <= x"0" & cafifo_bx_cnt;
       -- when x"3D" => odmb_data <= cafifo_rd_addr & cafifo_wr_addr;
       when x"3E" => odmb_data <= cafifo_l1a_match_data;
-
       when x"3F" => odmb_data <= dcfeb_l1a_cnt;
 
       when x"41" => odmb_data <= into_fifo_dav_cnt(1);
@@ -189,11 +205,12 @@ begin
       when x"57" => odmb_data <= data_fifo_re_cnt(7);  -- from control to FIFOs in top
       when x"58" => odmb_data <= data_fifo_re_cnt(8);  -- from control to FIFOs in top
       when x"59" => odmb_data <= data_fifo_re_cnt(9);  -- from control to FIFOs in top
-      -- when x"5A" => odmb_data <= ccb_cmd_reg;
-      -- when x"5B" => odmb_data <= ccb_data_reg;
-      -- when x"5C" => odmb_data <= ccb_other_reg;
-      -- when x"5D" => odmb_data <= ccb_rsv_reg;
-      -- when x"5F" => odmb_data <= no_resync_l1a_cnt;
+
+      when x"5A" => odmb_data <= ccb_cmd_reg;
+      when x"5B" => odmb_data <= ccb_data_reg;
+      when x"5C" => odmb_data <= ccb_other_reg;
+      when x"5D" => odmb_data <= ccb_rsv_reg;
+      when x"5F" => odmb_data <= unsync_l1a_cnt;
 
       when x"61" => odmb_data <= goodcrc_cnt(1);
       when x"62" => odmb_data <= goodcrc_cnt(2);
@@ -261,7 +278,6 @@ begin
     end case;
   end process;
 
-
   -------------------------------------------------------------------------------------------
   -- ODMB status signal generations
   -------------------------------------------------------------------------------------------
@@ -310,6 +326,23 @@ begin
     port map(GAP_COUNT => lct_l1a_gap(9), CLK => CMSCLK, RST => RESET, SIGNAL1 => RAW_L1A, SIGNAL2 => OTMB_DAV);
 
   -- Counting for DCFEB reduced signal
-  DCFEBL1A_CNT   : COUNT_EDGES port map(COUNT => dcfeb_l1a_cnt, CLK => CMSCLK, RST => L1ACNT_RST, DIN => DCFEB_L1A);
+  DCFEBL1A_CNT   : COUNT_EDGES port map(COUNT => dcfeb_l1a_cnt,  CLK => CMSCLK, RST => L1ACNT_RST, DIN => DCFEB_L1A);
+  UNSYNCL1A_CNT  : COUNT_EDGES port map(COUNT => unsync_l1a_cnt, CLK => CMSCLK, RST => PON_RESET,  DIN => DCFEB_L1A);
+
+  -------------------------------------------------------------------------------------------
+  -- CCB count generations
+  -------------------------------------------------------------------------------------------
+  GEN_CCB : for index in 0 to 7 generate
+    FDCMD : FDC port map(Q => ccb_cmd_reg(index),  C => CCB_CMD_S,  CLR => RESET, D => CCB_CMD_BXEV(index));
+    FDDAT : FDC port map(Q => ccb_data_reg(index), C => CCB_DATA_S, CLR => RESET, D => CCB_DATA(index));
+  end generate GEN_CCB;
+
+  GEN_CCB_FD : for index in 0 to 10 generate
+    FDOTHER : FDC port map(Q => ccb_other_reg(index), C => CCB_OTHER(index), CLR => RESET, D => ccb_other_reg_b(index));
+    FDRSV   : FDC port map(Q => ccb_rsv_reg(index),   C => CCB_RSV(index),   CLR => RESET, D => ccb_rsv_reg_b(index));
+    ccb_other_reg_b(index) <= not ccb_other_reg(index);
+    ccb_rsv_reg_b(index)   <= not ccb_rsv_reg(index);
+  end generate GEN_CCB_FD;
+
 
 end ODMB_STATUS_ARCH;
