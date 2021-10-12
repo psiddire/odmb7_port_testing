@@ -8,6 +8,9 @@ use unisim.vcomponents.all;
 
 --! @brief Module that interprets PROM commands and controls post-startup communication with EPROMs
 --! @details supported PROM commands (sent with W 602C XXXX)
+--! * 0001 write 1 (deprecated)
+--! * 0002 read 1 (deprecated)
+--! * 0003 write n (deprecated)
 --! * (n-1)<<5 | 0004 read n words from PROM to readback FIFO
 --! * (n) | 0006 read register n (1 - status register, 2 - flag status register, 3 - nonvolatile configuration register, 4 - volatile configuration register, 5 - enhanced volatile configuration register)
 --! * 000A erase sector
@@ -145,16 +148,17 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
   end component;
 
   --CMD FIFO signals
-  signal cmd_fifo_empty   : std_logic := '1';
-  signal cmd_fifo_full    : std_logic := '0';
-  signal cmd_fifo_read_en : std_logic := '0';
-  signal cmd_fifo_out     : std_logic_vector(15 downto 0) := x"0000";
-  signal prom_addr        : std_logic_vector(31 downto 0) := x"00000000";
-  signal prom_load_addr   : std_logic := '0';
-  signal temp_pagecount   : std_logic_vector(17 downto 0) := x"0000" & "01";
-  signal temp_sectorcount : std_logic_vector(13 downto 0) := x"000" & "01";
-  signal temp_cmdindex    : std_logic_vector(3 downto 0) := x"4"; --RDFR24QUAD
-  signal read_nwords      : unsigned(11 downto 0) := (others => '0');
+  signal cmd_fifo_in_macro : std_logic_vector(15 downto 0) := x"0000";
+  signal cmd_fifo_empty    : std_logic := '1';
+  signal cmd_fifo_full     : std_logic := '0';
+  signal cmd_fifo_read_en  : std_logic := '0';
+  signal cmd_fifo_out      : std_logic_vector(15 downto 0) := x"0000";
+  signal prom_addr         : std_logic_vector(31 downto 0) := x"00000000";
+  signal prom_load_addr    : std_logic := '0';
+  signal temp_pagecount    : std_logic_vector(17 downto 0) := x"0000" & "01";
+  signal temp_sectorcount  : std_logic_vector(13 downto 0) := x"000" & "01";
+  signal temp_cmdindex     : std_logic_vector(3 downto 0) := x"4"; --RDFR24QUAD
+  signal read_nwords       : unsigned(11 downto 0) := (others => '0');
   type cmd_fifo_states is (
     S_IDLE, 
     S_LOAD_ADDR_CMD, S_LOAD_ADDR_STALL_1, S_LOAD_ADDR_STALL_2, S_LOAD_ADDR_LOWER,
@@ -169,8 +173,8 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
     S_SWITCH_PROM_CMD,
     S_UNKNOWN_CMD, S_STALL
   );
-  signal cmd_fifo_state     : cmd_fifo_states := S_IDLE;
-  signal write_word_counter : unsigned(11 downto 0) := (others => '0');
+  signal cmd_fifo_state      : cmd_fifo_states := S_IDLE;
+  signal write_word_counter  : unsigned(11 downto 0) := (others => '0');
   
   signal program_nwords      : unsigned(11 downto 0) := (others => '0');
   signal write_fifo_write_en : std_logic := '0';
@@ -217,6 +221,7 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
   signal readback_fifo_empty       : std_logic := '0';
 
   --timer and status signals
+
   signal spi_timer_inner           : unsigned(31 downto 0) := x"00000000";
   signal spi_register_inner        : std_logic_vector(15 downto 0) := x"0000";
   signal spi_register_we           : std_logic := '0';
@@ -282,6 +287,13 @@ begin
   cnfg_data_in_inner <= CNFG_DATA_IN;
   CNFG_DATA_OUT <= cnfg_data_out_inner;
   CNFG_DATA_DIR <= cnfg_data_dir_inner;
+
+  --translate depricated commands
+  cmd_fifo_in_macro <= x"000C" when (CMD_FIFO_IN(4 downto 0) = "00001") else --01 write 1
+                       x"000A" when (CMD_FIFO_IN(4 downto 0) = "00010") else --02 read 1
+                       CMD_FIFO_IN(15 downto 5) & "01100" when (CMD_FIFO_IN(4 downto 0) = "00011") else --03 write n
+                       CMD_FIFO_IN(15 downto 5) & "01100" when (CMD_FIFO_IN(4 downto 0) = "01011") else --0B program
+                       CMD_FIFO_IN;
   
   --Handle outside signals coming to command FIFO
   spi_cmd_fifo_i : spi_cmd_fifo
@@ -289,7 +301,7 @@ begin
         srst => RST,
         wr_clk => CLK2P5,
         rd_clk => CLK40,
-        din => CMD_FIFO_IN,
+        din => cmd_fifo_in_macro,
         wr_en => CMD_FIFO_WRITE_EN,
         rd_en => cmd_fifo_read_en_pulse,
         dout => cmd_fifo_out,
@@ -306,7 +318,7 @@ begin
   begin
     if (RST='1') then
       fsm_is_enabled <= '1';
-    else
+    elsif rising_edge(CLK40) then
       if (FSM_ENABLE='1') then
         fsm_is_enabled <= '1';
       elsif (FSM_DISABLE='1') then

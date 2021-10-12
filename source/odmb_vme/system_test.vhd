@@ -67,12 +67,12 @@ architecture SYSTEM_TEST_Arch of SYSTEM_TEST is
   end component;
 
   -- Temporary debugging
-  component ila_2 is
-    port (
-      clk : in std_logic := '0';
-      probe0 : in std_logic_vector(383 downto 0) := (others=> '0')
-      );
-  end component;
+  --component ila_2 is
+  --  port (
+  --    clk : in std_logic := '0';
+  --    probe0 : in std_logic_vector(383 downto 0) := (others=> '0')
+  --    );
+  --end component;
 
   signal ila_data : std_logic_vector(383 downto 0) := (others => '0');
   signal outdata_inner : std_logic_vector(15 downto 0);
@@ -314,11 +314,11 @@ begin
   ila_data(176)            <= otmb_prbs_rx;
   ila_data(177)            <= CLK;
 
-  ila_systest_inst : ila_2
-    port map (
-      clk    => CLK160,
-      probe0 => ila_data
-      );
+  --ila_systest_inst : ila_2
+  --  port map (
+  --    clk    => CLK160,
+  --    probe0 => ila_data
+  --    );
 
 
 end SYSTEM_TEST_Arch;

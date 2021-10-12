@@ -49,12 +49,24 @@ entity CFEBJTAG is
     FEBTDO    : in  std_logic_vector(NCFEB downto 1); --! JTAG test data out signal from (x)DCFEBs.
 
     LED     : out std_logic;                          --! Debug signals.
-    DIAGOUT : out std_logic_vector(17 downto 0)       --! Debug signals.
+    DIAGOUT : out std_logic_vector(17 downto 0);      --! Debug signals.
+    EXT_DTACK : in std_logic                          --! Debug signals
     );
 end CFEBJTAG;
 
 architecture CFEBJTAG_Arch of CFEBJTAG is
   signal logich : std_logic := '1';
+  
+    --debugging stuff
+  component ila_spi
+  port (
+    clk : in std_logic;
+    probe0 : in std_logic_vector(511 downto 0)
+    );
+  end component;
+
+  signal ila_probe       : std_logic_vector(511 downto 0);
+  --/debugging stuff
 
   --Command parsing signals
   signal cmddev                                                  : std_logic_vector(15 downto 0);
@@ -91,6 +103,7 @@ architecture CFEBJTAG_Arch of CFEBJTAG is
   
   --Signals for new_strobe
   signal new_strobe, new_strobe_q, new_strobe_qq             : std_logic;
+  signal strobe_meta, strobe_sync : std_logic := '0';
   
   --Signals for load
   signal d1_load, d2_load, ce_load, clr_load, q_load, load      : std_logic;
@@ -101,6 +114,7 @@ architecture CFEBJTAG_Arch of CFEBJTAG is
   --shift DTACK signals
   signal dtack_shft                                                           : std_logic;
   signal d_dtack, ce_dtack, clr_dtack, q1_dtack, q2_dtack, q3_dtack, q4_dtack : std_logic;
+  signal q5_dtack, q6_dtack                                                   : std_logic;
   
   --Signals for instruction headers
   signal ce_iheaden, clr_iheaden, iheaden                                 : std_logic;
@@ -150,8 +164,41 @@ architecture CFEBJTAG_Arch of CFEBJTAG is
 
 begin
 
+ --debugging stuff
+  ila_spi_port_i : ila_spi
+  PORT MAP (
+    clk => FASTCLK,
+    probe0 => ila_probe
+  );
+  ila_probe(0) <= RST;
+  ila_probe(1) <= DEVICE;
+  ila_probe(2) <= STROBE;
+  ila_probe(4 downto 3) <= "00";
+  ila_probe(14 downto 5) <= COMMAND;
+  ila_probe(18 downto 15) <= x"1";
+  ila_probe(34 downto 19) <= INDATA;
+  ila_probe(35) <= tck_global;
+  ila_probe(36) <= q6_resetjtag_tms when (resetjtag = '1') else
+                   q4_shihead_tms when (shihead = '1') else
+                   q3_shdhead_tms when (shdhead = '1') else
+                   (tailen and d_donedata) when (shdata = '1') else
+                   q2_shtail_tms when (shtail = '1') else 'Z'; --tms
+  ila_probe(37) <= qv_tdi(0);
+  ila_probe(38) <= tdo;
+  ila_probe(45 downto 39) <= selfeb;
+  ila_probe(46) <= busy;
+  ila_probe(47) <= d_dtack;
+  ila_probe(48) <= dtack_shft;
+  ila_probe(49) <= dtack_selcfeb or dtack_readcfeb or dtack_rstjtag or dtack_readtdo or dtack_shft;
+  ila_probe(50) <= EXT_DTACK;
+  ila_probe(51) <= dtack_selcfeb;
+  ila_probe(52) <= dtack_readcfeb;
+  ila_probe(53) <= dtack_rstjtag;
+  ila_probe(54) <= dtack_readtdo;
+  ila_probe(511 downto 55) <= (others => '0');
 
-
+               
+               
 
 -- COMMAND DECODER
   cmddev <= "000" & device & command & "00";
@@ -180,7 +227,9 @@ begin
   FDPE_selfeb7 : FDPE port map(D => INDATA(6), C => SLOWCLK, CE => ce_selfeb, PRE => rst_init, Q => selfeb(7));
 
   -- Generate DTACK for SELCFEB command (0x1020) on clock cycle after strobe
-  d_dtack_selcfeb <= '1' when (STROBE = '1' and selcfeb = '1') else '0';
+  strobe_meta <= STROBE when rising_edge(SLOWCLK);
+  strobe_sync <= strobe_meta when rising_edge(SLOWCLK);
+  d_dtack_selcfeb <= '1' when (strobe_sync = '1' and selcfeb = '1') else '0';
   FD_selcfebdtack : FD port map(D => d_dtack_selcfeb, C => SLOWCLK, Q => dtack_selcfeb);
 
 
@@ -270,28 +319,32 @@ begin
   
   -- General signals for SHFT commands: new_strobe, load, busy, dtack
 
-  -- Generate new_strobe, which is 1 only on the first clock cycle after a new strobe
+  -- Generate new_strobe, which is 1 only on the first SLOWCLK edge after a new strobe
   FDCE_new_strobe_q : FDCE port map (D => STROBE, C => SLOWCLK, CE => '1', CLR => RST, Q => new_strobe_q);
   FDCE_new_strobe_qq : FDCE port map (D => new_strobe_q, C => SLOWCLK, CE => '1', CLR => RST, Q => new_strobe_qq);
   new_strobe <= new_strobe_q and (not new_strobe_qq);
 
-  -- Generate load on third clock cycle after new STROBE for DATASHFT and INSTSHFT commands IF not already busy with a JTAG command  
+  -- Generate load on third SLOWCLK edge after new STROBE for DATASHFT and INSTSHFT commands IF not already busy with a JTAG command  
   d1_load  <= datashft or instshft;
   clr_load <= load or RST;
   FDCE_qload : FDCE port map(D => d1_load, C => SLOWCLK, CE => new_strobe, CLR => clr_load, Q => q_load);
   d2_load  <= '1' when (q_load = '1' and busy = '0') else '0';
   FDC_load : FDC port map(D => d2_load, C => SLOWCLK, CLR => RST, Q => load);
+  
+  --note VME timeout at 1023 40MHz clock cycles
+  --load <= (datashft or instshft) and new_strobe;
 
-  -- Generate busy on second clock cycle after load (fourth after new STROBE), persist until all data or tailer sent
+  -- Generate busy on fifth SLOWCLK edge after STROBE, persist until all data or tailer sent
   -- once busy='1' every clock cycle TCK switches (i.e. TCK goes high on third clock cycle after load)
   FDC_qbusy : FDC port map(D => load, C => SLOWCLK, CLR => RST, Q => q_busy);
   clr_busy <= '1' when ((donedata(1) = '1' and (tailen = '0')) or rst = '1' or donetail = '1') else '0';
   d_busy   <= '1' when (q_busy = '1' or busy = '1')                                            else '0';
+  --d_busy   <= load or busy;
   FDC_busy : FDC port map(D => d_busy, C => SLOWCLK, CLR => clr_busy, Q => busy);
   FDC_busyp1 : FDC port map(D => busy, C => SLOWCLK, CLR => RST, Q => busyp1);
   
   -- Generate dtack for DATASHFT and INSTSHFT commands, at least 4 cycles after strobe when busy goes low
-  d_dtack   <= (datashft or instshft);
+  d_dtack   <= (datashft or instshft) and STROBE;
   ce_dtack  <= not busy;
   clr_dtack <= not STROBE;
   FDCE_q1dtack : FDCE port map(D => d_dtack, C => SLOWCLK, CE => CE_dtack, CLR => CLR_dtack, Q => q1_dtack);
@@ -448,7 +501,7 @@ begin
 
 
   -- Generate DTACK when READCFEB=1 on second clock cycle after strobe (see combined DTACK logic)
-  d_dtack_readcfeb <= '1' when (STROBE = '1' and readcfeb = '1') else '0';
+  d_dtack_readcfeb <= '1' when (strobe_sync = '1' and readcfeb = '1') else '0';
   FD_readcfebdtack : FD port map(D => d_dtack_readcfeb, C => SLOWCLK, Q => dtack_readcfeb);
   
   --Generate DTACK on cycle after rdtdodk

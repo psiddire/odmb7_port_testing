@@ -25,7 +25,7 @@ use work.ucsb_types.all;
 --! * R 6040 read BPI timer (16 MSB)
 --! VME commands to be implemented:
 --! Other features to be implemented:
---! * upload CONST and CFG registers on reset, then reset SPI_CTRL
+--! * upload CONST and CFG registers on reset
 entity SPI_PORT is
   port (
     SLOWCLK              : in std_logic; --! 2.5 MHz clock input
@@ -73,12 +73,12 @@ architecture SPI_PORT_Arch of SPI_PORT is
   --                                               x"D3B7", x"D3B7", x"00FF", x"0100",
   --                                               x"FFFC", x"FFFD", x"FFFE", x"FFFF");
   
-  component ila_spi
-  port (
-    clk : in std_logic;
-    probe0 : in std_logic_vector(511 downto 0)
-    );
-  end component;
+  --component ila_spi
+  --port (
+  --  clk : in std_logic;
+  --  probe0 : in std_logic_vector(511 downto 0)
+  --  );
+  --end component;
   
   --CFG register download signals
   type cfg_download_states is (S_IDLE, S_SET_ADDR_LOWER, S_ERASE, S_BUFFER_PROGRAM, S_WRITE);
@@ -143,6 +143,15 @@ architecture SPI_PORT_Arch of SPI_PORT is
   signal do_read_timer_lsb            : std_logic := '0';
   signal do_read_timer_msb            : std_logic := '0';
   signal do_read_status               : std_logic := '0';
+
+  --signals for uploading registers on reset
+  type rst_upload_states is (S_IDLE, S_WAIT, S_PULSE);
+  signal rst_upload_state : rst_upload_states := S_IDLE;
+  signal rst_meta         : std_logic := '0';
+  signal rst_sync         : std_logic := '0';
+  signal rst_sync_q       : std_logic := '0';
+  signal rst_wait_counter : unsigned(3 downto 0) := x"0";
+  signal startup_cfg_read : std_logic := '0';
   
   --dtack signals
   signal ce_d_dtack : std_logic := '0'; 
@@ -156,11 +165,11 @@ architecture SPI_PORT_Arch of SPI_PORT is
 begin
 
   --debug
-  ila_spi_port_i : ila_spi
-  PORT MAP (
-    clk => CLK,
-    probe0 => ila_probe
-  );
+  --ila_spi_port_i : ila_spi
+  --PORT MAP (
+  --  clk => CLK,
+  --  probe0 => ila_probe
+  --);
   ila_probe(0) <= DEVICE;
   ila_probe(1) <= STROBE;
   ila_probe(3 downto 2) <= "00";
@@ -223,6 +232,43 @@ begin
                    SPI_TIMER(31 downto 16) when (do_read_timer_msb = '1') else
                    spi_read_data;
   OUTDATA <= outdata_inner; --temp, for debugging
+
+  --load CFG registers on reset
+  reset_proc : process (SLOWCLK)
+  begin
+  if rising_edge(SLOWCLK) then
+    rst_meta <= rst;
+    rst_sync <= rst_meta;
+    rst_sync_q <= rst_sync;
+    case rst_upload_state is
+      when S_IDLE => 
+        rst_wait_counter <= x"0";
+        startup_cfg_read <= '0';
+        if (rst_sync_q = '0' and rst_sync = '1') then
+          rst_upload_state <= S_WAIT;
+        else
+          rst_upload_state <= S_IDLE;
+        end if;
+
+      when S_WAIT =>
+        rst_wait_counter <= rst_wait_counter + 1;
+        startup_cfg_read <= '0';
+        if (rst_wait_counter = x"4") then --previously 20 fastclk cycles = 1.25 slowclk cycles
+          rst_upload_state <= S_PULSE;
+        else
+          rst_upload_state <= S_WAIT;
+        end if;
+
+      when S_PULSE =>
+        rst_wait_counter <= x"0";
+        startup_cfg_read <= '1';
+        rst_upload_state <= S_IDLE;
+
+      when others =>
+        rst_upload_state <= S_IDLE;
+    end case;
+  end if;
+  end process;
              
   --pop 1 word from FIFO on read command
   spi_read_proc : process (SLOWCLK)
@@ -352,7 +398,7 @@ begin
       spi_cfg_ul_pulse_inner <= '0';
       spi_cfg_reg_we_inner <= NREGS;
       spi_cfg_ul_reg <= x"0000";
-      if do_cfg_read='1' then
+      if (do_cfg_read='1' or startup_cfg_read='1') then
         spi_cmd_fifo_write_en_cfg_ul <= '1';
         --send CMD to load address 00FE0000
         spi_cmd_fifo_in_cfg_ul <= x"1FD7";

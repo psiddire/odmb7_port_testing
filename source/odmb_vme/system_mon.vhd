@@ -98,7 +98,7 @@ architecture SYSTEM_MON_ARCH of SYSTEM_MON is
   signal cs_inner: std_logic;
   signal din_inner : std_logic;
   signal clk_inner : std_logic;
-  signal chip_selected : std_logic_vector(4 downto 0);
+  signal chip_selected : std_logic_vector(4 downto 0) := (others => '0');
   
   -- vme command decoding
   signal cmddev : std_logic_vector (15 downto 0);
@@ -117,8 +117,8 @@ architecture SYSTEM_MON_ARCH of SYSTEM_MON is
   -- signals in/out odmb7_voltageMon
   signal vmon_dout : std_logic_vector(11 downto 0) := x"000"; 
   signal vmon_dout_valid: std_logic := '0';
-  signal vmon_chanidx : integer := 0;
-  signal vmon_chipidx : integer := 0;
+  signal vmon_chanidx : integer range -1 to 6 := 0;
+  signal vmon_chipidx : integer range -1 to 6 := 0;
   signal vmon_n_valid: integer := 0;
   signal startchannelvalid: std_logic := '0';
   signal startchannelvalid2: std_logic := '0';
@@ -169,14 +169,30 @@ begin
     which_chip_inner_gen_i: FDCE port map(Q => which_chip_inner(I), C => SLOWCLK, CLR => data_done, CE => DEVICE, D => which_chip(I));
     which_chan_inner_gen_i: FDCE port map(Q => which_chan_inner(I), C => SLOWCLK, CLR => data_done, CE => DEVICE, D => which_chan(I));
   end generate which_inner_gen;
+  --process (SLOWCLK, data_done)
+  --begin
+  --  if (data_done='1') then
+  --  which_chip_inner <= "0000";
+  --    which_chan_inner <= "0000";
+  --  elsif rising_edge(SLOWCLK) then
+  --    if (DEVICE='1') then
+  --      which_chip_inner <= which_chip;
+  --      which_chan_inner <= which_chan;
+  --    end if;
+  --  end if;
+  --end process;
   
-  vmon_chanidx <= to_integer(signed(which_chan_inner)) - 1;
-  vmon_chipidx <= to_integer(signed(which_chip_inner)) - 1;
+  vmon_chanidx <= to_integer(unsigned(which_chan_inner)) - 1;
+  vmon_chipidx <= to_integer(unsigned(which_chip_inner)) - 1;
   -- sync DIN and CS using same clk
-  cs_gen : for I in 4 downto 0 generate
+  
+  --chip_selected(1) <= '0';
+  
+  cs_gen : for I in 3 downto 1 generate
   begin
+    --chip_selected(I) <= '0';
     chip_selected(I) <= '1' when (vmon_chipidx = I) else '0';
-    -- need FDPE_1 for falling edge
+    --need FDPE_1 for falling edge
     cs_gen_i: FDPE_1 port map(Q => adc_cs_inner(I), C => SLOWCLK, PRE => data_done, CE => chip_selected(I), D => cs_inner);
   end generate cs_gen;
   din_gen_i: FDCE port map(Q => adc_din_inner, C => SLOWCLK, CLR => data_done, CE => or_reduce(which_chip_inner), D => din_inner);
@@ -237,7 +253,8 @@ begin
       INIT_54 => x"A93A",    -- Temp lower alarm limit
       INIT_55 => x"5111",    -- Vccint lower alarm limit
       INIT_56 => x"CAAA",    -- Vccaux lower alarm limit
-      INIT_57 => x"B0CE"     -- Temp alarm OT reset (Default 70C -> ae4e, 75C -> b0ce)
+      INIT_57 => x"B0CE",    -- Temp alarm OT reset (Default 70C -> ae4e, 75C -> b0ce)
+      SIM_MONITOR_FILE => "sysmon_design.txt" --avoid simulation errors
       )
     port map (
       ALM => sysmon_alm,     -- to be connected

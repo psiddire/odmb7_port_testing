@@ -261,7 +261,8 @@ architecture Behavioral of ODMB_VME is
       TMS       : out std_logic;
       FEBTDO    : in  std_logic_vector(NCFEB downto 1);
       DIAGOUT   : out std_logic_vector(17 downto 0);
-      LED       : out std_logic
+      LED       : out std_logic;
+      EXT_DTACK : in std_logic
       );
   end component;
 
@@ -480,7 +481,8 @@ architecture Behavioral of ODMB_VME is
       DOE_B   : out std_logic;
 
       DIAGOUT : out std_logic_vector(17 downto 0);
-      LED     : out std_logic_vector(2 downto 0)
+      LED     : out std_logic_vector(2 downto 0);
+      EXT_DTACK : in std_logic_vector(9 downto 0)
       );
   end component;
 
@@ -575,6 +577,9 @@ architecture Behavioral of ODMB_VME is
   signal spi_rbk_wrd_cnt           : std_logic_vector(10 downto 0) := "00000000000";
   signal spi_timer                 : std_logic_vector(31 downto 0) := x"00000000";
   signal spi_status                : std_logic_vector(15 downto 0) := x"0000";
+  
+  --temp debugging
+  signal ext_dtack_inner : std_logic := '0';
 
 begin
 
@@ -598,6 +603,7 @@ begin
   VME_DATA_OUT <= outdata_dev(idx_dev);
 
   VME_DTACK_B <= not or_reduce(dtack_dev);
+  ext_dtack_inner <= not or_reduce(dtack_dev);
 
   ----------------------------------
   -- OTMB backplane pins
@@ -653,7 +659,7 @@ begin
     port map (
       -- CSP_LVMB_LA_CTRL => CSP_LVMB_LA_CTRL,
       FASTCLK => CLK40,
-      SLOWCLK => CLK1P25,
+      SLOWCLK => CLK2P5,
       RST     => RST,
 
       DEVICE  => device(1),
@@ -672,7 +678,8 @@ begin
       FEBTDO    => DCFEB_TDO,
 
       DIAGOUT => open,
-      LED     => led_cfebjtag
+      LED     => led_cfebjtag,
+      EXT_DTACK => ext_dtack_inner
       );
 
   DEV3_VMEMON : VMEMON
@@ -911,7 +918,8 @@ begin
       COMMAND => cmd,
       ADRS    => cmd_adrs_inner,
       DIAGOUT => open,
-      LED     => led_command
+      LED     => led_command,
+      EXT_DTACK => dtack_dev
       );
 
   SPI_CTRL_I : SPI_CTRL

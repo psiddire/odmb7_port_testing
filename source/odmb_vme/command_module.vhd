@@ -34,12 +34,23 @@ entity COMMAND_MODULE is
     DOE_B   : out std_logic;
 
     DIAGOUT : out std_logic_vector(17 downto 0);
-    LED     : out std_logic_vector(2 downto 0)
+    LED     : out std_logic_vector(2 downto 0);
+    EXT_DTACK : in std_logic_vector(9 downto 0)
 
     );
 end COMMAND_MODULE;
 
 architecture COMMAND_MODULE_Arch of COMMAND_MODULE is
+
+  --debugging
+  component ila_spi
+  port (
+    clk : in std_logic;
+    probe0 : in std_logic_vector(511 downto 0)
+    );
+  end component;
+
+  signal ila_probe       : std_logic_vector(511 downto 0);
 
   --Declaring internal signals
   signal CGA           : std_logic_vector(5 downto 0);  --NOTE: replacing CGAP with CGA(5)
@@ -98,6 +109,31 @@ architecture COMMAND_MODULE_Arch of COMMAND_MODULE is
   -----------------------------------------------------------------------------
 
 begin  --Architecture
+
+  --debugging
+  ila_spi_port_pm_i : ila_spi
+  PORT MAP (
+    clk => FASTCLK,
+    probe0 => ila_probe
+  );
+  ila_probe(0) <= GAP;
+  ila_probe(5 downto 1) <= GA;
+  ila_probe(28 downto 6) <= ADR;
+  ila_probe(34 downto 29) <= AM;
+  ila_probe(35) <= AS;
+  ila_probe(36) <= DS0;
+  ila_probe(37) <= DS1;
+  ila_probe(38) <= LWORD;
+  ila_probe(39) <= WRITER;
+  ila_probe(40) <= IACK;
+  ila_probe(41) <= BERR;
+  ila_probe(42) <= SYSFAIL;
+  ila_probe(43) <= SYSOK;
+  ila_probe(44) <= VALIDAM;
+  ila_probe(45) <= BOARDENB;
+  ila_probe(46) <= ASYNSTRB;
+  ila_probe(56 downto 47) <= EXT_DTACK;
+  ila_probe(511 downto 57) <= (others => '0');
 
   -- Generate DOE_B
   CE_DOE_B  <= '1' when TOVME_INNER_B = '0' and TIMER(7) = '0' else '0';
