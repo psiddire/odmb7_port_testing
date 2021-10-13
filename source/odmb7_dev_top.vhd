@@ -1142,42 +1142,44 @@ begin
   -- Handle data readout
   -------------------------------------------------------------------------------------------
 
-  odmb_status_pro : process (odmb_data_sel, VME_GAP_B, VME_GA_B)
+  --device 3 waits two 2.5MHz clock cycles to issue dtack, so might as well make this synchronous
+  odmb_status_pro : process (cmsclk)
   begin
-
-    case odmb_data_sel is
+    if rising_edge(cmsclk) then
+      case odmb_data_sel is
 
       --debug register
-      when x"06" => odmb_data <= x"7E57";
+        when x"06" => odmb_data <= x"7E57";
 
-      when x"20" => odmb_data <= "0000000000" & VME_GAP_B & VME_GA_B;
+        when x"20" => odmb_data <= "0000000000" & VME_GAP_B & VME_GA_B;
 
       -- FIXME: Use dcfeb_dvalid_cnt in place of into_cafifo_dav_cnt for now
-      when x"41" => odmb_data <= dcfeb_dvalid_cnt(1);
-      when x"42" => odmb_data <= dcfeb_dvalid_cnt(2);
-      when x"43" => odmb_data <= dcfeb_dvalid_cnt(3);
-      when x"44" => odmb_data <= dcfeb_dvalid_cnt(4);
-      when x"45" => odmb_data <= dcfeb_dvalid_cnt(5);
-      when x"46" => odmb_data <= dcfeb_dvalid_cnt(6);
-      when x"47" => odmb_data <= dcfeb_dvalid_cnt(7);
+        when x"41" => odmb_data <= dcfeb_dvalid_cnt(1);
+        when x"42" => odmb_data <= dcfeb_dvalid_cnt(2);
+        when x"43" => odmb_data <= dcfeb_dvalid_cnt(3);
+        when x"44" => odmb_data <= dcfeb_dvalid_cnt(4);
+        when x"45" => odmb_data <= dcfeb_dvalid_cnt(5);
+        when x"46" => odmb_data <= dcfeb_dvalid_cnt(6);
+        when x"47" => odmb_data <= dcfeb_dvalid_cnt(7);
                     -- when x"48" => odmb_data <= into_cafifo_dav_cnt(8);
                     -- when x"49" => odmb_data <= into_cafifo_dav_cnt(9);
 
-      when x"5A" => odmb_data <= ccb_cmd_reg;
-      when x"5B" => odmb_data <= ccb_data_reg;
-      when x"5C" => odmb_data <= ccb_other_reg;
-      when x"5D" => odmb_data <= ccb_rsv_reg;
+        when x"5A" => odmb_data <= ccb_cmd_reg;
+        when x"5B" => odmb_data <= ccb_data_reg;
+        when x"5C" => odmb_data <= ccb_other_reg;
+        when x"5D" => odmb_data <= ccb_rsv_reg;
 
-      when x"61" => odmb_data <= goodcrc_cnt(1);
-      when x"62" => odmb_data <= goodcrc_cnt(2);
-      when x"63" => odmb_data <= goodcrc_cnt(3);
-      when x"64" => odmb_data <= goodcrc_cnt(4);
-      when x"65" => odmb_data <= goodcrc_cnt(5);
-      when x"66" => odmb_data <= goodcrc_cnt(6);
-      when x"67" => odmb_data <= goodcrc_cnt(7);
+        when x"61" => odmb_data <= goodcrc_cnt(1);
+        when x"62" => odmb_data <= goodcrc_cnt(2);
+        when x"63" => odmb_data <= goodcrc_cnt(3);
+        when x"64" => odmb_data <= goodcrc_cnt(4);
+        when x"65" => odmb_data <= goodcrc_cnt(5);
+        when x"66" => odmb_data <= goodcrc_cnt(6);
+        when x"67" => odmb_data <= goodcrc_cnt(7);
 
-      when others => odmb_data <= (others => '1');
-    end case;
+        when others => odmb_data <= (others => '1');
+      end case;
+    end if;
   end process;
 
   -------------------------------------------------------------------------------------------

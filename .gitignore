@@ -12,6 +12,7 @@ testbench/ip
 odmb7_project/ip
 odmb7_project/odmb_project
 TestBench_odmb7
+fw
 
 project/odmb7_ucsb_dev.cache
 project/odmb7_ucsb_dev.hw

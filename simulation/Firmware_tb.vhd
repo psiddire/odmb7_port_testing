@@ -142,19 +142,28 @@ architecture Behavioral of Firmware_tb is
   constant bw_addr_entries : integer := 16;
   constant bw_input1 : integer := 16;
   constant bw_input2 : integer := 16;
-  component lut_input1 is
+  --component lut_input1 is
+  --  port (
+  --    clka : in std_logic := '0';
+  --    addra : in std_logic_vector(bw_addr-1 downto 0) := (others=> '0');
+  --    douta : out std_logic_vector(bw_input1-1 downto 0) := (others => '0')
+  --    );
+  --end component;
+  --component lut_input2 is
+  --  port (
+  --    clka : in std_logic := '0';
+  --    addra : in std_logic_vector(bw_addr-1 downto 0) := (others=> '0');
+  --    douta : out std_logic_vector(bw_input2-1 downto 0) := (others => '0')
+  --    );
+  --end component;
+  
+  component pseudolut is
     port (
-      clka : in std_logic := '0';
-      addra : in std_logic_vector(bw_addr-1 downto 0) := (others=> '0');
-      douta : out std_logic_vector(bw_input1-1 downto 0) := (others => '0')
-      );
-  end component;
-  component lut_input2 is
-    port (
-      clka : in std_logic := '0';
-      addra : in std_logic_vector(bw_addr-1 downto 0) := (others=> '0');
-      douta : out std_logic_vector(bw_input2-1 downto 0) := (others => '0')
-      );
+      CLK   : in std_logic;
+      ADDR  : in std_logic_vector(3 downto 0);
+      DOUT1 : out std_logic_vector(15 downto 0);
+      DOUT2 : out std_logic_vector(15 downto 0)
+    );
   end component;
 
   signal use_vio_input_vector : std_logic_vector(0 downto 0) := "0";
@@ -374,18 +383,26 @@ begin
       );
 
   -- Input LUTs
-  lut_input1_i: lut_input1
+  --lut_input1_i: lut_input1
+  --  port map(
+  --    clka=> sysclk,
+  --    addra=> std_logic_vector(lut_input_addr1_s),
+  --    douta=> lut_input1_dout_c
+  --    );
+  --lut_input2_i: lut_input2
+  --  port map(
+  --    clka=> sysclk,
+  --    addra=> std_logic_vector(lut_input_addr2_s),
+  --    douta=> lut_input2_dout_c
+  --    );
+      
+  pseudolut_i : pseudolut
     port map(
-      clka=> sysclk,
-      addra=> std_logic_vector(lut_input_addr1_s),
-      douta=> lut_input1_dout_c
-      );
-  lut_input2_i: lut_input2
-    port map(
-      clka=> sysclk,
-      addra=> std_logic_vector(lut_input_addr2_s),
-      douta=> lut_input2_dout_c
-      );
+      CLK => sysclk,
+      ADDR => std_logic_vector(lut_input_addr1_s),
+      DOUT1 => lut_input1_dout_c,
+      DOUT2 => lut_input2_dout_c
+    );
 
   --in simulation, VIO always outputs 0, even though this output is default 1
   --use_vio_input <= use_vio_input_vector(0);
