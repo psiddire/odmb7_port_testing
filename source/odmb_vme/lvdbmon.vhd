@@ -28,8 +28,6 @@ use unisim.vcomponents.all;
 --! * bit 1-0 PD - mode select 00 normal internal clock, 11 normal external clock, 10 standby, 11 power down
 entity LVDBMON is  
   port (
-    CSP_LVMB_LA_CTRL : inout std_logic_vector(35 downto 0); --! debug signal
-
     SLOWCLK   : in std_logic;                               --! 1.25 MHz clock input
     RST       : in std_logic;                               --! Reset signal
     PON_RESET : in std_logic;                               --! Power on reset, unused
@@ -53,6 +51,7 @@ entity LVDBMON is
     R_LVTURNON : in  std_logic_vector(8 downto 1);          --! Read-back power-on signal from LVMB
     LOADON     : out std_logic;                             --! Signal to load power-on signals
     DIAGOUT    : out std_logic_vector(17 downto 0)          --! Debugging signal
+    --CSP_LVMB_LA_CTRL : inout std_logic_vector(35 downto 0)  --! debug signal
     );
 end LVDBMON;
 

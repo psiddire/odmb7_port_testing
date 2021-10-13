@@ -1054,32 +1054,29 @@ process_read_register : process (CLK)
        -- assert CS and prep read register command
        read_register_spi_cs_bar <= '0';
        read_register_bit_index <= x"00";
-       read_register_cmdcounter <= "010111"; --24 bits: 8 command + 16 to skip the first cycle (or 2)
+       --read_register_cmdcounter <= "010111"; --24 bits: 8 command + 16 to skip the first cycle (or 2)
+       read_register_cmdcounter <= "000111"; --8 bits for command; don't skip first cycle since Nonvolatile register only outputs once
+       --MO I thought we would end on max_index=8/10, but that resutls in an off-by-one error so 9/11 it is
        if (read_register_type = x"1") then
          read_register_cmdreg <=  CmdStatus & x"00000000";
-         read_register_max_index <= x"07";
-         read_register_state <= S_READ_REGISTER_SHIFT_READ;
+         read_register_max_index <= x"09";
        elsif (read_register_type = x"2") then
          read_register_cmdreg <=  CmdFLAGStatus & x"00000000";
-         read_register_max_index <= x"07";
-         read_register_state <= S_READ_REGISTER_SHIFT_READ;
+         read_register_max_index <= x"09";
        elsif (read_register_type = x"3") then
          read_register_cmdreg <=  CmdReadNonvConf & x"00000000";
-         read_register_max_index <= x"07";
-         read_register_state <= S_READ_REGISTER_SHIFT_READ;
+         read_register_max_index <= x"09";
        elsif (read_register_type = x"4") then
          read_register_cmdreg <=  CmdReadNonvConf & x"00000000";
-         read_register_max_index <= x"0F"; --MSBs for nonvolatile register
-         read_register_state <= S_READ_REGISTER_SHIFT_READ;
+         read_register_max_index <= x"11"; --MSBs for nonvolatile register
        elsif (read_register_type = x"5") then
          read_register_cmdreg <=  CmdReadVolaConf & x"00000000";
-         read_register_max_index <= x"07";
-         read_register_state <= S_READ_REGISTER_SHIFT_READ;
+         read_register_max_index <= x"09";
        else
          read_register_cmdreg <=  CmdReadExteConf & x"00000000";
-         read_register_max_index <= x"07";
-         read_register_state <= S_READ_REGISTER_SHIFT_READ;
+         read_register_max_index <= x"09";
        end if;
+       read_register_state <= S_READ_REGISTER_SHIFT_READ;
        
   when S_READ_REGISTER_SHIFT_READ =>
        --shift read register command and read back 
@@ -1089,7 +1086,7 @@ process_read_register : process (CLK)
        else
          read_register_bit_index <= read_register_bit_index + 1;
          register_inner <= spi_miso & register_inner(7 downto 1);
-         if (write_config_status_bit_index = read_register_max_index) then 
+         if (read_register_bit_index = read_register_max_index) then 
            read_register_done <= '1';
            register_we <= '1';
            read_register_state <= S_READ_REGISTER_IDLE;

@@ -345,7 +345,7 @@ begin
       if do_const_write='1' then
         spi_cmd_fifo_write_en_const_dl <= '1';
         --send CMD to load address 00FE0000
-        spi_cmd_fifo_in_const_dl <= x"1FD7";
+        spi_cmd_fifo_in_const_dl <= x"1FB7";
         const_download_state <= S_SET_ADDR_LOWER;
       else
         spi_cmd_fifo_write_en_const_dl <= '0';
@@ -507,7 +507,7 @@ begin
       if do_const_read='1' then
         spi_cmd_fifo_write_en_const_ul <= '1';
         --send CMD to load address 00FE0000
-        spi_cmd_fifo_in_const_ul <= x"1FD7";
+        spi_cmd_fifo_in_const_ul <= x"1FB7";
         const_upload_state <= S_SET_ADDR_LOWER;
       else
         spi_cmd_fifo_write_en_const_ul <= '0';

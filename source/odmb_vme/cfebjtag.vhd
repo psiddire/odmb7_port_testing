@@ -49,24 +49,21 @@ entity CFEBJTAG is
     FEBTDO    : in  std_logic_vector(NCFEB downto 1); --! JTAG test data out signal from (x)DCFEBs.
 
     LED     : out std_logic;                          --! Debug signals.
-    DIAGOUT : out std_logic_vector(17 downto 0);      --! Debug signals.
-    EXT_DTACK : in std_logic                          --! Debug signals
+    DIAGOUT : out std_logic_vector(17 downto 0)       --! Debug signals.
     );
 end CFEBJTAG;
 
 architecture CFEBJTAG_Arch of CFEBJTAG is
   signal logich : std_logic := '1';
   
-    --debugging stuff
+  --debugging
   component ila_spi
   port (
     clk : in std_logic;
     probe0 : in std_logic_vector(511 downto 0)
-    );
+  );
   end component;
-
-  signal ila_probe       : std_logic_vector(511 downto 0);
-  --/debugging stuff
+  signal ila_probe : std_logic_vector(511 downto 0);
 
   --Command parsing signals
   signal cmddev                                                  : std_logic_vector(15 downto 0);
@@ -112,7 +109,7 @@ architecture CFEBJTAG_Arch of CFEBJTAG is
   signal q_busy, d_busy, clr_busy, busy, busyp1                           : std_logic;
   
   --shift DTACK signals
-  signal dtack_shft                                                           : std_logic;
+  signal dtack_shft, dtack_shft_d                                             : std_logic;
   signal d_dtack, ce_dtack, clr_dtack, q1_dtack, q2_dtack, q3_dtack, q4_dtack : std_logic;
   signal q5_dtack, q6_dtack                                                   : std_logic;
   
@@ -164,9 +161,8 @@ architecture CFEBJTAG_Arch of CFEBJTAG is
 
 begin
 
- --debugging stuff
-  ila_spi_port_i : ila_spi
-  PORT MAP (
+  ila_spi_cfebjtag_i : ila_spi
+  port map (
     clk => FASTCLK,
     probe0 => ila_probe
   );
@@ -190,12 +186,13 @@ begin
   ila_probe(47) <= d_dtack;
   ila_probe(48) <= dtack_shft;
   ila_probe(49) <= dtack_selcfeb or dtack_readcfeb or dtack_rstjtag or dtack_readtdo or dtack_shft;
-  ila_probe(50) <= EXT_DTACK;
   ila_probe(51) <= dtack_selcfeb;
   ila_probe(52) <= dtack_readcfeb;
   ila_probe(53) <= dtack_rstjtag;
   ila_probe(54) <= dtack_readtdo;
-  ila_probe(511 downto 55) <= (others => '0');
+  ila_probe(55) <= load;
+  ila_probe(511 downto 56) <= (others => '0');
+  
 
                
                
@@ -344,14 +341,15 @@ begin
   FDC_busyp1 : FDC port map(D => busy, C => SLOWCLK, CLR => RST, Q => busyp1);
   
   -- Generate dtack for DATASHFT and INSTSHFT commands, at least 4 cycles after strobe when busy goes low
-  d_dtack   <= (datashft or instshft) and STROBE;
+  d_dtack   <= (datashft or instshft);
   ce_dtack  <= not busy;
   clr_dtack <= not STROBE;
   FDCE_q1dtack : FDCE port map(D => d_dtack, C => SLOWCLK, CE => CE_dtack, CLR => CLR_dtack, Q => q1_dtack);
   FDC_q2dtack : FDC port map(D => q1_dtack, C => SLOWCLK, CLR => CLR_dtack, Q => q2_dtack);
   FD_q3dtack : FD port map(D => q2_dtack, C => SLOWCLK, Q => q3_dtack);
   FD_q4dtack : FD port map(D => q3_dtack, C => SLOWCLK, Q => q4_dtack);
-  dtack_shft <= (q1_dtack and q2_dtack and q3_dtack and q4_dtack and (not busy));
+  dtack_shft_d <= (q1_dtack and q2_dtack and q3_dtack and q4_dtack); --enough time for everything to latch
+  dtack_shft <= dtack_shft_d when rising_edge(SLOWCLK);
 
 
    

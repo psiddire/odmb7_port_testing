@@ -12,7 +12,7 @@ use unisim.vcomponents.all;
 --! * 0002 read 1 (deprecated)
 --! * 0003 write n (deprecated)
 --! * (n-1)<<5 | 0004 read n words from PROM to readback FIFO
---! * (n) | 0006 read register n (1 - status register, 2 - flag status register, 3 - nonvolatile configuration register, 4 - volatile configuration register, 5 - enhanced volatile configuration register)
+--! * (n) | 0006 read register n (1 - status register, 2 - flag status register, 3 - nonvolatile configuration register LSB, 4 - nonvolatile configuration register MSB, 5 - volatile configuration register, 6 - enhanced volatile configuration register)
 --! * 000A erase sector
 --! * (n-1)<<5 | 000C write n words to PROM (follow with n words to write)
 --! * 0012 write configuration register (follow with 2 words to write to configuration register)
@@ -1285,7 +1285,7 @@ begin
   elsif (rising_edge(CLK40)) then
     if (readback_fifo_wr_en = '1' and read_en_clk40_pulse = '0') then
       nwords_readback <= nwords_readback+1;
-    elsif (read_en_clk40_pulse = '1' and readback_fifo_wr_en = '0') then
+    elsif (read_en_clk40_pulse = '1' and readback_fifo_wr_en = '0' and readback_fifo_empty_sync /= '1') then
       nwords_readback <= nwords_readback-1;
     else
       nwords_readback <= nwords_readback;

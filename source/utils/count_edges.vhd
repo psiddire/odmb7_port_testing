@@ -32,13 +32,13 @@ begin
   begin
     if (RST = '1') then
       count_inner <= (others => '0');
-      COUNT <= count_inner;
     elsif rising_edge(CLK) then
       if din_q = '1' and din_qq = '0' then
         count_inner <= count_inner + 1;
-        COUNT <= count_inner;
       end if;
     end if;
   end process;
+  
+  COUNT <= count_inner;
 
 end COUNT_EDGES_ARCH;
