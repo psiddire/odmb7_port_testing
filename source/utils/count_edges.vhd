@@ -25,8 +25,8 @@ architecture COUNT_EDGES_ARCH of COUNT_EDGES is
   signal count_inner : std_logic_vector(WIDTH-1 downto 0);  
 begin
 
-  FDDIN : FDC port map(din_q, CLK, RST, DIN);
-  FDDIN2 : FDC port map(din_qq, CLK, RST, din_q);
+  FDDIN : FDC port map(Q => din_q, C => CLK, CLR => RST, D => DIN);
+  FDDIN2 : FDC port map(Q => din_qq, C => CLK, CLR => RST, D => din_q);
   
   edge_cnt_proc : process (CLK, RST)
   begin
@@ -37,7 +37,8 @@ begin
         count_inner <= count_inner + 1;
       end if;
     end if;
-    COUNT <= count_inner;
   end process;
+  
+  COUNT <= count_inner;
 
 end COUNT_EDGES_ARCH;
