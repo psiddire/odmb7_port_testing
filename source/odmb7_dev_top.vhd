@@ -277,7 +277,7 @@ architecture Behavioral of odmb7_ucsb_dev is
       clk_lfclk      : out std_logic;   -- buffed LF clock
       clk_gp6        : out std_logic;
       clk_gp7        : out std_logic;
-      clk_mgtclk1    : out std_logic;   -- buffed ODIV2 port of the refclks, CC160 MHz
+      clk_mgtclk1    : out std_logic;   -- buffed ODIV2 port of the refclks, 160 MHz
       clk_mgtclk2    : out std_logic;   -- buffed ODIV2 port of the refclks, 160 MHz
       clk_mgtclk3    : out std_logic;   -- buffed ODIV2 port of the refclks, 160 MHz
       clk_mgtclk4    : out std_logic;   -- buffed ODIV2 port of the refclks, 160 MHz
@@ -456,7 +456,7 @@ architecture Behavioral of odmb7_ucsb_dev is
   component ODMB_CTRL is
     generic (
       NCFEB       : integer range 1 to 7 := NCFEB; -- Number of DCFEBS, 7 for ME1/1, 5
-      CAFIFO_SIZE : integer range 1 to 128 := 16   -- Number FIFO words in CAFIFO: 32 for ODMB, 16 for test
+      CAFIFO_SIZE : integer range 1 to 128 := 32   -- Number FIFO words in CAFIFO: 32 for ODMB, 16 for test
       );
     port (
       --------------------
@@ -758,8 +758,8 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal dcfeb_tms    : std_logic := '0';
   signal dcfeb_tdi    : std_logic := '0';
   signal dcfeb_tdo    : std_logic_vector (NCFEB downto 1) := (others => '0');
-  signal gen_dcfeb_tdo    : std_logic_vector (NCFEB downto 1) := (others => '0');
-  signal dcfeb_tdo_inner    : std_logic_vector (NCFEB downto 1) := (others => '0');
+  signal gen_dcfeb_tdo : std_logic_vector (NCFEB downto 1) := (others => '0');
+  signal dcfeb_tdo_int : std_logic_vector (NCFEB downto 1) := (others => '0');
 
   --------------------------------------
   -- ODMB JTAG signals
@@ -1201,14 +1201,13 @@ begin
     OB_DCFEB_TCK: OBUFDS port map (I => dcfeb_tck(I), O => DCFEB_TCK_P(I), OB => DCFEB_TCK_N(I));
     IB_DCFEB_TDO: IBUFDS port map (O => dcfeb_tdo(I), I => DCFEB_TDO_P(I), IB => DCFEB_TDO_N(I));
     OB_DCFEB_L1A_MATCH: OBUFDS port map (I => dcfeb_l1a_match(I), O => L1A_MATCH_P(I), OB => L1A_MATCH_N(I));
-
-    dcfeb_tdo_inner(I) <= dcfeb_tdo(I) when (odmb_ctrl_reg(7) = '0') else gen_dcfeb_tdo(I);
   end generate GEN_DCFEBJTAG_7;
 
   --generate pulses if not masked
   dcfeb_injpls <= '0' when mask_pls = '1' else premask_injpls;
   dcfeb_extpls <= '0' when mask_pls = '1' else premask_extpls;
 
+  dcfeb_tdo_int <= dcfeb_tdo when (odmb_ctrl_reg(7) = '0') else gen_dcfeb_tdo;
 
   --generate RESYNC, BC0, L1A, and L1A match signals to DCFEBs
   --synchronization of CCB signals and push button
@@ -1421,7 +1420,7 @@ begin
       DCFEB_TCK      => dcfeb_tck,
       DCFEB_TMS      => dcfeb_tms,
       DCFEB_TDI      => dcfeb_tdi,
-      DCFEB_TDO      => dcfeb_tdo_inner,
+      DCFEB_TDO      => dcfeb_tdo,
       DCFEB_DONE     => DCFEB_DONE,
       DCFEB_INITJTAG => dcfeb_initjtag,
       DCFEB_REPROG_B => DCFEB_REPROG_B,
