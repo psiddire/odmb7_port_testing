@@ -302,7 +302,7 @@ begin
         srst => RST,
         wr_clk => CLK2P5,
         rd_clk => CLK40,
-        din => cmd_fifo_in_macro,
+        din => CMD_FIFO_IN,
         wr_en => CMD_FIFO_WRITE_EN,
         rd_en => cmd_fifo_read_en_pulse,
         dout => cmd_fifo_out,

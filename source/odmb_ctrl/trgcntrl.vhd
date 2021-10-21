@@ -73,8 +73,7 @@ begin  --Architecture
   LCT_IN <= (others => CAL_LCT) when (CAL_MODE = '1') else RAW_LCT;
   GEN_DLY_LCT : for K in 0 to NCFEB generate
   begin
-    LCTDLY_K : LCTDLY port map(DOUT => DLY_LCT(K), CLK => CLK, DELAY => lct_l1a_dly_cnst, DIN => LCT_IN(K)); -- local const version
-    -- LCTDLY_K : LCTDLY port map(DOUT => DLY_LCT(K), CLK => CLK, DELAY => LCT_L1A_DLY, DIN => LCT_IN(K));
+    LCTDLY_K : LCTDLY port map(DOUT => DLY_LCT(K), CLK => CLK, DELAY => LCT_L1A_DLY, DIN => LCT_IN(K));
   end generate GEN_DLY_LCT;
 
 -- Generate LCT
@@ -116,13 +115,11 @@ begin  --Architecture
     DS_L1AMATCH_PUSH : DELAY_SIGNAL port map(fifo_l1a_match_inner(K), clk, push_dly, l1a_match(K));
   end generate GEN_L1A_MATCH_PUSH_DLY;
 
-  push_otmb_diff <= push_dly-otmb_push_dly_cnst when push_dly > otmb_push_dly_cnst else 0; -- local const version
-  -- push_otmb_diff <= push_dly-otmb_push_dly when push_dly > otmb_push_dly else 0;
+  push_otmb_diff <= push_dly-otmb_push_dly when push_dly > otmb_push_dly else 0;
   DS_OTMB_PUSH : DELAY_SIGNAL port map(otmb_dav_sync, clk, push_otmb_diff, otmb_dav);
   fifo_l1a_match_inner(NCFEB+1) <= (otmb_dav_sync or pedestal_otmb) and fifo_push_inner and not kill(NCFEB+1);
 
-  push_alct_diff <= push_dly-alct_push_dly_cnst when push_dly > alct_push_dly_cnst else 0; -- local const version
-  -- push_alct_diff <= push_dly-alct_push_dly when push_dly > alct_push_dly else 0;
+  push_alct_diff <= push_dly-alct_push_dly when push_dly > alct_push_dly else 0;
   DS_ALCT_PUSH : DELAY_SIGNAL port map(alct_dav_sync, clk, push_alct_diff, alct_dav);
   fifo_l1a_match_inner(NCFEB+2) <= (alct_dav_sync or pedestal_otmb) and fifo_push_inner and not kill(NCFEB+2);
 
