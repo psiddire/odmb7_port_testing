@@ -14,15 +14,15 @@
       </db_ref>
    </db_ref_list>
    <zoom_setting>
-      <ZoomStartTime time="109734400fs"></ZoomStartTime>
-      <ZoomEndTime time="149834401fs"></ZoomEndTime>
-      <Cursor1Time time="160000000fs"></Cursor1Time>
+      <ZoomStartTime time="6525000fs"></ZoomStartTime>
+      <ZoomEndTime time="10320001fs"></ZoomEndTime>
+      <Cursor1Time time="7250000fs"></Cursor1Time>
    </zoom_setting>
    <column_width_setting>
-      <NameColumnWidth column_width="131"></NameColumnWidth>
-      <ValueColumnWidth column_width="66"></ValueColumnWidth>
+      <NameColumnWidth column_width="142"></NameColumnWidth>
+      <ValueColumnWidth column_width="98"></ValueColumnWidth>
    </column_width_setting>
-   <WVObjectSize size="110" />
+   <WVObjectSize size="117" />
    <wvobject type="vbus" fp_name="vbus167">
       <obj_property name="label">vme_crate_addr</obj_property>
       <obj_property name="DisplayName">label</obj_property>
@@ -279,10 +279,6 @@
       <obj_property name="ElementShortName">dtack_shft</obj_property>
       <obj_property name="ObjectShortName">dtack_shft</obj_property>
    </wvobject>
-   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/MBV/DEV1_CFEBJTAG/dtack_shft_q">
-      <obj_property name="ElementShortName">dtack_shft_q</obj_property>
-      <obj_property name="ObjectShortName">dtack_shft_q</obj_property>
-   </wvobject>
    <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/MBV/DEV1_CFEBJTAG/q1_dtack">
       <obj_property name="ElementShortName">q1_dtack</obj_property>
       <obj_property name="ObjectShortName">q1_dtack</obj_property>
@@ -311,6 +307,10 @@
       <obj_property name="label">SPIPORT Signals</obj_property>
       <obj_property name="DisplayName">label</obj_property>
    </wvobject>
+   <wvobject type="other" fp_name="/Firmware_tb/odmb_i/MBV/DEV6_SPI_PORT_I/rst_upload_state">
+      <obj_property name="ElementShortName">rst_upload_state</obj_property>
+      <obj_property name="ObjectShortName">rst_upload_state</obj_property>
+   </wvobject>
    <wvobject type="array" fp_name="/Firmware_tb/odmb_i/MBV/SPI_CTRL_I/CMD_FIFO_IN">
       <obj_property name="ElementShortName">CMD_FIFO_IN[15:0]</obj_property>
       <obj_property name="ObjectShortName">CMD_FIFO_IN[15:0]</obj_property>
@@ -326,6 +326,34 @@
    <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/MBV/SPI_CTRL_I/READBACK_FIFO_READ_EN">
       <obj_property name="ElementShortName">READBACK_FIFO_READ_EN</obj_property>
       <obj_property name="ObjectShortName">READBACK_FIFO_READ_EN</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/MBV/SPI_CTRL_I/read_slowclk_toggle">
+      <obj_property name="ElementShortName">read_slowclk_toggle</obj_property>
+      <obj_property name="ObjectShortName">read_slowclk_toggle</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/MBV/SPI_CTRL_I/read_slowclk_toggle_meta">
+      <obj_property name="ElementShortName">read_slowclk_toggle_meta</obj_property>
+      <obj_property name="ObjectShortName">read_slowclk_toggle_meta</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/MBV/SPI_CTRL_I/read_slowclk_toggle_sync1">
+      <obj_property name="ElementShortName">read_slowclk_toggle_sync1</obj_property>
+      <obj_property name="ObjectShortName">read_slowclk_toggle_sync1</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/MBV/SPI_CTRL_I/read_slowclk_toggle_sync2">
+      <obj_property name="ElementShortName">read_slowclk_toggle_sync2</obj_property>
+      <obj_property name="ObjectShortName">read_slowclk_toggle_sync2</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/MBV/SPI_CTRL_I/read_en_clk40_pulse">
+      <obj_property name="ElementShortName">read_en_clk40_pulse</obj_property>
+      <obj_property name="ObjectShortName">read_en_clk40_pulse</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/Firmware_tb/odmb_i/MBV/SPI_CTRL_I/nwords_readback">
+      <obj_property name="ElementShortName">nwords_readback[10:0]</obj_property>
+      <obj_property name="ObjectShortName">nwords_readback[10:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/Firmware_tb/odmb_i/MBV/DEV6_SPI_PORT_I/rst_wait_counter">
+      <obj_property name="ElementShortName">rst_wait_counter[3:0]</obj_property>
+      <obj_property name="ObjectShortName">rst_wait_counter[3:0]</obj_property>
    </wvobject>
    <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/MBV/SPI_CTRL_I/cmd_fifo_empty">
       <obj_property name="ElementShortName">cmd_fifo_empty</obj_property>

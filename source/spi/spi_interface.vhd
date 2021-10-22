@@ -39,10 +39,10 @@ entity spi_interface is
     OUT_UNLOCK_DONE         : out std_logic;                    --! '1' unless erase nonvolatile lock bits in progress
     START_LOCK              : in std_logic;                     --! Signal to write nonvolatile lock bit
     OUT_LOCK_DONE           : out std_logic;                    --! '1' unless write nonvolatile lock bits in progress
-    START_WRITE_CONFIG      : in std_logic;                     --! Signal to write nonvolatile configuration register
-    OUT_WRITE_CONFIG_DONE   : out std_logic;                    --! '1' unless write nonvolatile configuration register in progress
+    START_WRITE_REGISTER    : in std_logic_vector(3 downto 0);  --! Signal to write register, bit 3 indicates start and bits 2:0 indicate register
+    OUT_WRITE_REGISTER_DONE : out std_logic;                    --! '1' unless write register in progress
     REGISTER_CONTENTS       : in std_logic_vector(15 downto 0); --! Register contents to be written with write register commands
-    START_READ_REGISTER     : in std_logic_vector(3 downto 0);  --! Signal to start read register, when nonzero, number corresponds to register ID (1-status, 2-flag status, 3-nonvolatile configuration, 4-volatile configuration, 5-extended voltatile configuration)
+    START_READ_REGISTER     : in std_logic_vector(3 downto 0);  --! Signal to start read register, when nonzero, indicates register
     OUT_READ_REGISTER_DONE  : out std_logic;                    --! '1' unless read register in progress
     OUT_REGISTER            : out std_logic_vector(7 downto 0); --! Contents of register read out
     OUT_REGISTER_WE         : out std_logic;                     --! Write enable for register
@@ -130,6 +130,9 @@ END COMPONENT;
   constant  CmdEraseNonvLock   : std_logic_vector(7 downto 0)  := X"E4";
   constant  CmdWriteNonvLock   : std_logic_vector(7 downto 0)  := X"E3";
   constant  CmdWriteNonvConfig : std_logic_vector(7 downto 0)  := X"B1";
+  constant  CmdWriteVolaConfig : std_logic_vector(7 downto 0)  := X"81";
+  constant  CmdWriteExteConfig : std_logic_vector(7 downto 0)  := X"61";
+  constant  CmdWriteStatus     : std_logic_vector(7 downto 0)  := X"01";
   constant  CmdReadNonvConf    : std_logic_vector(7 downto 0)  := X"B5";
   constant  CmdReadVolaConf    : std_logic_vector(7 downto 0)  := X"85";
   constant  CmdReadExteConf    : std_logic_vector(7 downto 0)  := X"65";
@@ -201,6 +204,7 @@ END COMPONENT;
   signal write_config_cmdcounter       : unsigned(5 downto 0) := "111111";
   signal write_config_cmdreg           : std_logic_vector(39 downto 0) := x"1111111111";
   signal write_config_status_bit_index : std_logic_vector(7 downto 0) := x"00";
+  signal write_register_type           : std_logic_vector(3 downto 0) := x"0";
 
   ------------- Read register signals -------------------- 
   signal read_register_spi_cs_bar      : std_logic := '1';
@@ -438,7 +442,7 @@ OUT_ERASE_DONE <= erase_done;
 OUT_WRITE_DONE <= write_done;
 OUT_UNLOCK_DONE <= erase_lock_done;
 OUT_LOCK_DONE <= write_lock_done;
-OUT_WRITE_CONFIG_DONE <= write_config_done;
+OUT_WRITE_REGISTER_DONE <= write_config_done;
 OUT_READ_REGISTER_DONE <= read_register_done;
 OUT_REGISTER <= register_inner;
 OUT_REGISTER_WE <= register_we;
@@ -946,8 +950,9 @@ process_write_config : process (CLK)
    when S_WRITE_CONFIG_IDLE =>
         --when START_WRITE_CONFIG received, initiate write process
         write_config_spi_cs_bar <= '1';
-        if (START_WRITE_CONFIG = '1') then
+        if (START_WRITE_REGISTER(3) = '1') then
           write_config_done <= '0';
+          write_register_type <= START_WRITE_REGISTER;
           write_config_state <= S_WRITE_CONFIG_ASSERT_CS_WRITE_ENABLE;
          end if;
                        
@@ -971,8 +976,20 @@ process_write_config : process (CLK)
    when S_WRITE_CONFIG_ASSERT_CS_WRITE_CONFIG =>
         --assert CS and prepare for write nonvolatile config bits
         write_config_spi_cs_bar <= '0';   
-        write_config_cmdreg <= CmdWriteNonvConfig & REGISTER_CONTENTS & x"0000"; 
-        write_config_cmdcounter <= "010111"; --24 bits: 8 command + 16 register
+        if (write_register_type = x"9") then --status
+          write_config_cmdcounter <= "001111"; --16 bits: 8 command + 8 register
+          write_config_cmdreg <= CmdWriteStatus & REGISTER_CONTENTS(7 downto 0) & x"000000"; 
+        elsif (write_register_type = x"B") then --nonvolatile
+          write_config_cmdcounter <= "010111"; --24 bits: 8 command + 16 register
+          --endianness has LSbyte first
+          write_config_cmdreg <= CmdWriteNonvConfig & REGISTER_CONTENTS(7 downto 0) & REGISTER_CONTENTS(15 downto 8) & x"0000"; 
+        elsif (write_register_type = x"D") then --volatile
+          write_config_cmdcounter <= "001111"; --16 bits: 8 command + 8 register
+          write_config_cmdreg <= CmdWriteVolaConfig & REGISTER_CONTENTS(7 downto 0) & x"000000"; 
+        else --'E' enhanved volatile
+          write_config_cmdcounter <= "001111"; --16 bits: 8 command + 8 register
+          write_config_cmdreg <= CmdWriteExteConfig & REGISTER_CONTENTS(7 downto 0) & x"000000"; 
+        end if;
         write_config_state <= S_WRITE_CONFIG_SHIFT_WRITE_CONFIG;
                       
    when S_WRITE_CONFIG_SHIFT_WRITE_CONFIG =>     
@@ -1085,7 +1102,7 @@ process_read_register : process (CLK)
          read_register_cmdreg <= read_register_cmdreg(38 downto 0) & '0';
        else
          read_register_bit_index <= read_register_bit_index + 1;
-         register_inner <= spi_miso & register_inner(7 downto 1);
+         register_inner <= register_inner(6 downto 0)  & spi_miso; -- & register_inner(7 downto 1);
          if (read_register_bit_index = read_register_max_index) then 
            read_register_done <= '1';
            register_we <= '1';

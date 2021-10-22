@@ -10,12 +10,16 @@ use unisim.vcomponents.all;
 --! @details supported PROM commands (sent with W 602C XXXX)
 --! * 0001 write 1 (deprecated)
 --! * 0002 read 1 (deprecated)
---! * 0003 write n (deprecated)
+--! * (n-1)<<5 | 0003 write n (deprecated)
 --! * (n-1)<<5 | 0004 read n words from PROM to readback FIFO
---! * (n) | 0006 read register n (1 - status register, 2 - flag status register, 3 - nonvolatile configuration register LSB, 4 - nonvolatile configuration register MSB, 5 - volatile configuration register, 6 - enhanced volatile configuration register)
+--! * (n-1)<<5 | 0005 read array (depricated)
+--! * (n)<<5 | 0006 read register n (see below) 
 --! * 000A erase sector
---! * (n-1)<<5 | 000C write n words to PROM (follow with n words to write)
---! * 0012 write configuration register (follow with 2 words to write to configuration register)
+--! * (n-1)<<5 | 000B program n words (depricated)
+--! * (n-1)<<5 | 000C buffer program n words to PROM (follow with n words to write)
+--! * (n-1)<<5 | 000D buffer program write n (depricated)
+--! * (n-1)<<5 | 000E buffer program conf (depricated)
+--! * (n)<<5 | 0012 write register n (see below) (follow with 1 word to write)
 --! * 0013 write lock bit on sector
 --! * 0014 erase lock bit on sector
 --! * (addr_upper)<<5 | 0017 load address (follow with 1 word of lower address bits)
@@ -23,6 +27,15 @@ use unisim.vcomponents.all;
 --! * 001A stop SPI timer
 --! * 001B reset SPI timer
 --! * (prom_number)<<5 | 001D switch to PROM prom_number (0 or 1)
+--!
+--! #Register Codes (for commands 0006 and 0012)
+--! 1. status register
+--! 2. flag status register (read only)
+--! 3. nonvolatile configuration register (LSB for read)
+--! 4. nonvolatile configuration register MSB (read only)
+--! 5. volatile configuration register
+--! 6. enhanced volatile configuration register
+--! Note that for write commands other than nonvolatile configuration register, only lower byte is used
 entity SPI_CTRL is
   port (
     
@@ -85,8 +98,8 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
       OUT_UNLOCK_DONE         : out std_logic;
       START_LOCK              : in std_logic;
       OUT_LOCK_DONE           : out std_logic;
-      START_WRITE_CONFIG      : in std_logic;
-      OUT_WRITE_CONFIG_DONE   : out std_logic;                   
+      START_WRITE_REGISTER    : in std_logic_vector(3 downto 0);
+      OUT_WRITE_REGISTER_DONE : out std_logic;                   
       REGISTER_CONTENTS       : in std_logic_vector(15 downto 0); 
       START_READ_REGISTER     : in std_logic_vector(3 downto 0);
       OUT_READ_REGISTER_DONE  : out std_logic;                    
@@ -148,7 +161,6 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
   end component;
 
   --CMD FIFO signals
-  signal cmd_fifo_in_macro : std_logic_vector(15 downto 0) := x"0000";
   signal cmd_fifo_empty    : std_logic := '1';
   signal cmd_fifo_full     : std_logic := '0';
   signal cmd_fifo_read_en  : std_logic := '0';
@@ -168,7 +180,7 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
     S_ERASE_CMD, S_ERASE_LOW, S_ERASE_WAIT, 
     S_LOCK_CMD, S_LOCK_LOW, S_LOCK_WAIT,
     S_UNLOCK_CMD, S_UNLOCK_LOW, S_UNLOCK_WAIT,
-    S_WRITE_CONFIG_CMD, S_WRITE_CONFIG_STALL_1, S_WRITE_CONFIG_STALL_2, S_WRITE_CONFIG_LOWER, S_WRITE_CONFIG_WAIT,
+    S_WRITE_REGISTER_CMD, S_WRITE_REGISTER_STALL_1, S_WRITE_REGISTER_STALL_2, S_WRITE_REGISTER_LOWER, S_WRITE_REGISTER_WAIT,
     S_START_TIMER_CMD, S_STOP_TIMER_CMD, S_RESET_TIMER_CMD,
     S_SWITCH_PROM_CMD,
     S_UNKNOWN_CMD, S_STALL
@@ -183,13 +195,13 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
   signal prom_write_en       : std_logic := '0';
   signal prom_unlock_en      : std_logic := '0';
   signal prom_lock_en        : std_logic := '0';
-  signal prom_wr_config_en   : std_logic := '0';
+  signal prom_wr_register_en : std_logic_vector(3 downto 0) := x"0";
   signal read_done           : std_logic := '0';
   signal erase_done          : std_logic := '0';
   signal write_done          : std_logic := '0';
   signal lock_done           : std_logic := '0';
   signal unlock_done         : std_logic := '0';
-  signal write_config_done   : std_logic := '0';
+  signal write_register_done : std_logic := '0';
   signal read_register_en    : std_logic_vector(3 downto 0) := x"0";
   signal read_register_done  : std_logic := '0';
   signal spi_timer_en        : std_logic := '0';
@@ -213,9 +225,10 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
   signal readback_fifo_wr_rst_busy : std_logic := '0'; 
   signal readback_fifo_rd_rst_busy : std_logic := '0';
   signal nwords_readback           : unsigned(10 downto 0) := "00000000000";
-  signal read_en_clk40_meta        : std_logic := '0';
-  signal read_en_clk40_sync1       : std_logic := '0';
-  signal read_en_clk40_sync2       : std_logic := '0';
+  signal read_slowclk_toggle       : std_logic := '0';
+  signal read_slowclk_toggle_meta  : std_logic := '0';
+  signal read_slowclk_toggle_sync1 : std_logic := '0';
+  signal read_slowclk_toggle_sync2 : std_logic := '0';
   signal read_en_clk40_pulse       : std_logic := '0';
   signal readback_fifo_full        : std_logic := '0';
   signal readback_fifo_empty       : std_logic := '0';
@@ -287,13 +300,6 @@ begin
   cnfg_data_in_inner <= CNFG_DATA_IN;
   CNFG_DATA_OUT <= cnfg_data_out_inner;
   CNFG_DATA_DIR <= cnfg_data_dir_inner;
-
-  --translate depricated commands
-  cmd_fifo_in_macro <= x"000C" when (CMD_FIFO_IN(4 downto 0) = "00001") else --01 write 1
-                       x"000A" when (CMD_FIFO_IN(4 downto 0) = "00010") else --02 read 1
-                       CMD_FIFO_IN(15 downto 5) & "01100" when (CMD_FIFO_IN(4 downto 0) = "00011") else --03 write n
-                       CMD_FIFO_IN(15 downto 5) & "01100" when (CMD_FIFO_IN(4 downto 0) = "01011") else --0B program
-                       CMD_FIFO_IN;
   
   --Handle outside signals coming to command FIFO
   spi_cmd_fifo_i : spi_cmd_fifo
@@ -301,7 +307,7 @@ begin
         srst => RST,
         wr_clk => CLK2P5,
         rd_clk => CLK40,
-        din => cmd_fifo_in_macro,
+        din => CMD_FIFO_IN,
         wr_en => CMD_FIFO_WRITE_EN,
         rd_en => cmd_fifo_read_en_pulse,
         dout => cmd_fifo_out,
@@ -342,7 +348,19 @@ begin
         --do nothing until command to process (command FIFO is not empty)
         if (cmd_fifo_empty='0') then
           case "000" & cmd_fifo_out(4 downto 0) is
+          when x"01" =>
+            --write 1 (depricated)
+            cmd_fifo_state  <= S_WRITE_CMD;
+          when x"02" =>
+            --read 1 (depricated)
+            cmd_fifo_state  <= S_READ_CMD;
+          when x"03" =>
+            --write n (depricated)
+            cmd_fifo_state  <= S_WRITE_CMD;
           when x"04" =>
+            --read n
+            cmd_fifo_state  <= S_READ_CMD;
+          when x"05" =>
             --read n
             cmd_fifo_state  <= S_READ_CMD;
           when x"06" =>
@@ -351,12 +369,21 @@ begin
           when x"0A" =>
             --erase sector (hardcode to 1 sector?)
             cmd_fifo_state  <= S_ERASE_CMD;
+          when x"0B" =>
+            --program (depricated) 
+            cmd_fifo_state  <= S_WRITE_CMD;
           when x"0C" =>
             --buffer program 
             cmd_fifo_state  <= S_WRITE_CMD;
+          when x"0D" =>
+            --buffer program write n (depricated)
+            cmd_fifo_state  <= S_WRITE_CMD;
+          when x"0E" =>
+            --buffer program conf (depricated)
+            cmd_fifo_state  <= S_WRITE_CMD;
           when x"12" =>
             --write configuration register
-            cmd_fifo_state  <= S_WRITE_CONFIG_CMD;
+            cmd_fifo_state  <= S_WRITE_REGISTER_CMD;
           when x"13" =>
             --lock block
             cmd_fifo_state  <= S_LOCK_CMD;
@@ -390,7 +417,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -411,7 +438,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -432,7 +459,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -458,7 +485,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -479,7 +506,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= cmd_fifo_out(8 downto 5);
         prom_load_addr      <= '0';
@@ -500,7 +527,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -526,7 +553,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -547,7 +574,7 @@ begin
         prom_erase_en       <= '1';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -568,7 +595,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -593,7 +620,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -615,7 +642,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -636,7 +663,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -661,7 +688,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -687,7 +714,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '1';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -708,7 +735,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -733,7 +760,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -746,16 +773,16 @@ begin
         prom_select         <= prom_select;
         register_contents   <= register_contents;
 
-      when S_WRITE_CONFIG_CMD =>
+      when S_WRITE_REGISTER_CMD =>
         --remove command from FIFO
         write_word_counter  <= x"000";
-        cmd_fifo_state      <= S_WRITE_CONFIG_STALL_1; 
+        cmd_fifo_state      <= S_WRITE_REGISTER_STALL_1; 
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= '0' & cmd_fifo_out(7 downto 5);
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -768,15 +795,15 @@ begin
         prom_select         <= prom_select;
         register_contents   <= register_contents;
 
-      when S_WRITE_CONFIG_STALL_1 => 
+      when S_WRITE_REGISTER_STALL_1 => 
         --need to wait because empty takes an extra cycle to go low
-        cmd_fifo_state      <= S_WRITE_CONFIG_STALL_2;
+        cmd_fifo_state      <= S_WRITE_REGISTER_STALL_2;
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= prom_wr_register_en;
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -789,19 +816,19 @@ begin
         prom_select         <= prom_select;
         register_contents   <= register_contents;
         
-      when S_WRITE_CONFIG_STALL_2 => 
+      when S_WRITE_REGISTER_STALL_2 => 
         --continue when lower part of address is ready in command FIFO
         if (cmd_fifo_empty='0') then
-          cmd_fifo_state    <= S_WRITE_CONFIG_LOWER;
+          cmd_fifo_state    <= S_WRITE_REGISTER_LOWER;
         else
-          cmd_fifo_state    <= S_WRITE_CONFIG_STALL_2;
+          cmd_fifo_state    <= S_WRITE_REGISTER_STALL_2;
         end if;
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= prom_wr_register_en;
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -814,15 +841,15 @@ begin
         prom_select         <= prom_select;
         register_contents   <= register_contents;
               
-      when S_WRITE_CONFIG_LOWER =>
+      when S_WRITE_REGISTER_LOWER =>
         --set lower part of address, remove command from FIFO, and pass address onto spi_interface
-        cmd_fifo_state      <= S_WRITE_CONFIG_WAIT;
+        cmd_fifo_state      <= S_WRITE_REGISTER_WAIT;
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '1';
+        prom_wr_register_en <= prom_wr_register_en;
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -835,19 +862,19 @@ begin
         prom_select         <= prom_select;
         register_contents   <= cmd_fifo_out;
 
-      when S_WRITE_CONFIG_WAIT =>
-        --don't accept any more commands until done with erase command
-        if (write_config_done='1') then
+      when S_WRITE_REGISTER_WAIT =>
+        --don't accept any more commands until done with write register
+        if (write_register_done='1') then
           cmd_fifo_state    <= S_IDLE;
         else 
-          cmd_fifo_state    <= S_WRITE_CONFIG_WAIT;
+          cmd_fifo_state    <= S_WRITE_REGISTER_WAIT;
         end if;
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= '1' & prom_wr_register_en(2 downto 0);
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -868,7 +895,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '1';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -889,7 +916,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -914,7 +941,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -935,7 +962,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '1';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -956,7 +983,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -981,7 +1008,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -1002,7 +1029,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -1023,7 +1050,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -1048,7 +1075,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -1069,7 +1096,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '1';
@@ -1090,7 +1117,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -1111,7 +1138,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -1132,7 +1159,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -1153,7 +1180,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -1174,7 +1201,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -1195,7 +1222,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -1216,7 +1243,7 @@ begin
         prom_erase_en       <= '0';
         prom_lock_en        <= '0';
         prom_unlock_en      <= '0';
-        prom_wr_config_en   <= '0';
+        prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
@@ -1285,15 +1312,26 @@ begin
   elsif (rising_edge(CLK40)) then
     if (readback_fifo_wr_en = '1' and read_en_clk40_pulse = '0') then
       nwords_readback <= nwords_readback+1;
-    elsif (read_en_clk40_pulse = '1' and readback_fifo_wr_en = '0' and readback_fifo_empty_sync /= '1') then
-      nwords_readback <= nwords_readback-1;
+    elsif (read_en_clk40_pulse = '1' and readback_fifo_wr_en = '0') then
+      if (nwords_readback /= 0) then
+        nwords_readback <= nwords_readback-1;
+      end if;
     else
       nwords_readback <= nwords_readback;
     end if;
-    read_en_clk40_meta <= READBACK_FIFO_READ_EN;
-    read_en_clk40_sync1 <= read_en_clk40_meta;
-    read_en_clk40_sync2 <= read_en_clk40_sync1;
-    read_en_clk40_pulse <= read_en_clk40_sync1 and not read_en_clk40_sync2;
+    read_slowclk_toggle_meta <= read_slowclk_toggle;
+    read_slowclk_toggle_sync1 <= read_slowclk_toggle_meta;
+    read_slowclk_toggle_sync2 <= read_slowclk_toggle_sync1;
+    read_en_clk40_pulse <= read_slowclk_toggle_sync1 xor read_slowclk_toggle_sync2;
+  end if;
+  end process;
+  
+  process_nword_readback_slow : process(CLK2P5)
+  begin
+  if rising_edge(CLK2P5) then
+    if (READBACK_FIFO_READ_EN = '1') then
+      read_slowclk_toggle <= not read_slowclk_toggle;
+    end if;
   end if;
   end process;
   
@@ -1345,8 +1383,8 @@ begin
     OUT_UNLOCK_DONE         => unlock_done,
     START_LOCK              => prom_lock_en,
     OUT_LOCK_DONE           => lock_done,
-    START_WRITE_CONFIG      => prom_wr_config_en,
-    OUT_WRITE_CONFIG_DONE   => write_config_done,
+    START_WRITE_REGISTER    => prom_wr_register_en,
+    OUT_WRITE_REGISTER_DONE => write_register_done,
     REGISTER_CONTENTS       => register_contents,
     START_READ_REGISTER     => read_register_en,
     OUT_READ_REGISTER_DONE  => read_register_done,
