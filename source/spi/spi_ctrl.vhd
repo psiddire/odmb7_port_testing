@@ -14,19 +14,30 @@ use unisim.vcomponents.all;
 --! * (n-1)<<5 | 0004 read n words from PROM to readback FIFO
 --! * (n-1)<<5 | 0005 read array (depricated)
 --! * (n)<<5 | 0006 read register n (see below) 
+--! * 0007 read device ID
+--! * 0008 read CFI query (depricated)
+--! * 0009 clear status flag register
 --! * 000A erase sector
 --! * (n-1)<<5 | 000B program n words (depricated)
 --! * (n-1)<<5 | 000C buffer program n words to PROM (follow with n words to write)
 --! * (n-1)<<5 | 000D buffer program write n (depricated)
 --! * (n-1)<<5 | 000E buffer program conf (depricated)
+--! * 000F program suspend (depricated)
+--! * 0010 program resume (depricated)
+--! * 0011 program protection register (depricated)
 --! * (n)<<5 | 0012 write register n (see below) (follow with 1 word to write)
---! * 0013 write lock bit on sector
---! * 0014 erase lock bit on sector
+--! * (n)<<5 | 0013 write lock bit on sector (n=0 for nonvolatile, 1 for volatile)
+--! * 0014 erase all nonvolatile lock bits
+--! * (n)<<5 | 0015 read lock bit on sector (n=0 for nonvolatile, 1 for volatile)
+--! * 0016 blank check (depricated)
 --! * (addr_upper)<<5 | 0017 load address (follow with 1 word of lower address bits)
+--! * 0018 reserved (depricated)
 --! * 0019 start SPI timer
 --! * 001A stop SPI timer
 --! * 001B reset SPI timer
+--! * 001C clear FW SPI status
 --! * (prom_number)<<5 | 001D switch to PROM prom_number (0 or 1)
+--! * (n)<< 001E custom SPI command (normally disabled; send n bits, follow with 1 word of how many words to read follows by n words to write)
 --!
 --! #Register Codes (for commands 0006 and 0012)
 --! 1. status register
@@ -96,8 +107,14 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
       OUT_ERASE_DONE          : out std_logic;
       START_UNLOCK            : in std_logic;
       OUT_UNLOCK_DONE         : out std_logic;
-      START_LOCK              : in std_logic;
+      START_LOCK              : in std_logic_vector(1 downto 0);
       OUT_LOCK_DONE           : out std_logic;
+      START_READ_LOCK         : in std_logic_vector(1 downto 0);
+      OUT_READ_LOCK_DONE      : out std_logic;
+      START_READ_ID           : in std_logic;
+      OUT_READ_ID_DONE        : out std_logic;
+      START_CLEAR_STATUS      : in std_logic;
+      OUT_CLEAR_STATUS_DONE   : out std_logic;
       START_WRITE_REGISTER    : in std_logic_vector(3 downto 0);
       OUT_WRITE_REGISTER_DONE : out std_logic;                   
       REGISTER_CONTENTS       : in std_logic_vector(15 downto 0); 
@@ -105,6 +122,9 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
       OUT_READ_REGISTER_DONE  : out std_logic;                    
       OUT_REGISTER            : out std_logic_vector(7 downto 0); 
       OUT_REGISTER_WE         : out std_logic;                     
+      START_CUSTOM            : in std_logic_vector(11 downto 0); 
+      CUSTOM_WORDS_TO_READ    : in std_logic_vector(15 downto 0); 
+      OUT_CUSTOM_DONE         : out std_logic;                    
       ------------------ Read output
       OUT_READ_DATA           : out std_logic_vector(15 downto 0);
       OUT_READ_DATA_VALID     : out std_logic;
@@ -176,37 +196,55 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
     S_LOAD_ADDR_CMD, S_LOAD_ADDR_STALL_1, S_LOAD_ADDR_STALL_2, S_LOAD_ADDR_LOWER,
     S_READ_CMD, S_READ_LOW, S_READ_WAIT, 
     S_READ_REGISTER_CMD, S_READ_REGISTER_LOW, S_READ_REGISTER_WAIT,
+    S_READ_ID_CMD, S_READ_ID_LOW, S_READ_ID_WAIT,
+    S_CLEAR_STATUS_CMD, S_CLEAR_STATUS_LOW, S_CLEAR_STATUS_WAIT,
     S_WRITE_CMD, S_WRITE_STALL_1, S_WRITE_STALL_2, S_WRITE_WORD, S_WRITE_START, S_WRITE_WAIT, 
+    S_CUSTOM_CMD, S_CUSTOM_NREAD_STALL, S_CUSTOM_NREAD, S_CUSTOM_WORD_STALL, S_CUSTOM_WORD, S_CUSTOM_START_STALL,
+    S_CUSTOM_START, S_CUSTOM_WAIT,
     S_ERASE_CMD, S_ERASE_LOW, S_ERASE_WAIT, 
     S_LOCK_CMD, S_LOCK_LOW, S_LOCK_WAIT,
     S_UNLOCK_CMD, S_UNLOCK_LOW, S_UNLOCK_WAIT,
+    S_READ_LOCK_CMD, S_READ_LOCK_LOW, S_READ_LOCK_WAIT,
     S_WRITE_REGISTER_CMD, S_WRITE_REGISTER_STALL_1, S_WRITE_REGISTER_STALL_2, S_WRITE_REGISTER_LOWER, S_WRITE_REGISTER_WAIT,
-    S_START_TIMER_CMD, S_STOP_TIMER_CMD, S_RESET_TIMER_CMD,
+    S_START_TIMER_CMD, S_STOP_TIMER_CMD, S_RESET_TIMER_CMD, S_RESET_STATUS_CMD, 
     S_SWITCH_PROM_CMD,
     S_UNKNOWN_CMD, S_STALL
   );
-  signal cmd_fifo_state      : cmd_fifo_states := S_IDLE;
-  signal write_word_counter  : unsigned(11 downto 0) := (others => '0');
+  signal cmd_fifo_state         : cmd_fifo_states := S_IDLE;
+  signal write_word_counter     : unsigned(11 downto 0) := (others => '0');
   
-  signal program_nwords      : unsigned(11 downto 0) := (others => '0');
-  signal write_fifo_write_en : std_logic := '0';
-  signal prom_read_en        : std_logic := '0';
-  signal prom_erase_en       : std_logic := '0';
-  signal prom_write_en       : std_logic := '0';
-  signal prom_unlock_en      : std_logic := '0';
-  signal prom_lock_en        : std_logic := '0';
-  signal prom_wr_register_en : std_logic_vector(3 downto 0) := x"0";
-  signal read_done           : std_logic := '0';
-  signal erase_done          : std_logic := '0';
-  signal write_done          : std_logic := '0';
-  signal lock_done           : std_logic := '0';
-  signal unlock_done         : std_logic := '0';
-  signal write_register_done : std_logic := '0';
-  signal read_register_en    : std_logic_vector(3 downto 0) := x"0";
-  signal read_register_done  : std_logic := '0';
-  signal spi_timer_en        : std_logic := '0';
-  signal spi_timer_rst       : std_logic := '0';
-  signal register_contents   : std_logic_vector(15 downto 0) := (others => '0');
+  signal cmd_fifo_out_upper_mone : unsigned(10 downto 0) := (others => '0');
+  
+  signal program_nwords         : unsigned(11 downto 0) := (others => '0');
+  signal write_fifo_write_en    : std_logic := '0';
+  signal prom_read_en           : std_logic := '0';
+  signal prom_erase_en          : std_logic := '0';
+  signal prom_write_en          : std_logic := '0';
+  signal prom_unlock_en         : std_logic := '0';
+  signal prom_lock_en           : std_logic_vector(1 downto 0) := "00";
+  signal prom_read_lock_en      : std_logic_vector(1 downto 0) := "00";
+  signal prom_read_id_en        : std_logic := '0';
+  signal clear_status_en        : std_logic := '0';
+  signal prom_wr_register_en    : std_logic_vector(3 downto 0) := x"0";
+  signal read_done              : std_logic := '0';
+  signal erase_done             : std_logic := '0';
+  signal write_done             : std_logic := '0';
+  signal lock_done              : std_logic := '0';
+  signal read_lock_done         : std_logic := '0';
+  signal unlock_done            : std_logic := '0';
+  signal write_register_done    : std_logic := '0';
+  signal read_register_en       : std_logic_vector(3 downto 0) := x"0";
+  signal read_register_done     : std_logic := '0';
+  signal read_id_done           : std_logic := '0';
+  signal clear_status_done      : std_logic := '0';
+  signal spi_timer_en           : std_logic := '0';
+  signal spi_timer_rst          : std_logic := '0';
+  signal spi_status_rst         : std_logic := '0';
+  signal register_contents      : std_logic_vector(15 downto 0) := (others => '0');
+  signal prom_custom_en         : std_logic_vector(11 downto 0) := x"000";
+  signal prom_custom_rdwords    : std_logic_vector(15 downto 0) := x"0000";
+  signal custom_done            : std_logic := '0';
+  constant custom_enable        : std_logic := '1'; --should be 0 in normal firmware versions to disallow unintended SPI commands
   
   signal fsm_is_enabled      : std_logic := '1';
   
@@ -320,6 +358,11 @@ begin
   cmd_fifo_read_en_q <= cmd_fifo_read_en when rising_edge(CLK40) else cmd_fifo_read_en_q;
   cmd_fifo_read_en_pulse <= (not cmd_fifo_read_en_q) and cmd_fifo_read_en;
   
+  process(cmd_fifo_out)
+  begin
+    cmd_fifo_out_upper_mone <= (unsigned(cmd_fifo_out(15 downto 5)) - 1);
+  end process;
+  
   enable_cmd_fifo_fsm : process(CLK40, RST)
   begin
     if (RST='1') then
@@ -366,6 +409,15 @@ begin
           when x"06" =>
             --read register
             cmd_fifo_state  <= S_READ_REGISTER_CMD;
+          when x"07" =>
+            --read ID
+            cmd_fifo_state  <= S_READ_ID_CMD;
+          when x"08" =>
+            --read CFI query (depricated)
+            cmd_fifo_state  <= S_UNKNOWN_CMD;
+          when x"09" =>
+            --clear status flag register
+            cmd_fifo_state  <= S_CLEAR_STATUS_CMD;
           when x"0A" =>
             --erase sector (hardcode to 1 sector?)
             cmd_fifo_state  <= S_ERASE_CMD;
@@ -380,7 +432,16 @@ begin
             cmd_fifo_state  <= S_WRITE_CMD;
           when x"0E" =>
             --buffer program conf (depricated)
-            cmd_fifo_state  <= S_WRITE_CMD;
+            cmd_fifo_state  <= S_UNKNOWN_CMD;
+          when x"0F" =>
+            --Program suspend (depricated)
+            cmd_fifo_state  <= S_UNKNOWN_CMD;
+          when x"10" =>
+            --Program resume (depricated)
+            cmd_fifo_state  <= S_UNKNOWN_CMD;
+          when x"11" =>
+            --protection register program (depricated)
+            cmd_fifo_state  <= S_UNKNOWN_CMD;
           when x"12" =>
             --write configuration register
             cmd_fifo_state  <= S_WRITE_REGISTER_CMD;
@@ -390,9 +451,18 @@ begin
           when x"14" =>
             --unlock
             cmd_fifo_state  <= S_UNLOCK_CMD;
+          when x"15" =>
+            --read lock
+            cmd_fifo_state  <= S_READ_LOCK_CMD;
+          when x"16" =>
+            --blank check (depricated)
+            cmd_fifo_state  <= S_UNKNOWN_CMD;
           when x"17" =>
             --load address
             cmd_fifo_state  <= S_LOAD_ADDR_CMD;
+          when x"18" =>
+            --reserved (depricated)
+            cmd_fifo_state  <= S_UNKNOWN_CMD;
           when x"19" =>
             --start timer
             cmd_fifo_state  <= S_START_TIMER_CMD;
@@ -402,9 +472,19 @@ begin
           when x"1B" =>
             --reset timer
             cmd_fifo_state  <= S_RESET_TIMER_CMD;
+          when x"1C" =>
+            --reset status
+            cmd_fifo_state  <= S_RESET_STATUS_CMD;
           when x"1D" =>
             --switch prom
             cmd_fifo_state  <= S_SWITCH_PROM_CMD;
+          when x"1E" =>
+            --custom SPI command
+            if (custom_enable = '1') then
+              cmd_fifo_state  <= S_CUSTOM_CMD;
+            else
+              cmd_fifo_state  <= S_UNKNOWN_CMD;
+            end if;
           when others =>
             --unknown command
             cmd_fifo_state  <= S_UNKNOWN_CMD;
@@ -415,20 +495,26 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '0';
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords;
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
         
       when S_READ_CMD =>
         --start read process by sending read enable and number of words to read. Also remove command from FIFO
@@ -436,20 +522,26 @@ begin
         prom_read_en        <= '1';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '1';
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= "0" & unsigned(cmd_fifo_out(15 downto 5)); 
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
         
       when S_READ_LOW => 
         --needed to wait for read_done to go low
@@ -457,14 +549,18 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '0';
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords; 
         program_nwords      <= program_nwords;
@@ -472,6 +568,8 @@ begin
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
         
       when S_READ_WAIT =>
         --don't process any more commands until read is finished
@@ -483,20 +581,26 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '0';
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords; 
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
 
       when S_READ_REGISTER_CMD =>
         --start read process by sending read register enable. Also remove command from FIFO
@@ -504,20 +608,26 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= cmd_fifo_out(8 downto 5);
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '1';
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords; 
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
         
       when S_READ_REGISTER_LOW => 
         --needed to wait for read_done to go low
@@ -525,14 +635,18 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '0';
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords; 
         program_nwords      <= program_nwords;
@@ -540,6 +654,8 @@ begin
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
         
       when S_READ_REGISTER_WAIT =>
         --don't process any more commands until read is finished
@@ -551,20 +667,198 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '0';
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords; 
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
+
+      when S_READ_ID_CMD =>
+        --start read process by sending read ID enable. Also remove command from FIFO
+        cmd_fifo_state      <= S_READ_ID_LOW;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
+        prom_unlock_en      <= '0';
+        prom_read_id_en     <= '1';
+        clear_status_en     <= '0';
+        prom_wr_register_en <= x"0";
+        write_fifo_write_en <= '0';
+        read_register_en    <= x"0";
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '1';
+        spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
+        spi_timer_en        <= spi_timer_en;
+        read_nwords         <= read_nwords; 
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
+        
+      when S_READ_ID_LOW => 
+        --needed to wait for read_id_done to go low
+        cmd_fifo_state      <= S_READ_ID_WAIT;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
+        prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
+        prom_wr_register_en <= x"0";
+        write_fifo_write_en <= '0';
+        read_register_en    <= x"0";
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';
+        spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
+        spi_timer_en        <= spi_timer_en;
+        read_nwords         <= read_nwords; 
+        program_nwords      <= program_nwords;
+        write_word_counter  <= write_word_counter;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
+        
+      when S_READ_ID_WAIT =>
+        --don't process any more commands until read id is finished
+        if (read_id_done='1') then
+          cmd_fifo_state    <= S_IDLE;
+        else 
+          cmd_fifo_state    <= S_READ_ID_WAIT;
+        end if;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
+        prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
+        prom_wr_register_en <= x"0";
+        write_fifo_write_en <= '0';
+        read_register_en    <= x"0";
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';
+        spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
+        spi_timer_en        <= spi_timer_en;
+        read_nwords         <= read_nwords; 
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
+
+      when S_CLEAR_STATUS_CMD =>
+        --start clear status process by sending clear status enable. Also remove command from FIFO
+        cmd_fifo_state      <= S_CLEAR_STATUS_LOW;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
+        prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '1';
+        prom_wr_register_en <= x"0";
+        write_fifo_write_en <= '0';
+        read_register_en    <= x"0";
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '1';
+        spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
+        spi_timer_en        <= spi_timer_en;
+        read_nwords         <= read_nwords; 
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
+        
+      when S_CLEAR_STATUS_LOW => 
+        --needed to wait for clear_status_done to go low
+        cmd_fifo_state      <= S_CLEAR_STATUS_WAIT;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
+        prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
+        prom_wr_register_en <= x"0";
+        write_fifo_write_en <= '0';
+        read_register_en    <= x"0";
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';
+        spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
+        spi_timer_en        <= spi_timer_en;
+        read_nwords         <= read_nwords; 
+        program_nwords      <= program_nwords;
+        write_word_counter  <= write_word_counter;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
+        
+      when S_CLEAR_STATUS_WAIT =>
+        --don't process any more commands until read id is finished
+        if (clear_status_done='1') then
+          cmd_fifo_state    <= S_IDLE;
+        else 
+          cmd_fifo_state    <= S_CLEAR_STATUS_WAIT;
+        end if;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
+        prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
+        prom_wr_register_en <= x"0";
+        write_fifo_write_en <= '0';
+        read_register_en    <= x"0";
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';
+        spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
+        spi_timer_en        <= spi_timer_en;
+        read_nwords         <= read_nwords; 
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
         
       when S_ERASE_CMD =>
         --start erase sector command with erase enable and remove command from FIFO
@@ -572,20 +866,26 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '1';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '1';  
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords;
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
         
       when S_ERASE_LOW => 
         --wait for erase_done to go low
@@ -593,20 +893,26 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '0';
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords;
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
         
       when S_ERASE_WAIT =>
         --don't accept any more commands until done with erase command
@@ -618,20 +924,26 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '0';
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords;
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
         
       when S_WRITE_CMD =>
         --read number of words to program from command and remove command from FIFO
@@ -640,20 +952,26 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '1';
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords;      
         program_nwords      <= "0" & unsigned(cmd_fifo_out(15 downto 5));
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
 
       when S_WRITE_STALL_1 =>
         --wait an extra cycle for empty to be potentially de-asserted
@@ -661,20 +979,26 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '0';
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords;
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
        
       when S_WRITE_STALL_2 =>
         --continue when next word to write ready in command FIFO
@@ -686,20 +1010,26 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '0';
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords;
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
         
       when S_WRITE_WORD =>
         --write this word to the spi_interface write buffer FIFO (goes directly from command FIFO to spi_interface buffer)
@@ -712,20 +1042,26 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '1';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '1';
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords;
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
         
       when S_WRITE_START =>
         --start write command
@@ -733,20 +1069,26 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '1';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '0';
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords;
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
         
       when S_WRITE_WAIT => 
         --wait until write_done is 1
@@ -758,20 +1100,274 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '0';
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords;
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
+
+      when S_CUSTOM_CMD =>
+        --read number of bits to program from command and remove command from FIFO
+        write_word_counter  <= "00000" & (cmd_fifo_out_upper_mone(10 downto 4) + 1); --convert bits to words
+        cmd_fifo_state      <= S_CUSTOM_NREAD_STALL; 
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
+        prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
+        prom_wr_register_en <= x"0";
+        write_fifo_write_en <= '0';
+        read_register_en    <= x"0";
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '1';
+        spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
+        spi_timer_en        <= spi_timer_en;
+        read_nwords         <= read_nwords;      
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        prom_custom_en      <= cmd_fifo_out(15 downto 5) & "0";
+        prom_custom_rdwords <= x"0000";
+
+      when S_CUSTOM_NREAD_STALL =>
+        --wait a clock cycle for fifo empty
+        write_word_counter  <= write_word_counter;
+        cmd_fifo_state      <= S_CUSTOM_NREAD; 
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
+        prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
+        prom_wr_register_en <= x"0";
+        write_fifo_write_en <= '0';
+        read_register_en    <= x"0";
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';
+        spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
+        spi_timer_en        <= spi_timer_en;
+        read_nwords         <= read_nwords;      
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        prom_custom_en      <= prom_custom_en;
+        prom_custom_rdwords <= x"0000";
+
+      when S_CUSTOM_NREAD =>
+        --when cmd_fifo is nonempty, write contents to rdwords and proceed
+        if (cmd_fifo_empty='0') then
+          cmd_fifo_state      <= S_CUSTOM_WORD_STALL;
+          cmd_fifo_read_en    <= '1';
+          prom_custom_rdwords <= cmd_fifo_out;
+        else
+          cmd_fifo_state      <= S_CUSTOM_NREAD;
+          cmd_fifo_read_en    <= '0';
+          prom_custom_rdwords <= prom_custom_rdwords;
+        end if;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
+        prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
+        prom_wr_register_en <= x"0";
+        write_fifo_write_en <= '0';
+        read_register_en    <= x"0";
+        prom_load_addr      <= '0';
+        spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
+        spi_timer_en        <= spi_timer_en;
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        prom_custom_en      <= prom_custom_en;
+
+      when S_CUSTOM_WORD_STALL =>
+        --wait a clock cycle for fifo empty
+        write_word_counter  <= write_word_counter;
+        cmd_fifo_state      <= S_CUSTOM_WORD; 
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
+        prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
+        prom_wr_register_en <= x"0";
+        write_fifo_write_en <= '0';
+        read_register_en    <= x"0";
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';
+        spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
+        spi_timer_en        <= spi_timer_en;
+        read_nwords         <= read_nwords;      
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        prom_custom_en      <= prom_custom_en;
+        prom_custom_rdwords <= prom_custom_rdwords;
+
+      when S_CUSTOM_WORD =>
+        --when cmd_fifo is nonempty, write contents to FIFO and proceed
+        if (cmd_fifo_empty='0') then
+          write_fifo_write_en <= '1';
+          cmd_fifo_read_en    <= '1';
+          if (write_word_counter = 1) then
+            cmd_fifo_state      <= S_CUSTOM_START_STALL;
+            write_word_counter  <= x"00F";
+          else
+            write_word_counter  <= write_word_counter - 1;
+            cmd_fifo_state      <= S_CUSTOM_WORD_STALL;
+          end if;
+        else
+          cmd_fifo_state      <= S_CUSTOM_WORD;
+          write_fifo_write_en <= '0';
+          cmd_fifo_read_en    <= '0';
+        end if;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
+        prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
+        prom_wr_register_en <= x"0";
+        read_register_en    <= x"0";
+        prom_load_addr      <= '0';
+        spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
+        spi_timer_en        <= spi_timer_en;
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        prom_custom_en      <= prom_custom_en;
+        prom_custom_rdwords <= prom_custom_rdwords;
+
+
+      when S_CUSTOM_START_STALL =>
+        --wait for spi_interface fifo to propagate
+        if (write_word_counter /= 0) then
+          cmd_fifo_state      <= S_CUSTOM_START_STALL; 
+        else
+          cmd_fifo_state      <= S_CUSTOM_START; 
+        end if;
+        write_word_counter  <= write_word_counter - 1;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
+        prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
+        prom_wr_register_en <= x"0";
+        write_fifo_write_en <= '0';
+        read_register_en    <= x"0";
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';
+        spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
+        spi_timer_en        <= spi_timer_en;
+        read_nwords         <= read_nwords;      
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        prom_custom_en      <= prom_custom_en;
+        prom_custom_rdwords <= prom_custom_rdwords;
+
+      when S_CUSTOM_START =>
+        --start custom command
+        write_word_counter  <= x"000";
+        cmd_fifo_state      <= S_CUSTOM_WAIT; 
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
+        prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
+        prom_wr_register_en <= x"0";
+        write_fifo_write_en <= '0';
+        read_register_en    <= x"0";
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';
+        spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
+        spi_timer_en        <= spi_timer_en;
+        read_nwords         <= read_nwords;      
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        prom_custom_en      <= prom_custom_en(11 downto 1) & '1';
+        prom_custom_rdwords <= prom_custom_rdwords;
+
+      when S_CUSTOM_WAIT =>
+        --don't accept any more commands until done with custom command
+        if (custom_done='1') then
+          cmd_fifo_state    <= S_IDLE;
+        else 
+          cmd_fifo_state    <= S_CUSTOM_WAIT;
+        end if;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
+        prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
+        prom_wr_register_en <= x"0";
+        write_fifo_write_en <= '0';
+        read_register_en    <= x"0";
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';
+        spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
+        spi_timer_en        <= spi_timer_en;
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
 
       when S_WRITE_REGISTER_CMD =>
         --remove command from FIFO
@@ -780,20 +1376,26 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= '0' & cmd_fifo_out(7 downto 5);
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '1';
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords;      
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
 
       when S_WRITE_REGISTER_STALL_1 => 
         --need to wait because empty takes an extra cycle to go low
@@ -801,20 +1403,26 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= prom_wr_register_en;
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '0';  
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords;
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
         
       when S_WRITE_REGISTER_STALL_2 => 
         --continue when lower part of address is ready in command FIFO
@@ -826,20 +1434,26 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= prom_wr_register_en;
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '0';  
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords;
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
               
       when S_WRITE_REGISTER_LOWER =>
         --set lower part of address, remove command from FIFO, and pass address onto spi_interface
@@ -847,20 +1461,26 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= prom_wr_register_en;
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '1';  
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords;
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= cmd_fifo_out;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
 
       when S_WRITE_REGISTER_WAIT =>
         --don't accept any more commands until done with write register
@@ -872,20 +1492,26 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= '1' & prom_wr_register_en(2 downto 0);
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '0';
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords;
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
 
       when S_LOCK_CMD =>
         --start lock sector command with lock enable and remove command from FIFO
@@ -893,20 +1519,26 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '1';
+        prom_lock_en        <= cmd_fifo_out(5) & '1';
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '1';  
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords;
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
         
       when S_LOCK_LOW => 
         --wait for lock_done to go low
@@ -914,23 +1546,29 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '0';
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords;
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
         
       when S_LOCK_WAIT =>
-        --don't accept any more commands until done with erase command
+        --don't accept any more commands until done with read lock command
         if (lock_done='1') then
           cmd_fifo_state    <= S_IDLE;
         else 
@@ -939,20 +1577,111 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '0';
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords;
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
+
+      when S_READ_LOCK_CMD =>
+        --start read lock command and remove command from FIFO
+        cmd_fifo_state      <= S_READ_LOCK_LOW;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= cmd_fifo_out(5) & '1';
+        prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
+        prom_wr_register_en <= x"0";
+        write_fifo_write_en <= '0';
+        read_register_en    <= x"0";
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '1';  
+        spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
+        spi_timer_en        <= spi_timer_en;
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
+        
+      when S_READ_LOCK_LOW => 
+        --wait for read_lock_done to go low
+        cmd_fifo_state      <= S_READ_LOCK_WAIT;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
+        prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
+        prom_wr_register_en <= x"0";
+        write_fifo_write_en <= '0';
+        read_register_en    <= x"0";
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';
+        spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
+        spi_timer_en        <= spi_timer_en;
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
+        
+      when S_READ_LOCK_WAIT =>
+        --don't accept any more commands until done with read lock command
+        if (read_lock_done='1') then
+          cmd_fifo_state    <= S_IDLE;
+        else 
+          cmd_fifo_state    <= S_READ_LOCK_WAIT;
+        end if;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
+        prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
+        prom_wr_register_en <= x"0";
+        write_fifo_write_en <= '0';
+        read_register_en    <= x"0";
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '0';
+        spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
+        spi_timer_en        <= spi_timer_en;
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
 
       when S_UNLOCK_CMD =>
         --start erase sector command with erase enable and remove command from FIFO
@@ -960,20 +1689,26 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '1';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '1';  
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords;
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
         
       when S_UNLOCK_LOW => 
         --wait for erase_done to go low
@@ -981,20 +1716,26 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '0';
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords;
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
         
       when S_UNLOCK_WAIT =>
         --don't accept any more commands until done with erase command
@@ -1006,20 +1747,26 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '0';
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords;
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
         
       when S_LOAD_ADDR_CMD =>
         --set the upper part of address and remove command from FIFO
@@ -1027,20 +1774,26 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '1';  
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords;
         program_nwords      <= program_nwords;
         prom_addr           <= "00000" & cmd_fifo_out(15 downto 5) & prom_addr(15 downto 0);
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
 
       when S_LOAD_ADDR_STALL_1 => 
         --need to wait because empty takes an extra cycle to go low
@@ -1048,20 +1801,26 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '0';  
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords;
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
         
       when S_LOAD_ADDR_STALL_2 => 
         --continue when lower part of address is ready in command FIFO
@@ -1073,20 +1832,26 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '0';  
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords;
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
               
       when S_LOAD_ADDR_LOWER =>
         --set lower part of address, remove command from FIFO, and pass address onto spi_interface
@@ -1094,20 +1859,26 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '1';
         cmd_fifo_read_en    <= '1';  
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords;
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr(31 downto 16) & cmd_fifo_out;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
 
       when S_START_TIMER_CMD =>
         --start timer and remove command from FIFO
@@ -1115,20 +1886,26 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '1';
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= '1';
         read_nwords         <= read_nwords;
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
 
       when S_STOP_TIMER_CMD =>
         --stop timer and remove command from FIFO
@@ -1136,41 +1913,80 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '1';
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= '0';
         read_nwords         <= read_nwords;
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
 
       when S_RESET_TIMER_CMD =>
-        --stop timer and remove command from FIFO
+        --reset timer and remove command from FIFO
         cmd_fifo_state      <= S_STALL;
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '1';
         spi_timer_rst       <= '1';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords;
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
+
+      when S_RESET_STATUS_CMD =>
+        --reset SPI CTRL status register and remove command from FIFO
+        cmd_fifo_state      <= S_STALL;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
+        prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
+        prom_wr_register_en <= x"0";
+        write_fifo_write_en <= '0';
+        read_register_en    <= x"0";
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '1';
+        spi_timer_rst       <= '0';
+        spi_status_rst      <= '1';
+        spi_timer_en        <= spi_timer_en;
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
 
       when S_SWITCH_PROM_CMD =>
         --switch selected PROM and remove command from FIFO
@@ -1178,20 +1994,26 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '1';  
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords;
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= cmd_fifo_out(5);
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
         
       when S_UNKNOWN_CMD =>
         --do nothing but remove command from FIFO
@@ -1199,20 +2021,26 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '1';
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords;
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
 
       when S_STALL =>
         --need to wait because empty takes an extra cycle to go low
@@ -1220,20 +2048,26 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '0';
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords;
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
       
       when others =>
         --unimplemented state
@@ -1241,20 +2075,26 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= '0';
+        prom_lock_en        <= "00";
+        prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
         prom_wr_register_en <= x"0";
         write_fifo_write_en <= '0';
         read_register_en    <= x"0";
         prom_load_addr      <= '0';
         cmd_fifo_read_en    <= '0';
         spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
         spi_timer_en        <= spi_timer_en;
         read_nwords         <= read_nwords;
         program_nwords      <= program_nwords;
         prom_addr           <= prom_addr;
         prom_select         <= prom_select;
         register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
       end case;
     end if;
   end if;
@@ -1296,7 +2136,9 @@ begin
     cmd_fifo_empty_sync <= cmd_fifo_empty_meta;
     cmd_fifo_full_meta <= cmd_fifo_full;
     cmd_fifo_full_sync <= cmd_fifo_full_meta;
-    if (spi_register_we = '1') then
+    if (spi_status_rst = '1') then
+      spi_register_inner <= x"0000";
+    elsif (spi_register_we = '1') then
       spi_register_inner <= readback_fifo_empty_sync & readback_fifo_full_sync & "00" & cmd_fifo_empty_sync & cmd_fifo_full_sync & "00" & spi_register_readback;
     else
       spi_register_inner <= readback_fifo_empty_sync & readback_fifo_full_sync & "00" & cmd_fifo_empty_sync & cmd_fifo_full_sync & "00" & spi_register_inner(7 downto 0);
@@ -1383,6 +2225,12 @@ begin
     OUT_UNLOCK_DONE         => unlock_done,
     START_LOCK              => prom_lock_en,
     OUT_LOCK_DONE           => lock_done,
+    START_READ_LOCK         => prom_read_lock_en,
+    OUT_READ_LOCK_DONE      => read_lock_done,
+    START_READ_ID           => prom_read_id_en,
+    OUT_READ_ID_DONE        => read_id_done,
+    START_CLEAR_STATUS      => clear_status_en,
+    OUT_CLEAR_STATUS_DONE   => clear_status_done,
     START_WRITE_REGISTER    => prom_wr_register_en,
     OUT_WRITE_REGISTER_DONE => write_register_done,
     REGISTER_CONTENTS       => register_contents,
@@ -1390,6 +2238,9 @@ begin
     OUT_READ_REGISTER_DONE  => read_register_done,
     OUT_REGISTER            => spi_register_readback,
     OUT_REGISTER_WE         => spi_register_we,
+    START_CUSTOM            => prom_custom_en,
+    CUSTOM_WORDS_TO_READ    => prom_custom_rdwords,
+    OUT_CUSTOM_DONE         => custom_done,          
     ------------------ Read output
     OUT_READ_DATA           => spi_readdata,
     OUT_READ_DATA_VALID     => readback_fifo_wr_en,

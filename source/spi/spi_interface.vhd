@@ -37,15 +37,24 @@ entity spi_interface is
     OUT_ERASE_DONE          : out std_logic;                    --! '1' unless erase in progress
     START_UNLOCK            : in std_logic;                     --! Signal to erase nonvolatile lock bits on all sectors
     OUT_UNLOCK_DONE         : out std_logic;                    --! '1' unless erase nonvolatile lock bits in progress
-    START_LOCK              : in std_logic;                     --! Signal to write nonvolatile lock bit
-    OUT_LOCK_DONE           : out std_logic;                    --! '1' unless write nonvolatile lock bits in progress
+    START_LOCK              : in std_logic_vector(1 downto 0);  --! Signal to write lock bit - MSB is 0 for nonvolatile 1 for volatile
+    OUT_LOCK_DONE           : out std_logic;                    --! '1' unless write lock bits in progress
+    START_READ_LOCK         : in std_logic_vector(1 downto 0);  --! Signal to read lock bit - MSB is 0 for nonvolatile 1 for volatile
+    OUT_READ_LOCK_DONE      : out std_logic;                    --! '1' unless read lock bits in progress
+    START_READ_ID           : in std_logic;                     --! Signal to read PROM ID
+    OUT_READ_ID_DONE        : out std_logic;                    --! '1' unless read ID in progress
+    START_CLEAR_STATUS      : in std_logic;                     --! Signal to clear status flag register
+    OUT_CLEAR_STATUS_DONE   : out std_logic;                    --! '1' unless clear status flag in progress
     START_WRITE_REGISTER    : in std_logic_vector(3 downto 0);  --! Signal to write register, bit 3 indicates start and bits 2:0 indicate register
     OUT_WRITE_REGISTER_DONE : out std_logic;                    --! '1' unless write register in progress
     REGISTER_CONTENTS       : in std_logic_vector(15 downto 0); --! Register contents to be written with write register commands
     START_READ_REGISTER     : in std_logic_vector(3 downto 0);  --! Signal to start read register, when nonzero, indicates register
     OUT_READ_REGISTER_DONE  : out std_logic;                    --! '1' unless read register in progress
     OUT_REGISTER            : out std_logic_vector(7 downto 0); --! Contents of register read out
-    OUT_REGISTER_WE         : out std_logic;                     --! Write enable for register
+    OUT_REGISTER_WE         : out std_logic;                    --! Write enable for register
+    START_CUSTOM            : in std_logic_vector(11 downto 0); --! Signal to start custom command where (11 downto 1) are number of bits to send and (0) is start
+    CUSTOM_WORDS_TO_READ    : in std_logic_vector(15 downto 0); --! Number of bytes to read from custom command; should be set before START_CUSTOM(0)
+    OUT_CUSTOM_DONE         : out std_logic;                    --! '1' unless custom SPI command in progress
     ------------------ Read output
     OUT_READ_DATA           : out std_logic_vector(15 downto 0); --! Data read out from PROM
     OUT_READ_DATA_VALID     : out std_logic;                     --! Indicates when data from PROM is valid
@@ -129,6 +138,9 @@ END COMPONENT;
   constant  CmdExit4BMode      : std_logic_vector(7 downto 0)  := X"E9";
   constant  CmdEraseNonvLock   : std_logic_vector(7 downto 0)  := X"E4";
   constant  CmdWriteNonvLock   : std_logic_vector(7 downto 0)  := X"E3";
+  constant  CmdWriteVolaLock   : std_logic_vector(7 downto 0)  := X"E5";
+  constant  CmdReadVolaLock    : std_logic_vector(7 downto 0)  := X"E8";
+  constant  CmdReadNonvLock    : std_logic_vector(7 downto 0)  := X"E2";
   constant  CmdWriteNonvConfig : std_logic_vector(7 downto 0)  := X"B1";
   constant  CmdWriteVolaConfig : std_logic_vector(7 downto 0)  := X"81";
   constant  CmdWriteExteConfig : std_logic_vector(7 downto 0)  := X"61";
@@ -136,6 +148,7 @@ END COMPONENT;
   constant  CmdReadNonvConf    : std_logic_vector(7 downto 0)  := X"B5";
   constant  CmdReadVolaConf    : std_logic_vector(7 downto 0)  := X"85";
   constant  CmdReadExteConf    : std_logic_vector(7 downto 0)  := X"65";
+  constant  CmdClearFlagStatus : std_logic_vector(7 downto 0)  := X"50";
 
   ------------- STARTUPE3/SPI signals -------------------- 
   signal spi_miso         : std_logic;
@@ -149,8 +162,9 @@ END COMPONENT;
   signal dopin_ts         : std_logic_vector(3 downto 0) := "1110";
   
   ------------- Write FIFO signals -------------------- 
-  signal write_fifo_output        : std_logic_vector(3 downto 0) := "0000";
-  signal write_fifo_read_enable       : std_logic := '0';
+  signal write_fifo_output          : std_logic_vector(3 downto 0) := "0000";
+  signal write_spi_fifo_read_enable : std_logic := '0';
+  signal write_fifo_read_enable     : std_logic := '0';
 
   ------------- Read signals -------------------- 
   signal read_spi_cs_bar         : std_logic := '1';
@@ -192,11 +206,25 @@ END COMPONENT;
 
   ------------- Write lock signals -------------------- 
   signal write_lock_spi_cs_bar       : std_logic := '1';
+  signal write_lock_type             : std_logic_vector(1 downto 0) := "00";
   signal write_lock_address          : std_logic_vector(31 downto 0) := x"00000000";
+  signal write_lock_address_volatile : std_logic_vector(31 downto 0) := x"00000000";
   signal write_lock_done             : std_logic := '1';
   signal write_lock_cmdcounter       : unsigned(5 downto 0) := "111111";
   signal write_lock_cmdreg           : std_logic_vector(39 downto 0) := x"1111111111";
   signal write_lock_status_bit_index : std_logic_vector(7 downto 0) := x"00";
+
+  ------------- Read lock signals -------------------- 
+  signal read_lock_spi_cs_bar       : std_logic := '1';
+  signal read_lock_type             : std_logic_vector(1 downto 0) := "00";
+  signal read_lock_address          : std_logic_vector(31 downto 0) := x"00000000";
+  signal read_lock_address_volatile : std_logic_vector(31 downto 0) := x"00000000";
+  signal read_lock_done             : std_logic := '0';
+  signal read_lock_cmdcounter       : unsigned(5 downto 0) := "000000";
+  signal read_lock_cmdreg           : std_logic_vector(39 downto 0) := x"0000000000";
+  signal read_lock_data_counter     : unsigned(1 downto 0) := "00";
+  signal read_lock_data             : std_logic_vector(15 downto 0) := x"0000";
+  signal read_lock_data_valid       : std_logic := '0';
 
   ------------- Write config signals -------------------- 
   signal write_config_spi_cs_bar       : std_logic := '1';
@@ -216,6 +244,35 @@ END COMPONENT;
   signal register_inner                : std_logic_vector(7 downto 0) := x"00";
   signal register_we                   : std_logic := '0';
   signal read_register_max_index       : std_logic_vector(7 downto 0) := x"00";
+
+  ------------- Read ID signals -------------------- 
+  signal read_id_spi_cs_bar      : std_logic := '1';
+  signal read_id_done            : std_logic := '0';
+  signal read_id_cmdcounter      : unsigned(5 downto 0) := "111111";
+  signal read_id_cmdreg          : std_logic_vector(39 downto 0) := x"1111111111";
+  signal read_id_data            : std_logic_vector(15 downto 0) := x"0000";
+  signal read_id_data_valid      : std_logic := '0';
+  signal read_id_data_counter    : unsigned(7 downto 0) := x"00";
+
+  ------------- Clear status signals -------------------- 
+  signal clear_status_spi_cs_bar      : std_logic := '1';
+  signal clear_status_done            : std_logic := '0';
+  signal clear_status_cmdcounter      : unsigned(5 downto 0) := "111111";
+  signal clear_status_cmdreg          : std_logic_vector(39 downto 0) := x"1111111111";
+
+  ------------- Custom SPI command signals -------------------- 
+  signal custom_done             : std_logic := '1';
+  signal custom_spi_cs_bar       : std_logic := '1';
+  signal custom_fifo_read_enable : std_logic := '0';
+  signal custom_nbits_write      : unsigned(10 downto 0) := "00000000000";
+  signal custom_nwords_read      : unsigned(15 downto 0) := x"0000";
+  signal custom_mosi             : std_logic := '0';
+  signal custom_fifo_idx         : unsigned(1 downto 0) := "11";
+  signal custom_data_counter     : unsigned(3 downto 0) := x"0";
+  signal custom_data             : std_logic_vector(15 downto 0) := x"0000";
+  signal custom_data_valid       : std_logic := '0';
+  signal custom_first_read_cycle : std_logic := '0';
+  constant custom_enable         : std_logic := '1'; --should be 0 in normal firmware versions to disallow unintended SPI commands
 
   --------------- select read command and address -------------------- 
   --signal CmdIndex    : std_logic_vector(3 downto 0) := "0001";  
@@ -312,6 +369,30 @@ END COMPONENT;
   );
   signal read_register_state : read_register_states := S_READ_REGISTER_IDLE;
 
+  type read_id_states is
+  (
+    S_READ_ID_IDLE, S_READ_ID_ASSERT_CS_READ, S_READ_ID_SHIFT_READ
+  );
+  signal read_id_state : read_id_states := S_READ_ID_IDLE;
+
+  type read_lock_states is
+  (
+    S_READ_LOCK_IDLE, S_READ_LOCK_ASSERT_CS_READ, S_READ_LOCK_SHIFT_READ
+  );
+  signal read_lock_state : read_lock_states := S_READ_LOCK_IDLE;
+
+  type clear_status_states is
+  (
+    S_CLEAR_STATUS_IDLE, S_CLEAR_STATUS_ASSERT_CS, S_CLEAR_STATUS_SHIFT
+  );
+  signal clear_status_state : clear_status_states := S_CLEAR_STATUS_IDLE;
+
+  type custom_states is
+  (
+    S_CUSTOM_IDLE, S_CUSTOM_ASSERT_CS, S_CUSTOM_SHIFT, S_CUSTOM_FLUSH_FIFO
+  );
+  signal custom_state : custom_states := S_CUSTOM_IDLE;
+
  begin
    
   ----------------------------------------------------------------------------
@@ -371,8 +452,12 @@ END COMPONENT;
       elsif (erase_done = '0') then spi_mosi <= erase_cmdreg(39);
       elsif (erase_lock_done = '0') then spi_mosi <= erase_lock_cmdreg(39);
       elsif (write_lock_done = '0') then spi_mosi <= write_lock_cmdreg(39);
+      elsif (read_lock_done = '0') then spi_mosi <= read_lock_cmdreg(39);
       elsif (write_config_done = '0') then spi_mosi <= write_config_cmdreg(39);
       elsif (read_register_done = '0') then spi_mosi <= read_register_cmdreg(39);
+      elsif (read_id_done = '0') then spi_mosi <= read_id_cmdreg(39);
+      elsif (clear_status_done = '0') then spi_mosi <= clear_status_cmdreg(39);
+      elsif (custom_done = '0') then spi_mosi <= custom_mosi;
       else 
         case write_state is
           when S_WRITE_SHIFT_DATA =>
@@ -391,8 +476,12 @@ END COMPONENT;
       elsif (erase_done = '0') then spi_cs_bar_input <= erase_spi_cs_bar;
       elsif (erase_lock_done = '0') then spi_cs_bar_input <= erase_lock_spi_cs_bar;
       elsif (write_lock_done = '0') then spi_cs_bar_input <= write_lock_spi_cs_bar;
+      elsif (read_lock_done = '0') then spi_cs_bar_input <= read_lock_spi_cs_bar;
       elsif (write_config_done = '0') then spi_cs_bar_input <= write_config_spi_cs_bar;
       elsif (read_register_done = '0') then spi_cs_bar_input <= read_register_spi_cs_bar;
+      elsif (read_id_done = '0') then spi_cs_bar_input <= read_id_spi_cs_bar;
+      elsif (clear_status_done = '0') then spi_cs_bar_input <= clear_status_spi_cs_bar;
+      elsif (custom_done = '0') then spi_cs_bar_input <= custom_spi_cs_bar;
       else spi_cs_bar_input <= write_spi_cs_bar;
       end if;
     end if; --CLK
@@ -407,7 +496,7 @@ writeFIFO_i : writeSpiFIFO
     rd_clk => CLK,
     din => WRITE_FIFO_INPUT,
     wr_en => WRITE_FIFO_WRITE_ENABLE,
-    rd_en => write_fifo_read_enable,
+    rd_en => write_spi_fifo_read_enable,
     dout => write_fifo_output,
     full => open,
     empty => open,
@@ -415,6 +504,7 @@ writeFIFO_i : writeSpiFIFO
     wr_rst_busy => open,
     rd_rst_busy => open 
   );
+write_spi_fifo_read_enable <= write_fifo_read_enable or custom_fifo_read_enable;
 
 -----------------------------  pass output signals  --------------------------------------------------
 --    readdone                <= read_done;
@@ -435,17 +525,27 @@ writeFIFO_i : writeSpiFIFO
 --    out_wr_rddata <= rddata;
 --    out_wr_spistatus <= spi_status; 
 
-OUT_READ_DATA <= read_data;
-OUT_READ_DATA_VALID <= read_data_valid;
+OUT_READ_DATA <= read_id_data when (read_id_done='0') else 
+                 read_lock_data when (read_lock_done='0') else 
+                 custom_data when (custom_done='0') else 
+                 read_data;
+OUT_READ_DATA_VALID <= read_id_data_valid when (read_id_done='0') else
+                       read_lock_data_valid when (read_lock_done='0') else 
+                       custom_data_valid when (custom_done='0') else
+                       read_data_valid;
 OUT_READ_DONE <= read_done;
 OUT_ERASE_DONE <= erase_done;
 OUT_WRITE_DONE <= write_done;
 OUT_UNLOCK_DONE <= erase_lock_done;
 OUT_LOCK_DONE <= write_lock_done;
+OUT_READ_LOCK_DONE <= read_lock_done;
 OUT_WRITE_REGISTER_DONE <= write_config_done;
 OUT_READ_REGISTER_DONE <= read_register_done;
+OUT_READ_ID_DONE <= read_id_done;
+OUT_CLEAR_STATUS_DONE <= clear_status_done;
 OUT_REGISTER <= register_inner;
 OUT_REGISTER_WE <= register_we;
+OUT_CUSTOM_DONE <= custom_done;
 
 ---------------------------------  PROM READ FSM  ----------------------------------------------
 --CmdSelect <= CmdStatus when CmdIndex = x"1" else
@@ -469,7 +569,9 @@ process_read : process (CLK)
           read_data <= x"0000";
           read_state <= S_READ_ASSERT_CS;
           read_done <= '0';
-         end if;
+        else
+          read_done <= '1';
+        end if;
 
    when S_READ_ASSERT_CS =>
         --assert cs_bar and prep FASTREAD command
@@ -518,7 +620,9 @@ process_erase : process (CLK)
         if (START_ERASE = '1') then
           erase_done <= '0';
           erase_state <= S_ERASE_ASSERT_CS_WRITE_ENABLE;
-         end if;
+        else
+          erase_done <= '1';
+        end if;
                        
    when S_ERASE_ASSERT_CS_WRITE_ENABLE =>
         --assert CS and prep write enable commmand
@@ -600,6 +704,8 @@ process_write : process (CLK)
           dopin_ts <= "1110";
           write_done <= '0';
           write_state <= S_WRITE_ASSERT_CS_WRITE_ENABLE;
+        else
+          write_done <= '1';
         end if;
 
    when S_WRITE_ASSERT_CS_WRITE_ENABLE =>
@@ -780,7 +886,9 @@ process_erase_lock : process (CLK)
         if (START_UNLOCK = '1') then
           erase_lock_done <= '0';
           erase_lock_state <= S_ERASE_LOCK_ASSERT_CS_WRITE_ENABLE;
-         end if;
+        else
+          erase_lock_done <= '1';
+        end if;
                        
    when S_ERASE_LOCK_ASSERT_CS_WRITE_ENABLE =>
         --assert CS and prep write enable commmand
@@ -853,12 +961,18 @@ process_write_lock : process (CLK)
   case write_lock_state is 
    when S_WRITE_LOCK_IDLE =>
         --when START_WRITE received, initiate write process
-        if (START_ADDRESS_VALID = '1') then write_lock_address <= START_ADDRESS; end if; --4-byte addressing??
+        if (START_ADDRESS_VALID = '1') then 
+          write_lock_address <= START_ADDRESS; 
+          write_lock_address_volatile <= START_ADDRESS(23 downto 0) & x"00";
+        end if; --4-byte addressing for nonvolatile, 3 for volatile
         write_lock_spi_cs_bar <= '1';
-        if (START_LOCK = '1') then
+        if (START_LOCK(0) = '1') then
+          write_lock_type <= START_LOCK;
           write_lock_done <= '0';
           write_lock_state <= S_WRITE_LOCK_ASSERT_CS_WRITE_ENABLE;
-         end if;
+        else
+          write_lock_done <= '1';
+        end if;
                        
    when S_WRITE_LOCK_ASSERT_CS_WRITE_ENABLE =>
         --assert CS and prep write enable commmand
@@ -880,8 +994,13 @@ process_write_lock : process (CLK)
    when S_WRITE_LOCK_ASSERT_CS_WRITE_LOCK =>
         --assert CS and prepare for write nonvolatile lock bits
         write_lock_spi_cs_bar <= '0';   
-        write_lock_cmdreg <= CmdWriteNonvLock & write_lock_address; 
-        write_lock_cmdcounter <= "100111"; --40 bits: 8 command + 32 for address
+        if (write_lock_type(1) = '0') then --nonvolatile
+          write_lock_cmdreg <= CmdWriteNonvLock & write_lock_address; 
+          write_lock_cmdcounter <= "100111"; --40 bits: 8 command + 32 for address
+        else
+          write_lock_cmdreg <= CmdWriteVolaLock & write_lock_address_volatile; 
+          write_lock_cmdcounter <= "011111"; --32 bits: 8 command + 24 for address
+        end if;
         write_lock_state <= S_WRITE_LOCK_SHIFT_WRITE_LOCK;
                       
    when S_WRITE_LOCK_SHIFT_WRITE_LOCK =>     
@@ -942,6 +1061,65 @@ process_write_lock : process (CLK)
  end if;  -- Clk
 end process process_write_lock;
 
+-------------------------------  READ LOCK FSM  --------------------------------------------------
+process_read_lock : process (CLK)
+  begin
+  if rising_edge(CLK) then
+  case read_lock_state is 
+  when S_READ_LOCK_IDLE =>
+       --when START_READ_LOCK received, initiate write process
+       read_lock_spi_cs_bar <= '1';
+       read_lock_data_valid <= '0';
+       if (START_ADDRESS_VALID = '1') then 
+         read_lock_address <= START_ADDRESS; 
+         read_lock_address_volatile <= START_ADDRESS(23 downto 0) & x"00";
+       end if; --4-byte addressing for nonvolatile, 3 for volatile
+       if (START_READ_LOCK(0) = '1') then
+         read_lock_type <= START_READ_LOCK;
+         read_lock_done <= '0';
+         read_lock_state <= S_READ_LOCK_ASSERT_CS_READ;
+       else
+         read_lock_done <= '1';
+         read_lock_state <= S_READ_LOCK_IDLE;
+       end if;
+
+  when S_READ_LOCK_ASSERT_CS_READ =>
+       -- assert CS and prep read id command
+       read_lock_spi_cs_bar <= '0';
+       read_lock_cmdcounter <= "000111"; --8 bits for command
+       if (read_lock_type(1) = '0') then
+         read_lock_cmdreg <=  CmdReadNonvLock & read_lock_address;
+         read_lock_cmdcounter <= "100111"; --40 bits: 8 command + 32 for address
+       else
+         read_lock_cmdreg <=  CmdReadVolaLock & read_lock_address_volatile;
+         read_lock_cmdcounter <= "011111"; --32 bits: 8 command + 24 for address
+       end if;
+       read_lock_data_counter <= "10"; 
+       read_lock_state <= S_READ_LOCK_SHIFT_READ;
+       
+  when S_READ_LOCK_SHIFT_READ =>
+       --shift read id command and read back 
+       if (read_lock_cmdcounter /= 0) then 
+         read_lock_cmdcounter <= read_lock_cmdcounter - 1;
+         read_lock_cmdreg <= read_lock_cmdreg(38 downto 0) & '0';
+         read_lock_data_valid <= '0';
+       else
+         read_lock_data_counter <= read_lock_data_counter - 1;
+         read_lock_data <= read_lock_data(15 downto 1) & spi_miso;
+         if (read_lock_data_counter = "00") then
+           read_lock_data_valid <= '1';
+           read_lock_state <= S_READ_LOCK_IDLE;
+           --wait one cycle for read_lock_done to allow read_lock_data to be read
+         else
+           read_lock_data_valid <= '0';
+           read_lock_state <= S_READ_LOCK_SHIFT_READ;
+         end if;
+       end if; --read_lock_cmdcounter = 0
+
+  end case;  
+  end if;  -- Clk
+end process process_read_lock;
+
 -------------------------------  WRITE CONFIG FSM  --------------------------------------------------
 process_write_config : process (CLK)
   begin
@@ -954,7 +1132,9 @@ process_write_config : process (CLK)
           write_config_done <= '0';
           write_register_type <= START_WRITE_REGISTER;
           write_config_state <= S_WRITE_CONFIG_ASSERT_CS_WRITE_ENABLE;
-         end if;
+        else
+          write_config_done <= '1';
+        end if;
                        
    when S_WRITE_CONFIG_ASSERT_CS_WRITE_ENABLE =>
         --assert CS and prep write enable commmand
@@ -1065,6 +1245,7 @@ process_read_register : process (CLK)
          read_register_type <= START_READ_REGISTER;
        else
          read_register_done <= '1';
+         read_register_state <= S_READ_REGISTER_IDLE;
        end if;
 
   when S_READ_REGISTER_ASSERT_CS_READ =>
@@ -1073,7 +1254,7 @@ process_read_register : process (CLK)
        read_register_bit_index <= x"00";
        --read_register_cmdcounter <= "010111"; --24 bits: 8 command + 16 to skip the first cycle (or 2)
        read_register_cmdcounter <= "000111"; --8 bits for command; don't skip first cycle since Nonvolatile register only outputs once
-       --MO I thought we would end on max_index=8/10, but that resutls in an off-by-one error so 9/11 it is
+       --MO I thought we would end on max_index=8/10, but that results in an off-by-one error so 9/11 it is
        if (read_register_type = x"1") then
          read_register_cmdreg <=  CmdStatus & x"00000000";
          read_register_max_index <= x"09";
@@ -1113,6 +1294,182 @@ process_read_register : process (CLK)
   end case;  
   end if;  -- Clk
 end process process_read_register;
+
+-------------------------------  READ ID FSM  --------------------------------------------------
+process_read_id : process (CLK)
+  begin
+  if rising_edge(CLK) then
+  case read_id_state is 
+  when S_READ_ID_IDLE =>
+       --when START_READ_ID received, initiate write process
+       read_id_spi_cs_bar <= '1';
+       read_id_data_valid <= '0';
+       if (START_READ_ID = '1') then
+         read_id_done <= '0';
+         read_id_state <= S_READ_ID_ASSERT_CS_READ;
+       else
+         read_id_done <= '1';
+         read_id_state <= S_READ_ID_IDLE;
+       end if;
+
+  when S_READ_ID_ASSERT_CS_READ =>
+       -- assert CS and prep read id command
+       read_id_spi_cs_bar <= '0';
+       read_id_cmdcounter <= "000111"; --8 bits for command
+       read_id_cmdreg <=  CmdRDID & x"00000000";
+       read_id_data_counter <= x"a1"; --ID is 20 bytes
+       read_id_state <= S_READ_ID_SHIFT_READ;
+       
+  when S_READ_ID_SHIFT_READ =>
+       --shift read id command and read back 
+       if (read_id_cmdcounter /= 0) then 
+         read_id_cmdcounter <= read_id_cmdcounter - 1;
+         read_id_cmdreg <= read_id_cmdreg(38 downto 0) & '0';
+       else
+         read_id_data_counter <= read_id_data_counter - 1;
+         read_id_data <= read_id_data(14 downto 0) & spi_miso;
+         if (read_id_data_counter(3 downto 0) = x"0" and read_id_data_counter(7 downto 4) /= x"a") then
+           read_id_data_valid <= '1';
+         else
+           read_id_data_valid <= '0';
+         end if;
+         if (read_id_data_counter = x"00") then
+           --wait one cycle for read_id_done to allow last read_id_data to be read
+           read_id_state <= S_READ_ID_IDLE;
+         else
+           read_id_state <= S_READ_ID_SHIFT_READ;
+         end if;
+       end if; --read_id_cmdcounter = 0
+
+  end case;  
+  end if;  -- Clk
+end process process_read_id;
+
+
+-------------------------------  CLEAR STATUS FSM --------------------------------------------------
+process_clear_status : process (CLK)
+  begin
+  if rising_edge(CLK) then
+  case clear_status_state is 
+  when S_CLEAR_STATUS_IDLE =>
+       --when START_CLEAR_STATUS received, initiate write process
+       clear_status_spi_cs_bar <= '1';
+       if (START_CLEAR_STATUS = '1') then
+         clear_status_done <= '0';
+         clear_status_state <= S_CLEAR_STATUS_ASSERT_CS;
+       else
+         clear_status_done <= '1';
+         clear_status_state <= S_CLEAR_STATUS_IDLE;
+       end if;
+
+  when S_CLEAR_STATUS_ASSERT_CS =>
+       -- assert CS and prep clear status command
+       clear_status_spi_cs_bar <= '0';
+       clear_status_cmdcounter <= "000111"; --8 bits for command
+       clear_status_cmdreg <=  CmdClearFlagStatus & x"00000000";
+       clear_status_state <= S_CLEAR_STATUS_SHIFT;
+       
+  when S_CLEAR_STATUS_SHIFT =>
+       --shift read id command and read back 
+       if (clear_status_cmdcounter /= 0) then 
+         clear_status_cmdcounter <= clear_status_cmdcounter - 1;
+         clear_status_cmdreg <= clear_status_cmdreg(38 downto 0) & '0';
+         clear_status_spi_cs_bar <= '0';
+       else
+         clear_status_done <= '1';
+         clear_status_state <= S_CLEAR_STATUS_IDLE;
+         clear_status_spi_cs_bar <= '1';
+       end if; --clear_status_cmdcounter = 0
+
+  end case;  
+  end if;  -- Clk
+end process process_clear_status;
+
+-------------------------------  CUSTOM COMMAND FSM  --------------------------------------------------
+
+process_custom : process (CLK)
+  begin
+  if rising_edge(Clk) then
+  case custom_state is 
+  when S_CUSTOM_IDLE =>
+        custom_spi_cs_bar <= '1';
+        custom_fifo_read_enable <= '0';
+        custom_data_valid <= '0';
+        --initalize custom process when START_CUSTOM received
+        if (START_CUSTOM(0) = '1' and custom_enable = '1') then
+          custom_nbits_write <= unsigned(START_CUSTOM(11 downto 1));
+          custom_nwords_read <= unsigned(CUSTOM_WORDS_TO_READ);
+          custom_fifo_idx <= "11";
+          custom_done <= '0';
+          custom_state <= S_CUSTOM_ASSERT_CS;
+        else
+          custom_done <= '1';
+        end if;
+                   
+   when S_CUSTOM_ASSERT_CS =>
+        --assert CS and prepare custom command
+        custom_spi_cs_bar <= '0';
+        custom_mosi <= write_fifo_output(to_integer(custom_fifo_idx));
+        custom_fifo_idx <= custom_fifo_idx - 1;
+        custom_state <= S_CUSTOM_SHIFT;
+        custom_first_read_cycle <= '1';
+        custom_data_counter <= x"0";
+                                                 
+   when S_CUSTOM_SHIFT =>
+        -- shift custom command
+        if (custom_nbits_write /= 0) then 
+          custom_mosi <= write_fifo_output(to_integer(custom_fifo_idx));
+          custom_nbits_write <= custom_nbits_write - 1;
+          custom_fifo_idx <= custom_fifo_idx - 1;
+          if (custom_fifo_idx = 1) then
+            custom_fifo_read_enable <= '1';
+          else
+            custom_fifo_read_enable <= '0';
+          end if;
+          if (custom_nbits_write = 1 and custom_nwords_read = 0) then
+            custom_state <= S_CUSTOM_FLUSH_FIFO;
+            custom_spi_cs_bar <= '1';
+            custom_nbits_write <= "00000000011";
+          end if;
+        else --finished shifting write, now read
+          custom_fifo_read_enable <= '0';
+          custom_data <= custom_data(14 downto 0) & spi_miso;
+          custom_data_counter <= custom_data_counter + 1;
+          if (custom_data_counter = x"0") then
+            if (custom_first_read_cycle = '1') then
+              custom_first_read_cycle <= '0';
+              custom_data_valid <= '0';
+            else
+              custom_data_valid <= '1';
+              custom_nwords_read <= custom_nwords_read - 1;
+            end if;
+          else
+            custom_data_valid <= '0';
+          end if;
+          if (custom_nwords_read = 0) then
+            custom_state <= S_CUSTOM_FLUSH_FIFO;
+            custom_spi_cs_bar <= '1';
+            custom_nbits_write <= "00000000110";
+          end if;
+        end if; --reading
+                          
+   when S_CUSTOM_FLUSH_FIFO =>
+        --remove any remaining words in fifo
+        if (custom_nbits_write = 0) then
+          custom_fifo_read_enable <= '0';
+          custom_done <= '1';
+          custom_state <= S_CUSTOM_IDLE;
+        else
+          custom_data_valid <= '0';
+          custom_fifo_read_enable <= '1';
+          custom_nbits_write <= custom_nbits_write - 1;
+        end if;
+
+  end case;
+    
+  end if;  -- CLK
+end process process_custom;
+
 
 --------------********* misc **************---------------------
 --fifo_unconned(15 downto 0) <= data_to_fifo;
