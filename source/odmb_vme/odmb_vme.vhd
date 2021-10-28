@@ -15,12 +15,12 @@ use work.ucsb_types.all;
 --! @details ODMB7 module that processes slow control commands from the VMEbus backplane
 --! This module contains several 'device' submodules dedicated to certain types of commands
 --! The commands for device X take the for XYYY. The devices are:
---! * Device 0 - TESTCTRL - not implemented
+--! * Device 0 - TESTCTRL - NOT IMPLEMENTED
 --! * Device 1 - CFEBJTAG - generates slow control commands in the JTAG protocol for (x)DCFEBs
 --! * Device 2 - ODMBJTAG - generates slow control commands in the JTAG protocol for the ODMB7 FPGA (Kintex Ultrascale)
 --! * Device 3 - VMEMON - used to monitor various registers, set certain settings, and send reset signals
 --! * Device 4 - VMECONFREGS - used to interact with the configuration and constant registers loaded from nonvolatile memory
---! * Device 5 - TESTFIFOS - not implemented
+--! * Device 5 - TESTFIFOS - NOT IMPLEMENTED
 --! * Device 6 - SPI_PORT - used to interact with ODMB7 PROM ICs
 --! * Device 7 - SYSTEM_MON - used to measure temperature, currents, and voltages
 --! * Device 8 - LVDBMON - used to interact with LVMB7 board

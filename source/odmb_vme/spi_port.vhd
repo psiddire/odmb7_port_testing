@@ -23,8 +23,7 @@ use work.ucsb_types.all;
 --! * R 6038 read SPI status
 --! * R 603C read BPI timer (16 LSB)
 --! * R 6040 read BPI timer (16 MSB)
---! VME commands to be implemented:
---! Other features to be implemented:
+--! Other features:
 --! * upload CONST and CFG registers on reset
 entity SPI_PORT is
   port (
