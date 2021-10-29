@@ -37,7 +37,7 @@ entity spi_interface is
     OUT_ERASE_DONE          : out std_logic;                    --! '1' unless erase in progress
     START_UNLOCK            : in std_logic;                     --! Signal to erase nonvolatile lock bits on all sectors
     OUT_UNLOCK_DONE         : out std_logic;                    --! '1' unless erase nonvolatile lock bits in progress
-    START_LOCK              : in std_logic_vector(1 downto 0);  --! Signal to write lock bit - MSB is 0 for nonvolatile 1 for volatile
+    START_LOCK              : in std_logic_vector(2 downto 0);  --! Signal to write lock bit - MSBs are 00 for nonvolatile 01 for volatile lock 1x for volatile unlock
     OUT_LOCK_DONE           : out std_logic;                    --! '1' unless write lock bits in progress
     START_READ_LOCK         : in std_logic_vector(1 downto 0);  --! Signal to read lock bit - MSB is 0 for nonvolatile 1 for volatile
     OUT_READ_LOCK_DONE      : out std_logic;                    --! '1' unless read lock bits in progress
@@ -206,7 +206,7 @@ END COMPONENT;
 
   ------------- Write lock signals -------------------- 
   signal write_lock_spi_cs_bar       : std_logic := '1';
-  signal write_lock_type             : std_logic_vector(1 downto 0) := "00";
+  signal write_lock_type             : std_logic_vector(2 downto 0) := "000";
   signal write_lock_address          : std_logic_vector(31 downto 0) := x"00000000";
   signal write_lock_address_volatile : std_logic_vector(31 downto 0) := x"00000000";
   signal write_lock_done             : std_logic := '1';
@@ -272,7 +272,7 @@ END COMPONENT;
   signal custom_data             : std_logic_vector(15 downto 0) := x"0000";
   signal custom_data_valid       : std_logic := '0';
   signal custom_first_read_cycle : std_logic := '0';
-  constant custom_enable         : std_logic := '1'; --should be 0 in normal firmware versions to disallow unintended SPI commands
+  constant custom_enable         : std_logic := '0'; --should be 0 in normal firmware versions to disallow unintended SPI commands
 
   --------------- select read command and address -------------------- 
   --signal CmdIndex    : std_logic_vector(3 downto 0) := "0001";  
@@ -994,12 +994,15 @@ process_write_lock : process (CLK)
    when S_WRITE_LOCK_ASSERT_CS_WRITE_LOCK =>
         --assert CS and prepare for write nonvolatile lock bits
         write_lock_spi_cs_bar <= '0';   
-        if (write_lock_type(1) = '0') then --nonvolatile
+        if (write_lock_type(2 downto 1) = "00") then --nonvolatile
           write_lock_cmdreg <= CmdWriteNonvLock & write_lock_address; 
           write_lock_cmdcounter <= "100111"; --40 bits: 8 command + 32 for address
+        elsif (write_lock_type(2 downto 1) = "01") then
+          write_lock_cmdreg <= CmdWriteVolaLock & write_lock_address_volatile(31 downto 8) & x"01"; 
+          write_lock_cmdcounter <= "100111"; --40 bits: 8 command + 24 for address + 8 for register
         else
-          write_lock_cmdreg <= CmdWriteVolaLock & write_lock_address_volatile; 
-          write_lock_cmdcounter <= "011111"; --32 bits: 8 command + 24 for address
+          write_lock_cmdreg <= CmdWriteVolaLock & write_lock_address_volatile(31 downto 8) & x"00"; 
+          write_lock_cmdcounter <= "100111"; --40 bits: 8 command + 24 for address + 8 for register
         end if;
         write_lock_state <= S_WRITE_LOCK_SHIFT_WRITE_LOCK;
                       
@@ -1028,7 +1031,12 @@ process_write_lock : process (CLK)
           write_lock_cmdreg <= write_lock_cmdreg(38 downto 0) & '0';
         else
           write_lock_spi_cs_bar <= '1';
-          write_lock_state <= S_WRITE_LOCK_ASSERT_CS_READ_STATUS_2;
+          if (write_lock_type(2 downto 1) = "00") then
+            write_lock_state <= S_WRITE_LOCK_ASSERT_CS_READ_STATUS_2;
+          else
+            write_lock_done <= '1';
+             write_lock_state <= S_WRITE_LOCK_IDLE;
+          end if;
         end if; --write_lock_cmdcounter = 
 
    when S_WRITE_LOCK_ASSERT_CS_READ_STATUS_2 =>
@@ -1092,7 +1100,7 @@ process_read_lock : process (CLK)
          read_lock_cmdcounter <= "100111"; --40 bits: 8 command + 32 for address
        else
          read_lock_cmdreg <=  CmdReadVolaLock & read_lock_address_volatile;
-         read_lock_cmdcounter <= "011111"; --32 bits: 8 command + 24 for address
+         read_lock_cmdcounter <= "100110"; --39 bits: 8 command + 24 for address + 7 until last bit of volatile register
        end if;
        read_lock_data_counter <= "10"; 
        read_lock_state <= S_READ_LOCK_SHIFT_READ;

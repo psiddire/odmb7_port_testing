@@ -27,7 +27,7 @@ use unisim.vcomponents.all;
 --! * 0011 program protection register (depricated)
 --! * (n)<<5 | 0012 write register n (see below) (follow with 1 word to write)
 --! * (n)<<5 | 0013 write lock bit on sector (n=0 for nonvolatile, 1 for volatile)
---! * 0014 erase all nonvolatile lock bits
+--! * (n)<<5 | 0014 erase lock bits (n=0 for all nonvolatile lock bits, 1 for volatile bits for current sector)
 --! * (n)<<5 | 0015 read lock bit on sector (n=0 for nonvolatile, 1 for volatile)
 --! * 0016 blank check (depricated)
 --! * (addr_upper)<<5 | 0017 load address (follow with 1 word of lower address bits)
@@ -107,7 +107,7 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
       OUT_ERASE_DONE          : out std_logic;
       START_UNLOCK            : in std_logic;
       OUT_UNLOCK_DONE         : out std_logic;
-      START_LOCK              : in std_logic_vector(1 downto 0);
+      START_LOCK              : in std_logic_vector(2 downto 0);
       OUT_LOCK_DONE           : out std_logic;
       START_READ_LOCK         : in std_logic_vector(1 downto 0);
       OUT_READ_LOCK_DONE      : out std_logic;
@@ -203,6 +203,7 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
     S_CUSTOM_START, S_CUSTOM_WAIT,
     S_ERASE_CMD, S_ERASE_LOW, S_ERASE_WAIT, 
     S_LOCK_CMD, S_LOCK_LOW, S_LOCK_WAIT,
+    S_UNLOCK_VOLATILE_CMD,
     S_UNLOCK_CMD, S_UNLOCK_LOW, S_UNLOCK_WAIT,
     S_READ_LOCK_CMD, S_READ_LOCK_LOW, S_READ_LOCK_WAIT,
     S_WRITE_REGISTER_CMD, S_WRITE_REGISTER_STALL_1, S_WRITE_REGISTER_STALL_2, S_WRITE_REGISTER_LOWER, S_WRITE_REGISTER_WAIT,
@@ -221,7 +222,7 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
   signal prom_erase_en          : std_logic := '0';
   signal prom_write_en          : std_logic := '0';
   signal prom_unlock_en         : std_logic := '0';
-  signal prom_lock_en           : std_logic_vector(1 downto 0) := "00";
+  signal prom_lock_en           : std_logic_vector(2 downto 0) := "000";
   signal prom_read_lock_en      : std_logic_vector(1 downto 0) := "00";
   signal prom_read_id_en        : std_logic := '0';
   signal clear_status_en        : std_logic := '0';
@@ -244,7 +245,7 @@ architecture SPI_CTRL_Arch of SPI_CTRL is
   signal prom_custom_en         : std_logic_vector(11 downto 0) := x"000";
   signal prom_custom_rdwords    : std_logic_vector(15 downto 0) := x"0000";
   signal custom_done            : std_logic := '0';
-  constant custom_enable        : std_logic := '1'; --should be 0 in normal firmware versions to disallow unintended SPI commands
+  constant custom_enable        : std_logic := '0'; --should be 0 in normal firmware versions to disallow unintended SPI commands
   
   signal fsm_is_enabled      : std_logic := '1';
   
@@ -450,7 +451,11 @@ begin
             cmd_fifo_state  <= S_LOCK_CMD;
           when x"14" =>
             --unlock
-            cmd_fifo_state  <= S_UNLOCK_CMD;
+            if (cmd_fifo_out(5 downto 0) = "110100") then
+              cmd_fifo_state  <= S_UNLOCK_VOLATILE_CMD;            
+            else
+              cmd_fifo_state  <= S_UNLOCK_CMD;
+            end if;
           when x"15" =>
             --read lock
             cmd_fifo_state  <= S_READ_LOCK_CMD;
@@ -495,7 +500,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -522,7 +527,7 @@ begin
         prom_read_en        <= '1';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -549,7 +554,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -581,7 +586,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -608,7 +613,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -635,7 +640,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -667,7 +672,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -694,7 +699,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '1';
@@ -721,7 +726,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -753,7 +758,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -780,7 +785,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -807,7 +812,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -839,7 +844,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -866,7 +871,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '1';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -893,7 +898,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -924,7 +929,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -952,7 +957,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -979,7 +984,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1010,7 +1015,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1042,7 +1047,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1069,7 +1074,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '1';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1100,7 +1105,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1128,7 +1133,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1156,7 +1161,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1191,7 +1196,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1217,7 +1222,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1258,7 +1263,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1289,7 +1294,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1317,7 +1322,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1348,7 +1353,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1376,7 +1381,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1403,7 +1408,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1434,7 +1439,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1461,7 +1466,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1492,7 +1497,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1519,7 +1524,34 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= cmd_fifo_out(5) & '1';
+        prom_lock_en        <= '0' & cmd_fifo_out(5) & '1';
+        prom_read_lock_en   <= "00";
+        prom_unlock_en      <= '0';
+        prom_read_id_en     <= '0';
+        clear_status_en     <= '0';
+        prom_wr_register_en <= x"0";
+        write_fifo_write_en <= '0';
+        read_register_en    <= x"0";
+        prom_load_addr      <= '0';
+        cmd_fifo_read_en    <= '1';  
+        spi_timer_rst       <= '0';
+        spi_status_rst      <= '0';
+        spi_timer_en        <= spi_timer_en;
+        read_nwords         <= read_nwords;
+        program_nwords      <= program_nwords;
+        prom_addr           <= prom_addr;
+        prom_select         <= prom_select;
+        register_contents   <= register_contents;
+        prom_custom_en      <= x"000";
+        prom_custom_rdwords <= x"0000";
+       
+      when S_UNLOCK_VOLATILE_CMD =>
+        --start lock sector command with lock enable and remove command from FIFO
+        cmd_fifo_state      <= S_LOCK_LOW;
+        prom_read_en        <= '0';
+        prom_write_en       <= '0';
+        prom_erase_en       <= '0';
+        prom_lock_en        <= "101";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1546,7 +1578,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1577,7 +1609,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1604,7 +1636,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= cmd_fifo_out(5) & '1';
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1631,7 +1663,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1662,7 +1694,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1689,7 +1721,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '1';
         prom_read_id_en     <= '0';
@@ -1716,7 +1748,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1747,7 +1779,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1774,7 +1806,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1801,7 +1833,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1832,7 +1864,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1859,7 +1891,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1886,7 +1918,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1913,7 +1945,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1940,7 +1972,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1967,7 +1999,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -1994,7 +2026,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -2021,7 +2053,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -2048,7 +2080,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
@@ -2075,7 +2107,7 @@ begin
         prom_read_en        <= '0';
         prom_write_en       <= '0';
         prom_erase_en       <= '0';
-        prom_lock_en        <= "00";
+        prom_lock_en        <= "000";
         prom_read_lock_en   <= "00";
         prom_unlock_en      <= '0';
         prom_read_id_en     <= '0';
