@@ -52,8 +52,8 @@ entity SYSTEM_TEST is
     DDU_PRBS_ERR_CNT : in  std_logic_vector(15 downto 0);     --! DDU PRBS error count from MGT_DDU
 
     -- PC PRBS signals
-    PC_PRBS_TX_EN   : out std_logic_vector(0 downto 0);       --! PC PRBS transmitter enable to MGT_SPY
-    PC_PRBS_RX_EN   : out std_logic_vector(0 downto 0);       --! PC PRBS receiver enable to MGT_SPY
+    PC_PRBS_TX_EN   : out std_logic;                          --! PC PRBS transmitter enable to MGT_SPY
+    PC_PRBS_RX_EN   : out std_logic;                          --! PC PRBS receiver enable to MGT_SPY
     PC_PRBS_TST_CNT : out std_logic_vector(15 downto 0);      --! PC PRBS length to MGT_SPY
     PC_PRBS_ERR_CNT : in  std_logic_vector(15 downto 0);      --! PC PRBS error count from MGT_SPY
 
@@ -83,13 +83,13 @@ architecture SYSTEM_TEST_Arch of SYSTEM_TEST is
       );
   end component;
 
-  -- Temporary debugging
-  --component ila_2 is
-  --  port (
-  --    clk : in std_logic := '0';
-  --    probe0 : in std_logic_vector(383 downto 0) := (others=> '0')
-  --    );
-  --end component;
+  -- Instantiate to help debugging
+  -- component ila_2 is
+  --   port (
+  --     clk : in std_logic := '0';
+  --     probe0 : in std_logic_vector(383 downto 0) := (others=> '0')
+  --     );
+  -- end component;
 
   signal ila_data : std_logic_vector(383 downto 0) := (others => '0');
   signal outdata_inner : std_logic_vector(15 downto 0);
@@ -184,10 +184,10 @@ begin
   STROBE_PE : PULSE_EDGE port map (DOUT => strobe_pulse, PULSE1 => open, CLK => SLOWCLK, RST => RST, NPULSE => 1, DIN => STROBE);
 
   DDU_PRBS_RX_EN <= w_ddu_prbs_rx_en;
-  PC_PRBS_RX_EN(0)  <= w_pc_prbs_rx_en;
+  PC_PRBS_RX_EN  <= w_pc_prbs_rx_en;
 
   FDC_DDU_TX_PRBS : FDC port map(Q => DDU_PRBS_TX_EN, C => w_ddu_prbs_tx_en, CLR => RST, D => or_reduce(INDATA));
-  FDC_PC_TX_PRBS  : FDC port map(Q => PC_PRBS_TX_EN(0), C => w_pc_prbs_tx_en, CLR => RST, D => or_reduce(INDATA));
+  FDC_PC_TX_PRBS  : FDC port map(Q => PC_PRBS_TX_EN, C => w_pc_prbs_tx_en, CLR => RST, D => or_reduce(INDATA));
 
   GEN_PRBS : for i in 15 downto 0 generate
   begin
@@ -331,11 +331,11 @@ begin
   ila_data(176)            <= otmb_prbs_rx;
   ila_data(177)            <= CLK;
 
-  --ila_systest_inst : ila_2
-  --  port map (
-  --    clk    => CLK160,
-  --    probe0 => ila_data
-  --    );
+  -- ila_systest_inst : ila_2
+  --   port map (
+  --     clk    => CLK160,
+  --     probe0 => ila_data
+  --     );
 
 
 end SYSTEM_TEST_Arch;
