@@ -56,13 +56,13 @@ end CFEBJTAG;
 architecture CFEBJTAG_Arch of CFEBJTAG is
   signal logich : std_logic := '1';
   
-  --debugging
-  component ila_spi
-  port (
-    clk : in std_logic;
-    probe0 : in std_logic_vector(511 downto 0)
-  );
-  end component;
+  -- --debugging
+  -- component ila_spi
+  -- port (
+  --   clk : in std_logic;
+  --   probe0 : in std_logic_vector(511 downto 0)
+  -- );
+  -- end component;
   signal ila_probe : std_logic_vector(511 downto 0);
   signal prev_vme_cmd, pp_vme_cmd, ppp_vme_cmd, pppp_vme_cmd, ppppp_vme_cmd : std_logic_vector(15 downto 0);
 
@@ -162,11 +162,11 @@ architecture CFEBJTAG_Arch of CFEBJTAG is
 
 begin
 
-  ila_spi_cfebjtag_i : ila_spi
-  port map (
-    clk => FASTCLK,
-    probe0 => ila_probe
-  );
+  -- ila_spi_cfebjtag_i : ila_spi
+  -- port map (
+  --   clk => FASTCLK,
+  --   probe0 => ila_probe
+  -- );
   ila_probe(0) <= RST;
   ila_probe(1) <= DEVICE;
   ila_probe(2) <= STROBE;

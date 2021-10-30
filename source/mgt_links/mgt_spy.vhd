@@ -121,12 +121,12 @@ architecture Behavioral of mgt_spy is
       );
   end component;
 
-  component ila_1 is
-    port (
-      clk : in std_logic := '0';
-      probe0 : in std_logic_vector(127 downto 0) := (others=> '0')
-      );
-  end component;
+  -- component ila_1 is
+  --   port (
+  --     clk : in std_logic := '0';
+  --     probe0 : in std_logic_vector(127 downto 0) := (others=> '0')
+  --     );
+  -- end component;
 
   constant IDLE : std_logic_vector(DATAWIDTH-1 downto 0) := x"50BC"; -- IDLE word for 16 bit width
 

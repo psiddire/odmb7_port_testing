@@ -442,8 +442,7 @@ begin
         if waitCounter = 0  then
           if cack = '1' then
             inputCounter <= inputCounter + 1;
-            --waitCounter <= "0000001000";
-            waitCounter <= "1100000000";
+            waitCounter <= "0000001000";
             -- Initalize lut_input_addr_s
             if inputCounter = 0 then
               lut_input_addr1_s <= to_unsigned(0,bw_addr);
