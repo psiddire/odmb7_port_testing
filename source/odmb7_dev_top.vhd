@@ -140,11 +140,11 @@ entity odmb7_ucsb_dev is
     --------------------------------
     -- ODMB JTAG
     --------------------------------
-    KUS_TMS       : out std_logic;                         --! ODMB JTAG TMS signals. Connected to Bank 47.
-    KUS_TCK       : out std_logic;                         --! ODMB JTAG TCK signals. Connected to Bank 47.
-    KUS_TDI       : out std_logic;                         --! ODMB JTAG TDI signals. Connected to Bank 47.
-    KUS_TDO       : in std_logic;                          --! ODMB JTAG TDO signals. Connected to Bank 47 as TDO (pin U9).
-    KUS_DL_SEL    : out std_logic;                         --! ODMB JTAG path select, needs to be tied to '1' to allow redbox/DL communication on ODMB7 prototype. Connected to bank 47.
+    KUS_TMS       : out std_logic;                         --! JTAG TMS signal to ODMB FPGA, used by ODMBJTAG in ODMB_VME. Connected to bank 47.
+    KUS_TCK       : out std_logic;                         --! JTAG TCK signal to ODMB FPGA, used by ODMBJTAG in ODMB_VME. Connected to bank 47.
+    KUS_TDI       : out std_logic;                         --! JTAG TDI signal to ODMB FPGA, used by ODMBJTAG in ODMB_VME. Connected to bank 47.
+    KUS_TDO       : in std_logic;                          --! JTAG TDO signal from ODMB FPGA, used by ODMBJTAG in ODMB_VME. Connected to bank 47 as TDO (pin U9).
+    KUS_DL_SEL    : out std_logic;                         --! ODMB JTAG path select, connected to ODMBJTAG module in ODMB_VME. Use 1 for DL/red box and 0 for firmware communication. Connected to bank 47.
 
     --------------------------------
     -- ODMB optical ports
@@ -271,7 +271,6 @@ architecture Behavioral of odmb7_ucsb_dev is
       clk_sysclk20   : out std_logic;   -- derived clock from MMCM
       clk_sysclk40   : out std_logic;   -- derived clock from MMCM
       clk_sysclk80   : out std_logic;   -- derived clock from MMCM
-      clk_sysclk160  : out std_logic;   -- derived clock from MMCM
       clk_cmsclk     : out std_logic;   -- buffed CMS clock, 40.07897 MHz
       clk_emcclk     : out std_logic;   -- buffed EMC clock
       clk_lfclk      : out std_logic;   -- buffed LF clock
@@ -728,7 +727,6 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal sysclk20 : std_logic;
   signal sysclk40 : std_logic;
   signal sysclk80 : std_logic;
-  signal sysclk160 : std_logic;
   signal cmsclk : std_logic;
   signal clk_emcclk : std_logic;
   signal clk_lfclk : std_logic;
@@ -1146,7 +1144,6 @@ begin
       clk_sysclk20   => sysclk20,
       clk_sysclk40   => sysclk40,
       clk_sysclk80   => sysclk80,
-      clk_sysclk160  => sysclk160,
       clk_cmsclk     => cmsclk,
       clk_emcclk     => clk_emcclk,
       clk_lfclk      => clk_lfclk,
@@ -1394,7 +1391,7 @@ begin
       NCFEB => NCFEB
       )
     port map (
-      CLK160         => sysclk160,
+      CLK160         => mgtclk1,
       CLK40          => cmsclk,
       CLK10          => sysclk10,
       CLK2P5         => sysclk2p5,
