@@ -6,26 +6,48 @@ library work;
 use ieee.numeric_std.all;
 use ieee.std_logic_misc.all;
 
+--! @brief VME device controlling access to ODMB board monitoring (currents, voltages, temperature)
+--! @details Supported VME commands:
+--! * R 7XY0 read SYSMON channel XY (see below) - current is result*10 channels 0 and 9 and result*5 for others
+--! * W 73Y0 load data from ADC chip Y (chip 0-4)
+--! * R 74Y0 read loaded ADC for channel Y (channels 1-8) - number is voltage/1000
+--! #Sysmon channels
+--! 00 5V input current
+--! 01 3.3V current 
+--! 02 3.3V optical current
+--! 03 3.3V clock current
+--! 04 3.6V PPIB current
+--! 05 2.5V current
+--! 06 1.2V MGT current
+--! 07 1.0V MGT current
+--! 08 0.95V core current
+--! 09 3.3V input current
+--! 10 1.8V current
+--! 11 1.8V VCC aux current
+--! 12 1.8V MGT current
+--! 13 1.8V VCCO current
+--! 14 1.8V VCCO0_65 current
+--! 15 1.8V clock current
 entity SYSTEM_MON is
   port (
-    OUTDATA   : out std_logic_vector(15 downto 0);
-    DTACK     : out std_logic;
+    OUTDATA   : out std_logic_vector(15 downto 0); --! Output data to VME backplane
+    DTACK     : out std_logic;                     --! Data acknowledge to VME backplane
 
-    ADC_CS_B  : out std_logic_vector(4 downto 0);
-    ADC_DIN   : out std_logic;
-    ADC_SCK   : out std_logic;
-    ADC_DOUT  : in std_logic;
+    ADC_CS_B  : out std_logic_vector(4 downto 0);  --! SPI chip select to ADCs
+    ADC_DIN   : out std_logic;                     --! SPI input to ADCs
+    ADC_SCK   : out std_logic;                     --! SPI clock to ADCs
+    ADC_DOUT  : in std_logic;                      --! SPI output from ADCs
 
-    SLOWCLK   : in std_logic;
-    FASTCLK   : in std_logic;
-    RST       : in std_logic;
-    DEVICE    : in std_logic;
-    STROBE    : in std_logic;
-    COMMAND   : in std_logic_vector(9 downto 0);
-    WRITER    : in std_logic;
+    SLOWCLK   : in std_logic;                      --! 1.25 MHz clock
+    FASTCLK   : in std_logic;                      --! 40 MHz clock
+    RST       : in std_logic;                      --! Soft reset
+    DEVICE    : in std_logic;                      --! Indicates if this is the selected VME device
+    STROBE    : in std_logic;                      --! Indicates VME command ready
+    COMMAND   : in std_logic_vector(9 downto 0);   --! VME command
+    WRITER    : in std_logic;                      --! Indicates if a command is read (1) or write (0)
 
-    VAUXP     : in std_logic_vector(15 downto 0);
-    VAUXN     : in std_logic_vector(15 downto 0)
+    VAUXP     : in std_logic_vector(15 downto 0);  --! Current monitoring analog signals
+    VAUXN     : in std_logic_vector(15 downto 0)   --! Current monitoring analog signals
     );
 end SYSTEM_MON;
 
@@ -129,8 +151,8 @@ architecture SYSTEM_MON_ARCH of SYSTEM_MON is
   -- signals in/out odmb7_voltageMon
   signal vmon_dout : std_logic_vector(11 downto 0) := x"000";
   signal vmon_dout_valid: std_logic := '0';
-  signal vmon_chanidx : integer := 0;
-  signal vmon_chipidx : integer := 0;
+  signal vmon_chanidx : integer range -1 to 6 := 0;
+  signal vmon_chipidx : integer range -1 to 6 := 0;
   signal vmon_n_valid: integer := 0;
   signal startchannelvalid: std_logic := '0';
   signal startchannelvalid2: std_logic := '0';
@@ -166,7 +188,7 @@ begin
   which_chip <= cmddev(7 downto 4) when (w_vol_mon = '1') else x"0";
   which_chan <= cmddev(7 downto 4) when (r_vol_mon = '1') else x"0";
 
-  -- this is the channel
+  -- this is the SYSMON channel
   sysmon_daddr <= cmddev(11 downto 4) when (r_sys_mon = '1') else x"00";
 
   -- when w_vol_mon has a rising edge, trigger a sequence sent to MAX1271
@@ -188,10 +210,14 @@ begin
   vmon_chanidx <= to_integer(signed(which_chan_inner)) - 1;
   vmon_chipidx <= to_integer(signed(which_chip_inner)) - 1;
   -- sync DIN and CS using same clk
-  cs_gen : for I in 4 downto 0 generate
+  
+  --chip_selected(1) <= '0';
+  
+  cs_gen : for I in 3 downto 1 generate
   begin
+    --chip_selected(I) <= '0';
     chip_selected(I) <= '1' when (vmon_chipidx = I) else '0';
-    -- need FDPE_1 for falling edge
+    --need FDPE_1 for falling edge
     cs_gen_i: FDPE_1 port map(Q => adc_cs_inner(I), C => SLOWCLK, PRE => data_done, CE => chip_selected(I), D => cs_inner);
   end generate cs_gen;
   din_gen_i: FDCE port map(Q => adc_din_inner, C => SLOWCLK, CLR => data_done, CE => or_reduce(which_chip_inner), D => din_inner);
@@ -252,7 +278,8 @@ begin
       INIT_54 => x"A93A",    -- Temp lower alarm limit
       INIT_55 => x"5111",    -- Vccint lower alarm limit
       INIT_56 => x"CAAA",    -- Vccaux lower alarm limit
-      INIT_57 => x"B0CE"     -- Temp alarm OT reset (Default 70C -> ae4e, 75C -> b0ce)
+      INIT_57 => x"B0CE",    -- Temp alarm OT reset (Default 70C -> ae4e, 75C -> b0ce)
+      SIM_MONITOR_FILE => "sysmon_design.txt" --avoid simulation errors
       )
     port map (
       ALM => sysmon_alm,     -- to be connected

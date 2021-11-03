@@ -142,19 +142,28 @@ architecture Behavioral of Firmware_tb is
   constant bw_addr_entries : integer := 16;
   constant bw_input1 : integer := 16;
   constant bw_input2 : integer := 16;
-  component lut_input1 is
+  --component lut_input1 is
+  --  port (
+  --    clka : in std_logic := '0';
+  --    addra : in std_logic_vector(bw_addr-1 downto 0) := (others=> '0');
+  --    douta : out std_logic_vector(bw_input1-1 downto 0) := (others => '0')
+  --    );
+  --end component;
+  --component lut_input2 is
+  --  port (
+  --    clka : in std_logic := '0';
+  --    addra : in std_logic_vector(bw_addr-1 downto 0) := (others=> '0');
+  --    douta : out std_logic_vector(bw_input2-1 downto 0) := (others => '0')
+  --    );
+  --end component;
+  
+  component pseudolut is
     port (
-      clka : in std_logic := '0';
-      addra : in std_logic_vector(bw_addr-1 downto 0) := (others=> '0');
-      douta : out std_logic_vector(bw_input1-1 downto 0) := (others => '0')
-      );
-  end component;
-  component lut_input2 is
-    port (
-      clka : in std_logic := '0';
-      addra : in std_logic_vector(bw_addr-1 downto 0) := (others=> '0');
-      douta : out std_logic_vector(bw_input2-1 downto 0) := (others => '0')
-      );
+      CLK   : in std_logic;
+      ADDR  : in std_logic_vector(3 downto 0);
+      DOUT1 : out std_logic_vector(15 downto 0);
+      DOUT2 : out std_logic_vector(15 downto 0)
+    );
   end component;
 
   signal use_vio_input_vector : std_logic_vector(0 downto 0) := "0";
@@ -374,18 +383,26 @@ begin
       );
 
   -- Input LUTs
-  lut_input1_i: lut_input1
+  --lut_input1_i: lut_input1
+  --  port map(
+  --    clka=> sysclk,
+  --    addra=> std_logic_vector(lut_input_addr1_s),
+  --    douta=> lut_input1_dout_c
+  --    );
+  --lut_input2_i: lut_input2
+  --  port map(
+  --    clka=> sysclk,
+  --    addra=> std_logic_vector(lut_input_addr2_s),
+  --    douta=> lut_input2_dout_c
+  --    );
+      
+  pseudolut_i : pseudolut
     port map(
-      clka=> sysclk,
-      addra=> std_logic_vector(lut_input_addr1_s),
-      douta=> lut_input1_dout_c
-      );
-  lut_input2_i: lut_input2
-    port map(
-      clka=> sysclk,
-      addra=> std_logic_vector(lut_input_addr2_s),
-      douta=> lut_input2_dout_c
-      );
+      CLK => sysclk,
+      ADDR => std_logic_vector(lut_input_addr1_s),
+      DOUT1 => lut_input1_dout_c,
+      DOUT2 => lut_input2_dout_c
+    );
 
   --in simulation, VIO always outputs 0, even though this output is default 1
   --use_vio_input <= use_vio_input_vector(0);
@@ -425,8 +442,7 @@ begin
         if waitCounter = 0  then
           if cack = '1' then
             inputCounter <= inputCounter + 1;
-            --waitCounter <= "0000001000";
-            waitCounter <= "1100000000";
+            waitCounter <= "0000001000";
             -- Initalize lut_input_addr_s
             if inputCounter = 0 then
               lut_input_addr1_s <= to_unsigned(0,bw_addr);
@@ -659,10 +675,13 @@ begin
       RST_CLKS_B           => open,
       SYSMON_P             => x"0000",
       SYSMON_N             => x"0000",
-      ADC_CS_B           => open,
-      ADC_DIN           => open,
-      ADC_SCK           => open,
-      ADC_DOUT          => '1',
+      ADC_CS_B             => open,
+      ADC_DIN              => open,
+      ADC_SCK              => open,
+      ADC_DOUT             => '1',
+      PROM_RST_B           => open,
+      PROM_CS2_B           => open,
+      CNFG_DATA            => open,
       LEDS_CFV             => open
      --VME_DATA_IN          => vme_data_io_in,        --unused/open in real ODMB
      --VME_DATA_OUT         => vme_data_io_out,       --unused/open in real ODMB

@@ -6,61 +6,62 @@ use ieee.std_logic_misc.all;
 library unisim;
 use unisim.vcomponents.all;
 
+--! @brief ODMB7 clock management module
 entity odmb_clocking is
   port (
     --------------------
     -- Input ports
     --------------------
-    CMS_CLK_FPGA_P : in std_logic;      -- system clock: 40.07897 MHz
-    CMS_CLK_FPGA_N : in std_logic;      -- system clock: 40.07897 MHz
-    GP_CLK_6_P : in std_logic;          -- clock synthesizer ODIV6: 80 MHz
-    GP_CLK_6_N : in std_logic;          -- clock synthesizer ODIV6: 80 MHz
-    GP_CLK_7_P : in std_logic;          -- clock synthesizer ODIV7: 80 MHz
-    GP_CLK_7_N : in std_logic;          -- clock synthesizer ODIV7: 80 MHz
-    REF_CLK_1_P : in std_logic;         -- refclk0 to 224
-    REF_CLK_1_N : in std_logic;         -- refclk0 to 224
-    REF_CLK_2_P : in std_logic;         -- refclk0 to 227
-    REF_CLK_2_N : in std_logic;         -- refclk0 to 227
-    REF_CLK_3_P : in std_logic;         -- refclk0 to 226
-    REF_CLK_3_N : in std_logic;         -- refclk0 to 226
-    REF_CLK_4_P : in std_logic;         -- refclk0 to 225
-    REF_CLK_4_N : in std_logic;         -- refclk0 to 225
-    REF_CLK_5_P : in std_logic;         -- refclk1 to 227
-    REF_CLK_5_N : in std_logic;         -- refclk1 to 227
-    CLK_125_REF_P : in std_logic;       -- refclk1 to 226
-    CLK_125_REF_N : in std_logic;       -- refclk1 to 226
-    EMCCLK : in std_logic;              -- Low frequency, 133 MHz for SPI programing clock
-    LF_CLK : in std_logic;              -- Low frequency, 10 kHz
+    CMS_CLK_FPGA_P : in std_logic;      --! system clock: 40.07897 MHz
+    CMS_CLK_FPGA_N : in std_logic;      --! system clock: 40.07897 MHz
+    GP_CLK_6_P : in std_logic;          --! clock synthesizer ODIV6: 80 MHz
+    GP_CLK_6_N : in std_logic;          --! clock synthesizer ODIV6: 80 MHz
+    GP_CLK_7_P : in std_logic;          --! clock synthesizer ODIV7: 80 MHz
+    GP_CLK_7_N : in std_logic;          --! clock synthesizer ODIV7: 80 MHz
+    REF_CLK_1_P : in std_logic;         --! refclk0 to MGT quad 224
+    REF_CLK_1_N : in std_logic;         --! refclk0 to MGT quad 224
+    REF_CLK_2_P : in std_logic;         --! refclk0 to MGT quad 227
+    REF_CLK_2_N : in std_logic;         --! refclk0 to MGT quad 227
+    REF_CLK_3_P : in std_logic;         --! refclk0 to MGT quad 226
+    REF_CLK_3_N : in std_logic;         --! refclk0 to MGT quad 226
+    REF_CLK_4_P : in std_logic;         --! refclk0 to MGT quad 225
+    REF_CLK_4_N : in std_logic;         --! refclk0 to MGT quad 225
+    REF_CLK_5_P : in std_logic;         --! refclk1 to MGT quad 227
+    REF_CLK_5_N : in std_logic;         --! refclk1 to MGT quad 227
+    CLK_125_REF_P : in std_logic;       --! refclk1 to MGT quad 226
+    CLK_125_REF_N : in std_logic;       --! refclk1 to MGT quad 226
+    EMCCLK : in std_logic;              --! Low frequency (133 MHz) clock for FPGA programming
+    LF_CLK : in std_logic;              --! Low frequency, 10 kHz
 
     --------------------
     -- Output clocks
     --------------------
-    mgtrefclk0_224 : out std_logic;
-    mgtrefclk0_225 : out std_logic;
-    mgtrefclk0_226 : out std_logic;
-    mgtrefclk1_226 : out std_logic;
-    mgtrefclk0_227 : out std_logic;
-    mgtrefclk1_227 : out std_logic;
+    mgtrefclk0_224 : out std_logic;     --! buffered refclk0 for MGT quad 224
+    mgtrefclk0_225 : out std_logic;     --! buffered refclk0 for MGT quad 225
+    mgtrefclk0_226 : out std_logic;     --! buffered refclk0 for MGT quad 226
+    mgtrefclk1_226 : out std_logic;     --! buffered refclk1 for MGT quad 226
+    mgtrefclk0_227 : out std_logic;     --! buffered refclk0 for MGT quad 227
+    mgtrefclk1_227 : out std_logic;     --! buffered refclk1 for MGT quad 227
 
-    clk_sysclk625k : out std_logic;
-    clk_sysclk1p25 : out std_logic;
-    clk_sysclk2p5 : out std_logic;
-    clk_sysclk10 : out std_logic;
-    clk_sysclk20 : out std_logic;
-    clk_sysclk40 : out std_logic;
-    clk_sysclk80 : out std_logic;
-    clk_cmsclk : out std_logic;
-    clk_emcclk : out std_logic;
-    clk_lfclk : out std_logic;
-    clk_gp6 : out std_logic;
-    clk_gp7 : out std_logic;
-
-    clk_mgtclk1 : out std_logic;
-    clk_mgtclk2 : out std_logic;
-    clk_mgtclk3 : out std_logic;
-    clk_mgtclk4 : out std_logic;
-    clk_mgtclk5 : out std_logic;
-    clk_mgtclk125 : out std_logic
+    clk_sysclk625k : out std_logic;     --! buffered 625 kHz clock
+    clk_sysclk1p25 : out std_logic;     --! buffered 1.25 MHz clock
+    clk_sysclk2p5 : out std_logic;      --! buffered 2.5 MHz clock
+    clk_sysclk10 : out std_logic;       --! buffered 10 MHz clock
+    clk_sysclk20 : out std_logic;       --! buffered 20 MHz clock
+    clk_sysclk40 : out std_logic;       --! buffered 40 MHz clock
+    clk_sysclk80 : out std_logic;       --! buffered 80 MHz clock
+    clk_cmsclk : out std_logic;         --! buffered CMS (40.07897 MHz) clock
+    clk_emcclk : out std_logic;         --! buffered Low frequency (133 MHz) clock for FPGA programming
+    clk_lfclk : out std_logic;          --! buffered 10 kHz clock
+    clk_gp6 : out std_logic;            --! buffered 80 MHz cock
+    clk_gp7 : out std_logic;            --! buffered 80 MHz clock
+ 
+    clk_mgtclk1 : out std_logic;        --! buffered clock from MGT quad 224 clock 0 divided by 2
+    clk_mgtclk2 : out std_logic;        --! buffered clock from MGT quad 227 clock 0 divided by 2
+    clk_mgtclk3 : out std_logic;        --! buffered clock from MGT quad 226 clock 0 divided by 2
+    clk_mgtclk4 : out std_logic;        --! buffered clock from MGT quad 225 clock 0 divided by 2
+    clk_mgtclk5 : out std_logic;        --! buffered clock from MGT quad 227 clock 1 divided by 2
+    clk_mgtclk125 : out std_logic       --! buffered clock from MGT quad 226 clock 1 divided by 2
 
     );
 end odmb_clocking;
