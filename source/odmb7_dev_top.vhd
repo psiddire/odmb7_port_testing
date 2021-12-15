@@ -202,6 +202,8 @@ entity odmb7_ucsb_dev is
     --------------------------------
     -- Essential selector/reset signals not classified yet
     --------------------------------
+    FPGA_SEL      : out std_logic;                         --! Clock synthesizer control input selector, needs to be tied to '0'. Connected to bank 47.
+    RST_CLKS_B    : out std_logic;                         --! Clock synthesizer reset signal, needs to be tied to '1'. Connected to bank 47.
     ODMB_DONE     : in std_logic;                          --! Kintex Ultrascale configuration DONE signal from DONE_0 in bank 0 (N7). Unused but needs to be input. Connected to bank 66 (pin L9).
 
     --------------------------------
@@ -222,28 +224,8 @@ entity odmb7_ucsb_dev is
     CNFG_DATA     : inout std_logic_vector(7 downto 4);    --! Data signals to/from the secondary PROM, used by spi_interface in ODMB_VME. Connected to bank 65.
 
     --------------------------------
-    -- Clock synthesizer control signals
-    --------------------------------
-    RST_CLKS_B    : out std_logic;                         --! Clock synthesizer reset signal, needs to be tied to '1'. Connected to bank 47.
-    FPGA_SEL      : out std_logic;                         --! Clock synthesizer control input selector. Currently tied to '0'. '0' is control by usb, '1' is control by fpga. Connected to bank 47.
-    FPGA_AC       : out std_logic_vector(2 downto 0);      --! Clock synthesizer auto-configuration number used at reset. Connected to bank 47.
-    FPGA_TEST     : out std_logic;                         --! Clock synthesizer test mode. Nominally 0. Connected to bank 47.
-    FPGA_IF0_CSN  : out std_logic;                         --! Clock synthesizer interface mode to select i2c(00-10) or spi(11) during reset. After reset, spi chip select. Connected to bank 47.
-    FPGA_IF1_MISO : inout std_logic;                       --! Clock synthesizer interface mode to select i2c(00-10) or spi(11) during reset. After reset, spi miso. Connected to bank 47.
-    FPGA_SCLK     : out std_logic;                         --! Clock synthesizer clock. Connected to bank 47.
-    FPGA_MOSI     : inout std_logic;                       --! Clock synthesizer spi mosi or i2c sda. Connected to bank 47.
-
-    --------------------------------
-    -- Test point pins
-    --------------------------------
-    THTP          : out std_logic_vector(15 downto 0);     --! Through hole test point pins. Connected to bank 47.
-    SMTP          : out std_logic_vector(15 downto 0);     --! Surface mount test point pins. Connected to bank 48.
-
-    --------------------------------
     -- Others
     --------------------------------
-    LEDS_HEART_BEAT : out std_logic;                       --! On-board LED. Connected to bank 65.
-    LEDS_SPARES : out std_logic;                           --! On-board LED. Connected to bank 65.
     LEDS_CFV      : out std_logic_vector(11 downto 0)      --! Front panel LEDs, currently unused. Connected to bank 65.
     );
 end odmb7_ucsb_dev;
