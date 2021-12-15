@@ -1,6 +1,6 @@
 -------------------------------------------------------
 --! @file
---! @brief top level file for ODMB7 prototype firmware
+--! @brief top level file for ODMB5 prototype firmware
 -------------------------------------------------------
 
 library IEEE;
@@ -13,11 +13,11 @@ use unisim.vcomponents.all;
 
 use work.ucsb_types.all;
 
---! @brief ODMB7 prototype firmware
---! @details ODMB7 firmware. Currently capable of testing virtually all 
+--! @brief ODMB5 prototype firmware
+--! @details ODMB5 firmware. Currently capable of testing virtually all 
 --! hardware interfaces and performing most slow control functionality, however
 --! data acquisition firmware has not yet been developed
-entity odmb7_ucsb_dev is
+entity odmb5_ucsb_dev is
   port (
     --------------------
     -- Input clocks
@@ -66,15 +66,15 @@ entity odmb7_ucsb_dev is
     VME_DTACK_KUS_B : out std_logic;                       --! VME data acknowledge. Controlled by ODMB_VME module. Connected to bank 44.
 
     -- From/To PPIB (connectors J3 and J4)
-    DCFEB_TCK_P    : out std_logic_vector(7 downto 1);     --! (x)DCFEB JTAG TCK signal. One per (x)DCFEB. Used by ODMB_VME module. Connected to bank 68.
-    DCFEB_TCK_N    : out std_logic_vector(7 downto 1);     --! (x)DCFEB JTAG TCK signal. One per (x)DCFEB. Used by ODMB_VME module. Connected to bank 68. 
+    DCFEB_TCK_P    : out std_logic_vector(5 downto 1);     --! (x)DCFEB JTAG TCK signal. One per (x)DCFEB. Used by ODMB_VME module. Connected to bank 68.
+    DCFEB_TCK_N    : out std_logic_vector(5 downto 1);     --! (x)DCFEB JTAG TCK signal. One per (x)DCFEB. Used by ODMB_VME module. Connected to bank 68. 
     DCFEB_TMS_P    : out std_logic;                        --! (x)DCFEB JTAG TMS signal. Used by ODMB_VME module. Connected to bank 68.
     DCFEB_TMS_N    : out std_logic;                        --! (x)DCFEB JTAG TMS signal. Used by ODMB_VME module. Connected to bank 68.
     DCFEB_TDI_P    : out std_logic;                        --! (x)DCFEB JTAG TDI signal. Used by ODMB_VME module. Connected to bank 68.
     DCFEB_TDI_N    : out std_logic;                        --! (x)DCFEB JTAG TDI signal. Used by ODMB_VME module. Connected to bank 68.
-    DCFEB_TDO_P    : in  std_logic_vector(7 downto 1);     --! (x)DCFEB JTAG TDO signal. One per (x)DCFEB. Used by ODMB_VME module. Connected to bank 67-68 as "C_TDO".
-    DCFEB_TDO_N    : in  std_logic_vector(7 downto 1);     --! (x)DCFEB JTAG TDO signal. One per (x)DCFEB. Used by ODMB_VME module. Connected to bank 67-68 as "C_TDO". 
-    DCFEB_DONE     : in  std_logic_vector(7 downto 1);     --! (x)DCFEB programming done signal. Used only by top level DCFEB startup process. Connected to bank 68 as "DONE_*".
+    DCFEB_TDO_P    : in  std_logic_vector(5 downto 1);     --! (x)DCFEB JTAG TDO signal. One per (x)DCFEB. Used by ODMB_VME module. Connected to bank 67-68 as "C_TDO".
+    DCFEB_TDO_N    : in  std_logic_vector(5 downto 1);     --! (x)DCFEB JTAG TDO signal. One per (x)DCFEB. Used by ODMB_VME module. Connected to bank 67-68 as "C_TDO". 
+    DCFEB_DONE     : in  std_logic_vector(5 downto 1);     --! (x)DCFEB programming done signal. Used only by top level DCFEB startup process. Connected to bank 68 as "DONE_*".
     RESYNC_P       : out std_logic;                        --! (x)DCFEB resync signal. Used by ODMB_VME module. Connected to bank 66.
     RESYNC_N       : out std_logic;                        --! (x)DCFEB resync signal. Used by ODMB_VME module. Connected to bank 66.
     BC0_P          : out std_logic;                        --! (x)DCFEB bunch crossing 0 synchronization signal. Initiated by CCB_BX0 signal or from ODMB_VME. Connected to bank 68.
@@ -87,7 +87,7 @@ entity odmb7_ucsb_dev is
     L1A_N          : out std_logic;                        --! Trigger L1A signal for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
     L1A_MATCH_P    : out std_logic_vector(7 downto 1);     --! L1A match for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
     L1A_MATCH_N    : out std_logic_vector(7 downto 1);     --! L1A match for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
-    PPIB_OUT_EN_B  : out std_logic;                        --! PPIB output enable signal. Should be fixed to '0'. Connected to bank 68.
+    CFEB_OUT_EN_B  : out std_logic;                        --! CFEB output enable signal. Fixed to '0'. Connected to bank 68.
     DCFEB_REPROG_B : out std_logic;                        --! (x)DCFEB reprogram signal. From ODMBCTRL in ODMB_VME module. Connected to bank 68.
 
     --------------------
@@ -115,21 +115,20 @@ entity odmb7_ucsb_dev is
     --------------------
     -- LVMB Signals
     --------------------
-    LVMB_PON     : out std_logic_vector(7 downto 0);       --! Signal to LVMB to power on (x)DCFEBs and ALCT. Mapping of bits to boards is chamber dependent. Used by ODMB_VME. Connected to bank 67.
+    LVMB_PON     : out std_logic_vector(5 downto 0);       --! Signal to LVMB to power on (x)DCFEBs and ALCT. Mapping of bits to boards is chamber dependent. Used by ODMB_VME. Connected to bank 67.
     PON_LOAD_B   : out std_logic;                          --! Signal to write LVMB_PON to LVMB. Used by ODMB_VME. Connected to bank 67.
     PON_OE       : out std_logic;                          --! Output enable for LVMB_PON. Fixed to '1'. Used by ODMB_VME. Connected to bank 67.
-    MON_LVMB_PON : in  std_logic_vector(7 downto 0);       --! Signal to check (x)DCFEBs and ALCT power status from LVMB. Mapping of bits to boards is chamber dependent. Used by ODMB_VME. Connected to bank 67.
+    MON_LVMB_PON : in  std_logic_vector(5 downto 0);       --! Signal to check (x)DCFEBs and ALCT power status from LVMB. Mapping of bits to boards is chamber dependent. Used by ODMB_VME. Connected to bank 67.
     LVMB_CSB     : out std_logic_vector(6 downto 0);       --! LVMB ADC SPI chip select. Used by ODMB_VME. Connected to bank 67.
     LVMB_SCLK    : out std_logic;                          --! LVMB ADC SPI clock. Used by ODMB_VME. Connected to bank 68.
     LVMB_SDIN    : out std_logic;                          --! LVMB ADC SPI input. Used by ODMB_VME. Connected to bank 68.
-    LVMB_SDOUT_P : in std_logic;                           --! LVMB ADC SPI output. Used by ODMB_VME. Connected to bank 67 as C_LVMB_SDOUT_P.
-    LVMB_SDOUT_N : in std_logic;                           --! LVMB ADC SPI output. Used by ODMB_VME. Connected to bank 67 as C_LVMB_SDOUT_N.
+    LVMB_SDOUT   : in std_logic;                           --! LVMB ADC SPI output. Used by ODMB_VME. Connected to bank 67 as C_LVMB_SDOUT.
 
     --------------------------------
     -- OTMB communication signals
     --------------------------------
     OTMB            : in  std_logic_vector(35 downto 0);   --! OTMB data. Used for packet building and PRBS test. Connected to bank 44-45 as "TMB[35:0]".
-    RAWLCT          : in  std_logic_vector(7 downto 0);    --! Local charged track signals, used by TRGCNTRL in ODMB CTRL for timing and for PRBS test. Connected to bank 45 (to be updated).
+    RAWLCT          : in  std_logic_vector(5 downto 0);    --! Local charged track signals, used by TRGCNTRL in ODMB CTRL for timing and for PRBS test. Connected to bank 45 (to be updated).
     OTMB_DAV        : in  std_logic;                       --! OTMB data available used by TRGCNTRL in ODMB CTRL for timing. Connected to bank 45 as TMB_DAV.
     LEGACY_ALCT_DAV : in  std_logic;                       --! ALCT data available used by TRGCNTRL in ODMB CTRL for timing. Connected to bank 45 as RSVTD[7] (to be updated).
     OTMB_FF_CLK     : in  std_logic;                       --! Unused. Connected to bank 45 as TMB_FF_CLK.
@@ -243,13 +242,13 @@ entity odmb7_ucsb_dev is
     -- Others
     --------------------------------
     LEDS_HEART_BEAT : out std_logic;                       --! On-board LED. Connected to bank 65.
-    LEDS_SPARES : out std_logic;                           --! On-board LED. Connected to bank 65.
+    LEDS_CFEBS_DONE : out std_logic;                       --! On-board LED. Connected to bank 65.
     LEDS_CFV      : out std_logic_vector(11 downto 0)      --! Front panel LEDs, currently unused. Connected to bank 65.
     );
-end odmb7_ucsb_dev;
+end odmb5_ucsb_dev;
 
-architecture Behavioral of odmb7_ucsb_dev is
-  constant NCFEB  : integer range 1 to 7 := 7;  -- Number of DCFEBS, 7 for ODMB7
+architecture Behavioral of odmb5_ucsb_dev is
+  constant NCFEB  : integer range 1 to 7 := 5;  -- Number of DCFEBS, 5 for ODMB5
 
   component odmb_clocking is
     port (
@@ -305,7 +304,7 @@ architecture Behavioral of odmb7_ucsb_dev is
 
   component ODMB_VME is
     generic (
-      NCFEB       : integer range 1 to 7 := 7  -- Number of DCFEBS, 7 for ME1/1, 5
+      NCFEB       : integer range 1 to 7 := 5  -- Number of DCFEBS, 5 for ME234/1
       );
     port (
       --------------------
@@ -360,12 +359,12 @@ architecture Behavioral of odmb7_ucsb_dev is
       ODMB_INITJTAG : in std_logic;
 
       --------------------
-      -- From/To LVMB: ODMB & ODMB7 design, ODMB5 to be seen
+      -- From/To LVMB: ODMB5
       --------------------
-      LVMB_PON     : out std_logic_vector(7 downto 0);
+      LVMB_PON     : out std_logic_vector(NCFEB downto 0);
       PON_LOAD_B   : out std_logic;
       PON_OE       : out std_logic;
-      R_LVMB_PON   : in  std_logic_vector(7 downto 0);
+      R_LVMB_PON   : in  std_logic_vector(NCFEB downto 0);
       LVMB_CSB     : out std_logic_vector(6 downto 0);
       LVMB_SCLK    : out std_logic;
       LVMB_SDIN    : out std_logic;
@@ -375,7 +374,7 @@ architecture Behavioral of odmb7_ucsb_dev is
       -- OTMB signals
       --------------------
       OTMB        : in  std_logic_vector(35 downto 0);      -- "TMB[35:0]" in Bank 44-45
-      RAWLCT      : in  std_logic_vector(7 downto 0);       -- Bank 45
+      RAWLCT      : in  std_logic_vector(NCFEB downto 0);       -- Bank 45
       OTMB_DAV    : in  std_logic;                          -- "TMB_DAV" in Bank 45
       ALCT_DAV    : in  std_logic;                          -- "LEGACY_ALCT_DAV" in Bank 45
       OTMB_FF_CLK : in  std_logic;                          -- "TMB_FF_CLK" in Bank 45, not used
@@ -472,7 +471,7 @@ architecture Behavioral of odmb7_ucsb_dev is
 
   component ODMB_CTRL is
     generic (
-      NCFEB       : integer range 1 to 7 := NCFEB; -- Number of DCFEBS, 7 for ME1/1, 5
+      NCFEB       : integer range 1 to 5 := NCFEB; -- Number of DCFEBS, 5 for ME234/1
       CAFIFO_SIZE : integer range 1 to 128 := 32   -- Number FIFO words in CAFIFO: 32 for ODMB, 16 for test
       );
     port (
@@ -632,7 +631,7 @@ architecture Behavioral of odmb7_ucsb_dev is
 
   component odmb_status is
     generic (
-      NCFEB            : integer range 1 to 7 := 7  -- Number of DCFEBS, 7 for ME1/1, 5
+      NCFEB            : integer range 1 to 7 := 5  -- Number of DCFEBS, 5 for ME234/1
       );
     port (
       ODMB_STAT_SEL    : in  std_logic_vector(7 downto 0);
@@ -847,12 +846,6 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal ccb_cmd_bxev    : std_logic_vector(7 downto 0) := (others => '0');
   signal ccb_rsv         : std_logic_vector(10 downto 0) := (others => '0');
   signal ccb_other       : std_logic_vector(10 downto 0) := (others => '0');
-
-  --------------------------------------
-  -- LVMB signals
-  --------------------------------------
-  signal lvmb_sdout : std_logic := '0';
-
   --------------------------------------
   -- Triggers
   --------------------------------------
@@ -1202,7 +1195,7 @@ begin
   -- Handle PPIB/DCFEB signals
   -------------------------------------------------------------------------------------------
 
-  PPIB_OUT_EN_B <= '0'; -- always enable
+  CFEB_OUT_EN_B <= '0'; -- always enable
   -- Handle DCFEB I/O buffers
   OB_DCFEB_TMS: OBUFDS port map (I => dcfeb_tms, O => DCFEB_TMS_P, OB => DCFEB_TMS_N);
   OB_DCFEB_TDI: OBUFDS port map (I => dcfeb_tdi, O => DCFEB_TDI_P, OB => DCFEB_TDI_N);
@@ -1330,12 +1323,6 @@ begin
   PULSE_DCFEB_INITJTAG : NPULSE2FAST port map(DOUT => dcfeb_initjtag, CLK_DOUT => sysclk1p25, RST => '0', NPULSE => 5, DIN => dcfeb_initjtag_d);
 
   -------------------------------------------------------------------------------------------
-  -- Handle LVMB signals
-  -------------------------------------------------------------------------------------------
-
-  IB_LVMB_SDOUT: IBUFDS port map (O => lvmb_sdout, I => LVMB_SDOUT_P, IB => LVMB_SDOUT_N);
-
-  -------------------------------------------------------------------------------------------
   -- Handle Triggers and DAVs
   -------------------------------------------------------------------------------------------
   LCTDLY_GTRG : LCTDLY port map(DOUT => test_l1a, CLK => cmsclk, DELAY => lct_l1a_dly, DIN => test_lct);
@@ -1359,7 +1346,8 @@ begin
   -------------------------------------------------------------------------------------------
 
   -- FIXME: should change with bad_dcfeb_pulse and good_dcfeb_pulse, currently, KILL must be updated manually via VME command
-  change_reg_data <= x"0" & "000" & kill(9) & kill(8) & kill(7 downto 1);
+  -- change_reg_data <= x"0" & "000" & kill(9) & kill(8) & kill(7 downto 1);
+  change_reg_data <= x"0" & "000" & kill(9) & kill(8) & "00" & kill(5 downto 1);
   change_reg_index <= NREGS;
 
   -------------------------------------------------------------------------------------------
@@ -1674,9 +1662,6 @@ begin
   RX12_I2C_ENA <= '0';
   RX12_CS_B <= '1';
   RX12_RST_B <= '1';
-  TX12_I2C_ENA <= '0';
-  TX12_CS_B <= '1';
-  TX12_RST_B <= '1';
   B04_I2C_ENA <= '0';
   B04_CS_B <= '1';
   B04_RST_B <= '1';
@@ -1719,7 +1704,7 @@ begin
 
   GTH_DCFEB : mgt_cfeb
     generic map (
-      NLINK     => 7,  -- number of links
+      NLINK     => 5,  -- number of links
       DATAWIDTH => 16  -- user data width
       )
     port map (
@@ -1733,7 +1718,7 @@ begin
       crc_valid    => dcfeb_crc_valid,
       rxready      => dcfeb_rxready,
       bad_rx       => dcfeb_bad_rx,
-      kill_rxout   => kill(7 downto 1),
+      kill_rxout   => kill(5 downto 1),
       kill_rxpd    => (others => '0'),
       fifo_full    => dcfeb_datafifo_full,
       fifo_afull   => dcfeb_datafifo_afull,
