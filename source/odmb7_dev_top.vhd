@@ -243,7 +243,7 @@ entity odmb7_ucsb_dev is
     -- Others
     --------------------------------
     LEDS_HEART_BEAT : out std_logic;                       --! On-board LED. Connected to bank 65.
-    LEDS_SPARES : out std_logic;                           --! On-board LED. Connected to bank 65.
+    LEDS_SPARE : out std_logic;                           --! On-board LED. Connected to bank 65.
     LEDS_CFV      : out std_logic_vector(11 downto 0)      --! Front panel LEDs, currently unused. Connected to bank 65.
     );
 end odmb7_ucsb_dev;
