@@ -85,8 +85,8 @@ entity odmb5_ucsb_dev is
     EXTPLS_N       : out std_logic;                        --! Calibration EXTPLS signal for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
     L1A_P          : out std_logic;                        --! Trigger L1A signal for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
     L1A_N          : out std_logic;                        --! Trigger L1A signal for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
-    L1A_MATCH_P    : out std_logic_vector(7 downto 1);     --! L1A match for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
-    L1A_MATCH_N    : out std_logic_vector(7 downto 1);     --! L1A match for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
+    L1A_MATCH_P    : out std_logic_vector(5 downto 1);     --! L1A match for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
+    L1A_MATCH_N    : out std_logic_vector(5 downto 1);     --! L1A match for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
     CFEB_OUT_EN_B  : out std_logic;                        --! CFEB output enable signal. Fixed to '0'. Connected to bank 68.
     DCFEB_REPROG_B : out std_logic;                        --! (x)DCFEB reprogram signal. From ODMBCTRL in ODMB_VME module. Connected to bank 68.
 
@@ -374,7 +374,7 @@ architecture Behavioral of odmb5_ucsb_dev is
       -- OTMB signals
       --------------------
       OTMB        : in  std_logic_vector(35 downto 0);      -- "TMB[35:0]" in Bank 44-45
-      RAWLCT      : in  std_logic_vector(NCFEB downto 0);       -- Bank 45
+      RAWLCT      : in  std_logic_vector(NCFEB downto 0);   -- Bank 45
       OTMB_DAV    : in  std_logic;                          -- "TMB_DAV" in Bank 45
       ALCT_DAV    : in  std_logic;                          -- "LEGACY_ALCT_DAV" in Bank 45
       OTMB_FF_CLK : in  std_logic;                          -- "TMB_FF_CLK" in Bank 45, not used
@@ -519,7 +519,7 @@ architecture Behavioral of odmb5_ucsb_dev is
       -- TRGCNTRL
       --------------------
       RAW_L1A       : in std_logic;
-      RAWLCT        : in std_logic_vector(7 downto 0);
+      RAWLCT        : in std_logic_vector(NCFEB downto 0);
 
       --------------------
       -- DAV
@@ -552,7 +552,7 @@ architecture Behavioral of odmb5_ucsb_dev is
 
       EOF_DATA    : in std_logic_vector(NCFEB+2 downto 1);
 
-      CAFIFO_PREV_NEXT_L1A_MATCH : out std_logic_vector(15 downto 0);
+      CAFIFO_PREV_NEXT_L1A_MATCH : out std_logic_vector(NCFEB*2+1 downto 0);
       CAFIFO_PREV_NEXT_L1A       : out std_logic_vector(15 downto 0);
       CONTROL_DEBUG              : out std_logic_vector(15 downto 0);
       CAFIFO_DEBUG               : out std_logic_vector(15 downto 0);
@@ -1035,8 +1035,9 @@ architecture Behavioral of odmb5_ucsb_dev is
   signal cafifo_l1a_match_in : std_logic_vector(NCFEB+2 downto 1);
   signal cafifo_l1a_match_out : std_logic_vector(NCFEB+2 downto 1);
   signal dcfeb_fifo_rst   : std_logic_vector(NCFEB downto 1);
+  signal dcfeb_fifo_rst_zeroes : std_logic_vector(NCFEB downto 1) := (others => '0');
 
-  signal cafifo_prev_next_l1a_match : std_logic_vector(15 downto 0);
+  signal cafifo_prev_next_l1a_match : std_logic_vector(NCFEB*2+1 downto 0);
   signal cafifo_prev_next_l1a       : std_logic_vector(15 downto 0);
   signal cafifo_debug, control_debug : std_logic_vector(15 downto 0);
   signal cafifo_wr_addr              : std_logic_vector(7 downto 0);
@@ -1099,7 +1100,7 @@ begin
       DCFEB_TMS           => dcfeb_tms,
       DCFEB_TDI           => dcfeb_tdi,
 
-      DCFEB_FIFO_RST      => "0000000", -- auto-kill related
+      DCFEB_FIFO_RST      => dcfeb_fifo_rst_zeroes, -- auto-kill related
       EOF_DATA            => eof_data,
       INTO_FIFO_DAV       => into_fifo_dav,
 
@@ -1347,7 +1348,7 @@ begin
 
   -- FIXME: should change with bad_dcfeb_pulse and good_dcfeb_pulse, currently, KILL must be updated manually via VME command
   -- change_reg_data <= x"0" & "000" & kill(9) & kill(8) & kill(7 downto 1);
-  change_reg_data <= x"0" & "000" & kill(9) & kill(8) & "00" & kill(5 downto 1);
+  change_reg_data <= x"0" & "000" & kill(NCFEB+2) & kill(NCFEB+1) & "00" & kill(5 downto 1);
   change_reg_index <= NREGS;
 
   -------------------------------------------------------------------------------------------
@@ -1599,7 +1600,7 @@ begin
       -- For headers/trailers
       GA => vme_ga_b,
       CRATEID => crateid,
-      AUTOKILLED_DCFEBS  => "0000000",
+      AUTOKILLED_DCFEBS  => dcfeb_fifo_rst_zeroes,
 
       -- From/To Data FIFOs
       FIFO_RE_B  => fifo_re_b,
@@ -1702,31 +1703,33 @@ begin
       reset           => opt_reset
       );
 
-  GTH_DCFEB : mgt_cfeb
-    generic map (
-      NLINK     => 5,  -- number of links
-      DATAWIDTH => 16  -- user data width
-      )
-    port map (
-      mgtrefclk    => mgtrefclk0_225,
-      rxusrclk     => usrclk_mgtc,
-      sysclk       => sysclk80,
-      daq_rx_n     => DAQ_RX_N(6 downto 0),
-      daq_rx_p     => DAQ_RX_P(6 downto 0),
-      rxdata_cfeb  => dcfeb_rxdata,
-      rxd_valid    => dcfeb_rxd_valid,
-      crc_valid    => dcfeb_crc_valid,
-      rxready      => dcfeb_rxready,
-      bad_rx       => dcfeb_bad_rx,
-      kill_rxout   => kill(5 downto 1),
-      kill_rxpd    => (others => '0'),
-      fifo_full    => dcfeb_datafifo_full,
-      fifo_afull   => dcfeb_datafifo_afull,
-      prbs_type    => mgt_prbs_type,
-      prbs_rx_en   => dcfeb_prbs_rx_en,
-      prbs_tst_cnt => dcfeb_prbs_tst_cnt,
-      prbs_err_cnt => dcfeb_prbs_err_cnt,
-      reset        => opt_reset
-      );
+  --temporary: remove mgt_cfeb for ODMB5 firmware for now until we find a long term solution for number of links differing
+  usrclk_mgtc <= mgtrefclk0_225;
+--  GTH_DCFEB : mgt_cfeb
+--    generic map (
+--      NLINK     => 5,  -- number of links
+--      DATAWIDTH => 16  -- user data width
+--      )
+--    port map (
+--      mgtrefclk    => mgtrefclk0_225,
+--      rxusrclk     => usrclk_mgtc,
+--      sysclk       => sysclk80,
+--      daq_rx_n     => DAQ_RX_N(4 downto 0),
+--      daq_rx_p     => DAQ_RX_P(4 downto 0),
+--      rxdata_cfeb  => dcfeb_rxdata,
+--      rxd_valid    => dcfeb_rxd_valid,
+--      crc_valid    => dcfeb_crc_valid,
+--      rxready      => dcfeb_rxready,
+--      bad_rx       => dcfeb_bad_rx,
+--      kill_rxout   => kill(5 downto 1),
+--      kill_rxpd    => (others => '0'),
+--      fifo_full    => dcfeb_datafifo_full,
+--      fifo_afull   => dcfeb_datafifo_afull,
+--      prbs_type    => mgt_prbs_type,
+--      prbs_rx_en   => dcfeb_prbs_rx_en,
+--      prbs_tst_cnt => dcfeb_prbs_tst_cnt,
+--      prbs_err_cnt => dcfeb_prbs_err_cnt,
+--      reset        => opt_reset
+--      );
 
 end Behavioral;

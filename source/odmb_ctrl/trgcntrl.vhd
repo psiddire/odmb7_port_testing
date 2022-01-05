@@ -141,8 +141,8 @@ begin  --Architecture
   -- ila_data(84 downto 79) <= std_logic_vector(to_unsigned(PUSH_DLY, 6));
 
   DIAGOUT(3 downto 0)  <= otmb_dav_sync & alct_dav_sync & fifo_push_inner & l1a;
-  DIAGOUT(10 downto 4) <= lct(7 downto 1);  
-  DIAGOUT(17 downto 11) <= l1a_match(7 downto 1);  
+  --DIAGOUT(10 downto 4) <= lct(7 downto 1);  
+  --DIAGOUT(17 downto 11) <= l1a_match(7 downto 1);  
   -- DIAGOUT(26 downto 18) <= fifo_l1a_match_inner(9 downto 1);  
   -- DIAGOUT <= ila_data;
 

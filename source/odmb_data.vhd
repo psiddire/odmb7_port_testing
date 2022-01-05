@@ -260,14 +260,14 @@ begin
   end process;
 
   rx_alct_data_valid <= not alct_qq(17);
-  alct_data_valid    <= '0' when KILL(9) = '1' else
+  alct_data_valid    <= '0' when KILL(NCFEB+2) = '1' else
                         rx_alct_data_valid when (GEN_DCFEB_SEL = '0') else
                         gen_alct_data_valid;
 
   alct_data <= alct_qq(15 downto 0) when (GEN_DCFEB_SEL = '0') else gen_alct_data;
 
   rx_otmb_data_valid <= not otmb_qq(17);
-  otmb_data_valid    <= '0' when KILL(8) = '1' else
+  otmb_data_valid    <= '0' when KILL(NCFEB+1) = '1' else
                         rx_otmb_data_valid when (GEN_DCFEB_SEL = '0') else
                         gen_otmb_data_valid;
 
