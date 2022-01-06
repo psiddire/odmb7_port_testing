@@ -241,7 +241,7 @@ begin
 
   GEN_FDPE_selfeb : for I in 1 to NCFEB generate
   begin
-    FDPE_selfeb1 : FDPE port map(D => INDATA(I), C => SLOWCLK, CE => ce_selfeb, PRE => rst_init, Q => selfeb(I));
+    FDPE_selfeb1 : FDPE port map(D => INDATA(I-1), C => SLOWCLK, CE => ce_selfeb, PRE => rst_init, Q => selfeb(I));
   end generate GEN_FDPE_selfeb;
 
   -- Generate DTACK for SELCFEB command (0x1020) on clock cycle after strobe

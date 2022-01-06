@@ -212,6 +212,7 @@ architecture Behavioral of Firmware_tb is
   signal dcfeb_tdi_n    : std_logic := '0';
   signal dcfeb_tdo_p    : std_logic_vector (NCFEB downto 1)  := (others => '0');
   signal dcfeb_tdo_n    : std_logic_vector (NCFEB downto 1)  := (others => '0');
+  signal dcfeb_tdo      : std_logic_vector (NCFEB downto 1)  := (others => '0');
   signal injpls         : std_logic := '0';
   signal injpls_p       : std_logic := '0';
   signal injpls_n       : std_logic := '0';
@@ -420,6 +421,11 @@ begin
   begin
     VME_BUF : IOBUF port map(O => vme_data_io_out_buf(I), IO => vme_data_io(I), I => vme_data_io_in_buf(I), T => vme_oe_b);
   end generate VCC_GEN_15;
+  
+  CFEB_GEN_5 : for I in 1 to NCFEB generate
+  begin
+    CFEB_TDO_BUF : OBUFDS port map(I => dcfeb_tdo(I), O => dcfeb_tdo_p(I), OB => dcfeb_tdo_n(I));
+  end generate CFEB_GEN_5;
 
   -- ODMB Firmware module
 
@@ -555,13 +561,13 @@ begin
       RX12_RST_B           => open,
       RX12_INT_B           => '0',
       RX12_PRESENT_B       => '0',
-      TX12_I2C_ENA         => open,
-      TX12_SDA             => open,
-      TX12_SCL             => open,
-      TX12_CS_B            => open,
-      TX12_RST_B           => open,
-      TX12_INT_B           => '0',
-      TX12_PRESENT_B       => '0',
+      -- TX12_I2C_ENA         => open,
+      -- TX12_SDA             => open,
+      -- TX12_SCL             => open,
+      -- TX12_CS_B            => open,
+      -- TX12_RST_B           => open,
+      -- TX12_INT_B           => '0',
+      -- TX12_PRESENT_B       => '0',
       B04_I2C_ENA          => open,
       B04_SDA              => open,
       B04_SCL              => open,
@@ -624,7 +630,7 @@ begin
       TCK             => dcfeb_tck_p(2),
       TMS             => dcfeb_tms_p,
       TDI             => dcfeb_tdi_p,
-      TDO             => dcfeb_tdo_p(2),
+      TDO             => dcfeb_tdo(2),
       RTN_SHFT_EN     => open,
       DONE            => dcfeb_done(2),
       INJPLS          => injpls_p,
