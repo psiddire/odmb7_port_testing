@@ -37,7 +37,7 @@ entity ODMB_VME is
     CLK40       : in std_logic;                                    --! 40 MHz "fastclk" used for numerous purposes by VMEMON, VMECONFREGS, SYSTEM_TEST, COMMAND_MODULE, and SPI_CTRL
     CLK10       : in std_logic;                                    --! 10 MHz "midclk" currently unused
     CLK2P5      : in std_logic;                                    --! 2.5 MHz "slowclk" used for most slow control logic
-    CLK1P25     : in std_logic;                                    --! 1.25 MHz "slowclk" used by CFEBJTAG, SYSTEM_MON, and LVDBMON
+    CLK1P25     : in std_logic;                                    --! 1.25 MHz "slowclk" used by CFEBJTAG, SYSTEM_MON
 
     --------------------
     -- VME signals  <-- relevant ones only
