@@ -20,7 +20,7 @@ use work.ucsb_types.all;
 --! * Device 2 - ODMBJTAG - generates slow control commands in the JTAG protocol for the ODMB7 FPGA (Kintex Ultrascale)
 --! * Device 3 - VMEMON - used to monitor various registers, set certain settings, and send reset signals
 --! * Device 4 - VMECONFREGS - used to interact with the configuration and constant registers loaded from nonvolatile memory
---! * Device 5 - TESTFIFOS - NOT IMPLEMENTED
+--! * Device 5 - TESTFIFOS - NOT IMPLEMENTED, temporarily CLOCK_MON
 --! * Device 6 - SPI_PORT - used to interact with ODMB7 PROM ICs
 --! * Device 7 - SYSTEM_MON - used to measure temperature, currents, and voltages
 --! * Device 8 - LVDBMON - used to interact with LVMB7 board
@@ -143,6 +143,20 @@ entity ODMB_VME is
     CRATEID              : out std_logic_vector(7 downto 0);       --! VMECONFREGS register with VME crate ID, used by CONTROL_FSM in packet generation.
     CHANGE_REG_DATA      : in std_logic_vector(15 downto 0);       --! Signals to VMECONFREGS to auto-kill bad boards, new value for KILL.
     CHANGE_REG_INDEX     : in integer range 0 to NREGS;            --! Signals to VMECONFREGS to auto-kill bad boards, will only ever be 7(KILL) or NREGS(none).
+
+    --------------------
+    -- Clock Synth Signals
+    --------------------
+    RST_CLKS_B           : out std_logic;                          --! Reset signal to clock synth.
+    FPGA_SEL             : out std_logic;                          --! Clock synth. input select
+    FPGA_AC              : out std_logic_vector(2 downto 0);       --! Clock synth. auto-config
+    FPGA_TEST            : out std_logic;                          --! Clock synth. test mode setting
+    FPGA_IF0_CSN         : out std_logic;                          --! IF select or SPI chip select
+    FPGA_IF1_MISO_IN     : in std_logic;                           --! IF select or SPI MISO
+    FPGA_IF1_MISO_OUT    : out std_logic;                          --! IF select or SPI MISO
+    FPGA_MOSI            : out std_logic;                          --! SPI Main-Out-Secondary-In
+    FPGA_SCLK            : out std_logic;                          --! SPI clock
+    FPGA_MISO_DIR        : out std_logic;                          --! SPI MISO direction select
 
     --------------------
     -- PROM signals
@@ -350,6 +364,35 @@ architecture Behavioral of ODMB_VME is
       --exernal registers
       ODMB_STAT_SEL   : out std_logic_vector(7 downto 0);
       ODMB_STAT_DATA  : in  std_logic_vector(15 downto 0)
+      );
+  end component;
+
+  component CLOCK_MON is
+    port (
+      --VME/Control signals
+      RST               : in std_logic;
+      CLK2P5            : in std_logic;
+      DEVICE            : in std_logic;
+      STROBE            : in std_logic;
+      WRITER            : in std_logic;
+      COMMAND           : in std_logic_vector(9 downto 0);
+      INDATA            : in std_logic_vector(15 downto 0);
+      OUTDATA           : out std_logic_vector(15 downto 0);
+      DTACK             : out std_logic;
+      --output to FPGA pins
+      RST_CLKS_B        : out std_logic;
+      FPGA_SEL          : out std_logic;
+      FPGA_AC0          : out std_logic;
+      FPGA_AC1          : out std_logic;
+      FPGA_AC2          : out std_logic;
+      FPGA_TEST         : out std_logic;
+      FPGA_IF0_CSN_B    : out std_logic;
+      FPGA_IF1_MISO_IN  : in std_logic;
+      FPGA_IF1_MISO_OUT : out std_logic; 
+      FPGA_MOSI         : out std_logic;
+      FPGA_SCLK         : out std_logic;
+      --control output to FPGA pins
+      FPGA_MISO_DIR     : out std_logic      
       );
   end component;
 
@@ -639,7 +682,6 @@ begin
   VME_DIR_B <= tovme_b;
 
   outdata_dev(0) <= (others => '0');
-  outdata_dev(5) <= (others => '0');
   idx_dev <= to_integer(unsigned(cmd_adrs_inner(15 downto 12)));
   VME_DATA_OUT <= outdata_dev(idx_dev);
 
@@ -828,6 +870,34 @@ begin
       SPI_CFG_REG_WE      => spi_cfg_reg_we,
       SPI_CONST_REGS      => spi_const_regs,
       SPI_CFG_REGS        => spi_cfg_regs
+      );
+
+  DEV5_CLOCK_MON_I : CLOCK_MON
+    port map (
+      --VME/Control signals
+      RST               => RST, 
+      CLK2P5            => CLK2P5, 
+      DEVICE            => device(5),
+      STROBE            => strobe,
+      WRITER            => VME_WRITE_B,
+      COMMAND           => cmd,
+      INDATA            => VME_DATA_IN,
+      OUTDATA           => outdata_dev(5),
+      DTACK             => dtack_dev(5),
+      --output to FPGA pins
+      RST_CLKS_B        => RST_CLKS_B,
+      FPGA_SEL          => FPGA_SEL,
+      FPGA_AC0          => FPGA_AC(0),
+      FPGA_AC1          => FPGA_AC(1),
+      FPGA_AC2          => FPGA_AC(2),
+      FPGA_TEST         => FPGA_TEST,
+      FPGA_IF0_CSN_B    => FPGA_IF0_CSN,
+      FPGA_IF1_MISO_IN  => FPGA_IF1_MISO_IN,
+      FPGA_IF1_MISO_OUT => FPGA_IF1_MISO_OUT,
+      FPGA_MOSI         => FPGA_MOSI,
+      FPGA_SCLK         => FPGA_SCLK,
+      --control output to FPGA pins
+      FPGA_MISO_DIR     => FPGA_MISO_DIR
       );
 
   DEV6_SPI_PORT_I : SPI_PORT

@@ -423,7 +423,21 @@ architecture Behavioral of odmb7_ucsb_dev is
       CHANGE_REG_INDEX : in integer range 0 to NREGS;
 
       --------------------
-      -- EEPROM signals
+      -- Clock Synth Signals
+      --------------------
+      RST_CLKS_B           : out std_logic;
+      FPGA_SEL             : out std_logic;
+      FPGA_AC              : out std_logic_vector(2 downto 0);
+      FPGA_TEST            : out std_logic;
+      FPGA_IF0_CSN         : out std_logic;
+      FPGA_IF1_MISO_IN     : in std_logic;
+      FPGA_IF1_MISO_OUT    : out std_logic;
+      FPGA_MOSI            : out std_logic;
+      FPGA_SCLK            : out std_logic;
+      FPGA_MISO_DIR        : out std_logic;
+
+      --------------------
+      -- PROM signals
       --------------------
       CNFG_DATA_IN     : in std_logic_vector(7 downto 4);
       CNFG_DATA_OUT    : out std_logic_vector(7 downto 4);
@@ -891,11 +905,16 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal test_ped : std_logic := '0';
 
   --------------------------------------
-  -- EEPROM signals
+  -- PROM signals
   --------------------------------------
   signal cnfg_data_in    : std_logic_vector(7 downto 4) := (others => '0');
   signal cnfg_data_out   : std_logic_vector(7 downto 4) := (others => '0');
   signal cnfg_data_dir   : std_logic_vector(7 downto 4) := (others => '0');
+
+  --------------------------------------
+  -- Clock synth signals
+  --------------------------------------
+  signal fpga_if1_miso_in, fpga_if1_miso_out, fpga_if1_miso_dir : std_logic := '1';
 
   --------------------------------------
   -- Reset signals
@@ -1076,10 +1095,11 @@ architecture Behavioral of odmb7_ucsb_dev is
 begin
 
   -------------------------------------------------------------------------------------------
-  -- Constant driver for selector/reset pins for board to work
+  -- Handle clock chip signals
   -------------------------------------------------------------------------------------------
-  FPGA_SEL <= '0';
-  RST_CLKS_B <= '1';
+  --FPGA_SEL <= '0';
+  --RST_CLKS_B <= '1';
+  FPGA_MISO_BUF : IOBUF port map(O => fpga_if1_miso_in, IO => FPGA_IF1_MISO, I => fpga_if1_miso_out, T => fpga_if1_miso_dir);
 
   -------------------------------------------------------------------------------------------
   -- Handle incoming data from OTMB/ALCT/DCFEBs
@@ -1497,6 +1517,17 @@ begin
       CRATEID          => crateid,
       CHANGE_REG_DATA  => change_reg_data,
       CHANGE_REG_INDEX => change_reg_index,
+
+      RST_CLKS_B        => RST_CLKS_B,
+      FPGA_SEL          => FPGA_SEL,
+      FPGA_AC           => FPGA_AC,
+      FPGA_TEST         => FPGA_TEST,
+      FPGA_IF0_CSN      => FPGA_IF0_CSN,
+      FPGA_IF1_MISO_IN  => fpga_if1_miso_in,
+      FPGA_IF1_MISO_OUT => fpga_if1_miso_out,
+      FPGA_MOSI         => FPGA_MOSI,
+      FPGA_SCLK         => FPGA_SCLK,
+      FPGA_MISO_DIR     => fpga_if1_miso_dir,
 
       CNFG_DATA_IN     => cnfg_data_in,
       CNFG_DATA_OUT    => cnfg_data_out,

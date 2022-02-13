@@ -90,6 +90,21 @@ architecture Behavioral of Firmware_tb is
       );
   end component;
 
+  component CLOCK_CHIP_SIM is
+    port (
+      FPGA_SEL   : in std_logic; 
+      RSTN       : in std_logic;
+      AC0_GPIO0  : in std_logic;
+      AC1_GPIO1  : in std_logic;
+      AC2_GPIO2  : in std_logic;
+      TEST_GPIO3 : in std_logic;
+      IF0_CSN    : in std_logic;
+      IF1_MISO   : inout std_logic;
+      SCL_SCLK   : in std_logic;
+      SDA_MOSI   : in std_logic
+    );
+  end component;
+
   -- LUT constents
   constant bw_addr   : integer := 4;
   constant bw_addr_entries : integer := 16;
@@ -259,6 +274,16 @@ architecture Behavioral of Firmware_tb is
   signal cms_clk_fpga_p : std_logic;
   signal cms_clk_fpga_n : std_logic;
 
+  -- signals to clock chip
+  signal zl_fpga_sel : std_logic;
+  signal zl_rstn : std_logic;
+  signal zl_ac : std_logic_vector(2 downto 0);
+  signal zl_test_gpio3 : std_logic;
+  signal zl_if0_csn : std_logic;
+  signal zl_if1_miso : std_logic;
+  signal zl_scl_sclk : std_logic;
+  signal zl_sda_mosi : std_logic;
+
   -- ILA
   signal trig0 : std_logic_vector(255 downto 0) := (others=> '0');
   signal data  : std_logic_vector(4095 downto 0) := (others=> '0');
@@ -410,7 +435,7 @@ begin
 
   --aVME signal management
   rstn <= not rst_global;
-  vc_cmd <= '1' when (cmddev(15 downto 12) = x"1" or cmddev(15 downto 12) = x"2" or cmddev(15 downto 12) = x"4" or cmddev(15 downto 12) = x"3" or cmddev(15 downto 12) = x"6" or cmddev(15 downto 12) = x"7" or cmddev(15 downto 12) = x"8") else '0';
+  vc_cmd <= '1' when (cmddev(15 downto 12) = x"1" or cmddev(15 downto 12) = x"2" or cmddev(15 downto 12) = x"3" or cmddev(15 downto 12) = x"4" or cmddev(15 downto 12) = x"5" or cmddev(15 downto 12) = x"6" or cmddev(15 downto 12) = x"7" or cmddev(15 downto 12) = x"8") else '0';
   vc_addr <= x"A8" & cmddev(15 downto 1);
   vc_rd <=  '1' when vme_data_in = x"2EAD" else '0';
 
@@ -573,8 +598,15 @@ begin
       SPY_TDIS             => open,
 
       ODMB_DONE            => '1',
-      FPGA_SEL             => open,
-      RST_CLKS_B           => open,
+
+      FPGA_SEL             => zl_fpga_sel,
+      RST_CLKS_B           => zl_rstn,
+      FPGA_AC              => zl_ac,
+      FPGA_TEST            => zl_test_gpio3,
+      FPGA_IF0_CSN         => zl_if0_csn,
+      FPGA_IF1_MISO        => zl_if1_miso,
+      FPGA_SCLK            => zl_scl_sclk,
+      FPGA_MOSI            => zl_sda_mosi,
 
       SYSMON_P             => x"0000",
       SYSMON_N             => x"0000",
@@ -665,5 +697,19 @@ begin
       DATA_OUT       => vme_data_io_in_buf    -- between VME and ODMB
       );
 
+  -- clock chip simulation
+  zl30267_i : CLOCK_CHIP_SIM
+    port map (
+      FPGA_SEL   => zl_fpga_sel,
+      RSTN       => zl_rstn,
+      AC0_GPIO0  => zl_ac(0),
+      AC1_GPIO1  => zl_ac(1),
+      AC2_GPIO2  => zl_ac(2),
+      TEST_GPIO3 => zl_test_gpio3,
+      IF0_CSN    => zl_if0_csn,
+      IF1_MISO   => zl_if1_miso,
+      SCL_SCLK   => zl_scl_sclk,
+      SDA_MOSI   => zl_sda_mosi
+    );
 
 end Behavioral;
