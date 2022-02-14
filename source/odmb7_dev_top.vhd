@@ -1162,8 +1162,7 @@ begin
   -------------------------------------------------------------------------------------------
 
   -- Handle VME data direction and output enable lines
-  KUS_VME_DIR <= vme_dir;
-  vme_dir <= not vme_dir_b;
+  KUS_VME_DIR <= not vme_dir_b;
   KUS_VME_OE_B <= vme_oe_b;
 
   GEN_VMEIO_16 : for I in 0 to 15 generate
@@ -1324,7 +1323,6 @@ begin
 
   raw_lct <= (others => '1') when (test_lct = '1') else RAWLCT;
   raw_l1a <= '1' when test_l1a = '1' else not CCB_L1A_B;
-             --tc_l1a when (testctrl_sel = '1') else
 
   otmb_push_dly_p1 <= otmb_push_dly + 1;
   alct_push_dly_p1 <= alct_push_dly + 1;
@@ -1705,7 +1703,7 @@ begin
       DATAWIDTH => 16  -- user data width
       )
     port map (
-      mgtrefclk    => mgtrefclk0_225,
+      mgtrefclk    => mgtrefclk0_224,
       rxusrclk     => usrclk_mgtc,
       sysclk       => sysclk80,
       daq_rx_n     => DAQ_RX_N(6 downto 0),
