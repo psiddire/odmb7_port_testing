@@ -132,7 +132,7 @@ architecture SYSTEM_MON_ARCH of SYSTEM_MON is
   signal cs_inner: std_logic;
   signal din_inner : std_logic;
   signal clk_inner : std_logic;
-  signal chip_selected : std_logic_vector(4 downto 0);
+  signal chip_selected : std_logic_vector(4 downto 0) := (others => '0');
 
   -- vme command decoding
   signal cmddev : std_logic_vector (15 downto 0);
@@ -206,9 +206,9 @@ begin
     which_chip_inner_gen_i: FDCE port map(Q => which_chip_inner(I), C => SLOWCLK, CLR => data_done, CE => DEVICE, D => which_chip(I));
     which_chan_inner_gen_i: FDCE port map(Q => which_chan_inner(I), C => SLOWCLK, CLR => data_done, CE => DEVICE, D => which_chan(I));
   end generate which_inner_gen;
-
-  vmon_chanidx <= to_integer(signed(which_chan_inner)) - 1;
-  vmon_chipidx <= to_integer(signed(which_chip_inner)) - 1;
+  
+  vmon_chanidx <= to_integer(unsigned(which_chan_inner)) - 1;
+  vmon_chipidx <= to_integer(unsigned(which_chip_inner)) - 1;
   -- sync DIN and CS using same clk
   
   --chip_selected(1) <= '0';
@@ -375,6 +375,5 @@ begin
 
   sysmon_data(0) <= sysmon_drdy;
   sysmon_data(1) <= sysmon_den;
-
 
 end SYSTEM_MON_ARCH;

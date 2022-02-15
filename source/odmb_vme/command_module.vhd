@@ -84,20 +84,6 @@ architecture COMMAND_MODULE_Arch of COMMAND_MODULE is
       );
   end component;
 
--- Transparent Input Data Latch
-  component ILD
-    generic(
-      INIT : bit := '0'
-      );
-    port (
-      Q  : out STD_LOGIC;
-      D  : in STD_LOGIC;
-      G  : in STD_LOGIC
-      );
-
-  end component;
-  -----------------------------------------------------------------------------
-
 begin  --Architecture
 
   -- Generate DOE_B
@@ -194,33 +180,3 @@ begin  --Architecture
   
 end COMMAND_MODULE_Arch;
 
-library ieee;
-use ieee.std_logic_1164.all;
-entity ILD is
-  generic( INIT : bit := '0' );
-  port (
-    Q  : out STD_LOGIC;
-    D  : in STD_LOGIC;
-    G  : in STD_LOGIC
-    );
--- attribute IOB         : string ;
--- attribute IOB of Q : signal is "True";
-
-end ILD;
-
---architecture Behavioral_ild of ILD is
---  signal q_tmp : std_logic := TO_X01(INIT);
-
---begin
---  Q <= q_tmp;
-
---  process(D, G)
---  begin
---    if (G = '1') then
---      q_tmp <= D;
---    else
---      q_tmp <= q_tmp;
---    end if;
---  end process;
-
---end Behavioral_ild;

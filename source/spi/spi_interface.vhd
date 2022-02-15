@@ -422,8 +422,6 @@ END COMPONENT;
           USRDONETS => '0'    
   );
 
-  CNFG_DATA_OUT <= qspi_io(3 downto 1) & spi_mosi;
-  do_in <= qspi_io(3 downto 1) & spi_mosi;
   spi_miso <= di_out(1) when PROM_SELECT='0' else
               CNFG_DATA_IN(5);
   --CNFG_DATA_DIR <= not dopin_ts(3) & not dopin_ts(2) & not dopin_ts(1) & not dopin_ts(0);
@@ -431,10 +429,12 @@ END COMPONENT;
   
   qspi_io(3 downto 1) <= write_fifo_output(3 downto 1) when rising_edge(CLK);
 
-  --update spi_cs_bar on falling edges
+  --update chip select and MOSI on falling edges
   update_chipsel : process(CLK)
   begin
     if falling_edge(CLK) then
+      do_in <= qspi_io(3 downto 1) & spi_mosi;
+      CNFG_DATA_OUT <= qspi_io(3 downto 1) & spi_mosi;    
       if (PROM_SELECT='0') then
         spi_cs_bar <= spi_cs_bar_input;
         PROM_CS2_B <= '1';

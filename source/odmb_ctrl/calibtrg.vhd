@@ -8,7 +8,7 @@ use UNISIM.vcomponents.all;
 use ieee.std_logic_1164.all;
 use ieee.std_logic_arith.all;
 use work.Latches_Flipflops.all;
-
+use work.ucsb_types.all;
 
 entity CALIBTRG is
   port (
@@ -40,15 +40,6 @@ entity CALIBTRG is
 end CALIBTRG;
 
 architecture CALIBTRG_arch of CALIBTRG is
-  component LCTDLY is  -- Aligns RAW_LCT with L1A by 2.4 us to 4.8 us
-    port (
-      DIN   : in std_logic;
-      CLK   : in std_logic;
-      DELAY : in std_logic_vector(5 downto 0);
-
-      DOUT : out std_logic
-      );
-  end component;
 
   signal bc0_cmd, bc0_rst, bc0_inner                     : std_logic;
   signal start_trg_cmd, start_trg_rst, start_trg_inner   : std_logic;
@@ -153,6 +144,6 @@ begin
   CALLCT        <= callct_inner;
 
   -- Generate CAL_GTRG
-  LCTDLY_GTRG : LCTDLY port map(DIN => callct_inner, CLK => cmsclk, DELAY => lct_l1a_dly, DOUT => CAL_GTRG);
+  LCTDLY_GTRG : LCTDLY port map(DOUT => CAL_GTRG, CLK => cmsclk, DELAY => lct_l1a_dly, DIN => callct_inner);
 
 end CALIBTRG_arch;

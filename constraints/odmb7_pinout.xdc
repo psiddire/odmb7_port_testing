@@ -12,6 +12,7 @@
 # - Optical TX/RX pins
 # - Optical control pins
 # - SYSMON pins
+# - PROM pins
 # - LED pins
 # --------------------------------------------------------------------------
 
@@ -73,7 +74,6 @@ set_property PACKAGE_PIN     W29        [get_ports RST_CLKS_B]
 set_property IOSTANDARD      LVCMOS18   [get_ports RST_CLKS_B]
 set_property PACKAGE_PIN     L9         [get_ports ODMB_DONE]
 set_property IOSTANDARD      LVCMOS18   [get_ports ODMB_DONE]
-
 
 # --------------------------------------------------------------------------
 # VME control pins
@@ -618,31 +618,30 @@ set_property PULLTYPE        PULLDOWN   [get_ports RAWLCT[4]]
 set_property PACKAGE_PIN     AJ14       [get_ports RAWLCT[5]]
 set_property IOSTANDARD      LVCMOS18   [get_ports RAWLCT[5]]
 set_property PULLTYPE        PULLDOWN   [get_ports RAWLCT[5]]
-set_property PACKAGE_PIN     AL14       [get_ports RAWLCT[6]]
+set_property PACKAGE_PIN     AE16       [get_ports RAWLCT[6]]
 set_property IOSTANDARD      LVCMOS18   [get_ports RAWLCT[6]]
 set_property PULLTYPE        PULLDOWN   [get_ports RAWLCT[6]]
+set_property PACKAGE_PIN     AE18       [get_ports RAWLCT[7]]
+set_property IOSTANDARD      LVCMOS18   [get_ports RAWLCT[7]]
+set_property PULLTYPE        PULLDOWN   [get_ports RAWLCT[7]]
 
-set_property PACKAGE_PIN     AK8        [get_ports RSVTD_OUT[0]]
-set_property IOSTANDARD      LVCMOS18   [get_ports RSVTD_OUT[0]]
-set_property PACKAGE_PIN     AL8        [get_ports RSVTD_OUT[1]]
-set_property IOSTANDARD      LVCMOS18   [get_ports RSVTD_OUT[1]]
-set_property PACKAGE_PIN     AM9        [get_ports RSVTD_OUT[2]]
-set_property IOSTANDARD      LVCMOS18   [get_ports RSVTD_OUT[2]]
-set_property PACKAGE_PIN     AF17       [get_ports RSVTD_IN[3]]
-set_property IOSTANDARD      LVCMOS18   [get_ports RSVTD_IN[3]]
-set_property PACKAGE_PIN     AE16       [get_ports RSVTD_IN[4]]
-set_property IOSTANDARD      LVCMOS18   [get_ports RSVTD_IN[4]]
-set_property PULLTYPE        PULLDOWN   [get_ports RSVTD_IN[4]]
-set_property PACKAGE_PIN     AE18       [get_ports RSVTD_IN[5]]
-set_property IOSTANDARD      LVCMOS18   [get_ports RSVTD_IN[5]]
-set_property PULLTYPE        PULLDOWN   [get_ports RSVTD_IN[5]]
-set_property PACKAGE_PIN     AF18       [get_ports RSVTD_IN[6]]
-set_property IOSTANDARD      LVCMOS18   [get_ports RSVTD_IN[6]]
-set_property PACKAGE_PIN     AE15       [get_ports RSVTD_IN[7]]
-set_property IOSTANDARD      LVCMOS18   [get_ports RSVTD_IN[7]]
+set_property PACKAGE_PIN     AK8        [get_ports RSVFD[1]]
+set_property IOSTANDARD      LVCMOS18   [get_ports RSVFD[1]]
+set_property PACKAGE_PIN     AL8        [get_ports RSVFD[2]]
+set_property IOSTANDARD      LVCMOS18   [get_ports RSVFD[2]]
+set_property PACKAGE_PIN     AM9        [get_ports RSVFD[3]]
+set_property IOSTANDARD      LVCMOS18   [get_ports RSVFD[3]]
+set_property PACKAGE_PIN     AF18       [get_ports RSVTD[3]]
+set_property IOSTANDARD      LVCMOS18   [get_ports RSVTD[3]]
+set_property PACKAGE_PIN     AL14       [get_ports RSVTD[4]]
+set_property IOSTANDARD      LVCMOS18   [get_ports RSVTD[4]]
+set_property PACKAGE_PIN     AF17       [get_ports RSVTD[5]]
+set_property IOSTANDARD      LVCMOS18   [get_ports RSVTD[5]]
 
 set_property PACKAGE_PIN     AD15       [get_ports OTMB_DAV]
 set_property IOSTANDARD      LVCMOS18   [get_ports OTMB_DAV]
+set_property PACKAGE_PIN     AE15       [get_ports LEGACY_ALCT_DAV]
+set_property IOSTANDARD      LVCMOS18   [get_ports LEGACY_ALCT_DAV]
 set_property PACKAGE_PIN     AD16       [get_ports OTMB_FF_CLK]
 set_property IOSTANDARD      LVCMOS18   [get_ports OTMB_FF_CLK]
 set_property PACKAGE_PIN     AD14       [get_ports LCT_RQST[1]]
@@ -693,8 +692,8 @@ set_property package_pin     H2         [get_ports  B04_RX_P[3]]
 set_property package_pin     H1         [get_ports  B04_RX_N[3]]
 set_property package_pin     F2         [get_ports  B04_RX_P[4]]
 set_property package_pin     F1         [get_ports  B04_RX_N[4]]
-#set_property package_pin     R4         [get_ports  SPY_TX_P]
-#set_property package_pin     R3         [get_ports  SPY_TX_N]
+set_property package_pin     R4         [get_ports  SPY_TX_P]
+set_property package_pin     R3         [get_ports  SPY_TX_N]
 
 # --------------------------------------------------------------------------
 # Optical control pins
@@ -844,7 +843,6 @@ set_property IOSTANDARD      LVCMOS18   [get_ports ADC_DOUT]
 # --------------------------------------------------------------------------
 # PROM pins bank 65 (bank 0 pins controlled by STARTUPE3 module)
 # --------------------------------------------------------------------------
-
 set_property PACKAGE_PIN     G25        [get_ports PROM_RST_B]
 set_property IOSTANDARD      LVCMOS18   [get_ports PROM_RST_B]
 set_property PACKAGE_PIN     G26        [get_ports PROM_CS2_B]

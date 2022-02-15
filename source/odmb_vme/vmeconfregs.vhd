@@ -100,10 +100,10 @@ architecture VMECONFREGS_Arch of VMECONFREGS is
 --                                             x"FFF4", x"FFF5", x"FFF6", x"FFF7",
 --                                             x"FFF8", FW_VERSION, x"FFFA", x"FFFB",
 --                                             x"FFFC", x"FFFD", x"FFFE", x"FFFF");
-                                               constant cfg_reg_init : cfg_regs_array := (x"5468", x"6973", x"2069", x"7320",
-                                                                                          x"6120", x"7465", x"7374", x"2066",
-                                                                                          x"6F72", x"2077", x"7269", x"7469",
-                                                                                          x"6E67", x"2050", x"524F", x"4D21");
+  constant cfg_reg_init : cfg_regs_array := (x"5468", x"6973", x"2069", x"7320",
+                                             x"6120", x"7465", x"7374", x"2066",
+                                             x"0001", x"2077", x"7269", x"7469",
+                                             x"6E67", x"2050", x"524F", x"4D21");
   constant const_reg_init : cfg_regs_array := (x"0D3B", FW_VERSION, FW_ID, FW_MONTH_DAY,
                                                FW_YEAR, x"FFF5", x"FFF6", x"FFF7",
                                                x"FFF8", x"FFF9", x"FFFA", x"FFFB",
