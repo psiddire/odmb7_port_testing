@@ -75,7 +75,6 @@ begin
     if (rst_if = "11" and RSTN='1') then --in SPI mode and not reset
       if (csn_fpga = '1') then
         counter <= x"00";
-        read_reg <= x"5A";
         miso_dir <= '1';
       else
         if (counter < 8) then
@@ -88,7 +87,7 @@ begin
           miso_dir <= '1';
         elsif (counter = 23) then
           addr <= addr(14 downto 0) & mosi_fpga;
-          if (cmd=x"02" and (addr(14 downto 0) & mosi_fpga)=x"F5F6") then
+          if (cmd=x"03" and (addr(14 downto 0) & mosi_fpga)=x"F5F6") then
             miso_out_desync <= read_reg(7);
             read_reg <= read_reg(6 downto 0) & read_reg(7);
             miso_dir <= '0';
@@ -97,10 +96,14 @@ begin
             miso_dir <= '1';
           end if;
         else
-          if (cmd=x"02" and addr=x"F5F6") then
+          if (cmd=x"03" and addr=x"F5F6") then
             miso_out_desync <= read_reg(7);
             read_reg <= read_reg(6 downto 0) & read_reg(7);
             miso_dir <= '0';
+          elsif (cmd=x"02" and addr=x"F5F6") then
+            read_reg <= read_reg(6 downto 0) & mosi_fpga;
+            miso_out_desync <= '1';
+            miso_dir <= '1';
           else
             miso_out_desync <= '1';
             miso_dir <= '1';
@@ -108,6 +111,8 @@ begin
         end if;
         counter <= counter + 1;
       end if;
+    elsif (RSTN='0') then
+      read_reg <= x"5A";
     else
       counter <= x"00";
       miso_dir <= '1';

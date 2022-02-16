@@ -18,12 +18,12 @@ architecture behavioral of pseudolut is
   type lut_array is array (0 to 15) of std_logic_vector(15 downto 0);
 
   constant vme_addrs : lut_array := (x"5000", x"5004", x"5008", x"500C",
-                                     x"4200", x"4300", x"4100", x"4200",
-                                     x"1018", x"1020", x"1024", x"191C",
+                                     x"5004", x"5008", x"5014", x"5004",
+                                     x"5008", x"500C", x"1024", x"191C",
                                      x"1F04", x"1014", x"1F08", x"1014");
-  constant vme_datas : lut_array := (x"001E", x"F5F6", x"0002", x"2EAD",
-                                     x"2EAD", x"2EAD", x"2EAD", x"2EAD",
-                                     x"0000", x"0002", x"2EAD", x"03C9",
+  constant vme_datas : lut_array := (x"001E", x"F5F6", x"0003", x"2EAD",
+                                     x"F5F6", x"0002", x"00DB", x"F5F6",
+                                     x"0003", x"2EAD", x"2EAD", x"03C9",
                                      x"0000", x"2EAD", x"0000", x"2EAD");
 
   signal dout1_inner : std_logic_vector(15 downto 0) := (others => '0');

@@ -15,6 +15,7 @@ use work.ucsb_types.all;
 --! W   X008 set command to INDATA(7:0)
 --! W/R X00C send command with address. Read back a byte if R
 --! W/R X010 send command with no address. Read back a byte if R
+--! W   X014 send command with address followed by INDATA(7:0)
 --! 
 --! Reset convetion: TEST control manufacturing test mode 
 --! IF(1:0)= "00": I2C w/ address 1110100, "01": I2C w/address 1110101,
@@ -68,6 +69,8 @@ architecture CLOCK_MON_Arch of CLOCK_MON is
   signal vme_cmd_loadcmd       : std_logic;
   signal vme_cmd_sendcmd       : std_logic;
   signal vme_cmd_sendcmdnoaddr : std_logic;
+  signal vme_cmd_sendcmdwrite  : std_logic;
+  signal vme_cmd_sendgeneral   : std_logic;
 
   --vme_cmd_reset
   signal rst_ac       : std_logic_vector(2 downto 0);
@@ -95,11 +98,48 @@ architecture CLOCK_MON_Arch of CLOCK_MON is
   signal shift_dtack       : std_logic;
   signal mosi_sync         : std_logic;
   signal cs_b_sync         : std_logic;
+  signal write_data        : std_logic_vector(7 downto 0);
                              
-  type spi_states is (S_IDLE, S_SHIFT_CMD, S_SHIFT_ADDR, S_READ, S_SET_DTACK);
+  type spi_states is (S_IDLE, S_SHIFT_CMD, S_SHIFT_ADDR, S_READ, S_WRITE, S_SET_DTACK);
   signal spi_state : spi_states := S_IDLE;
+  
+  component clock_ila
+  port (
+    clk : in std_logic;
+    probe0 : in std_logic_vector(511 downto 0)
+    );
+  end component;
+  signal ila_probe : std_logic_vector(511 downto 0);
 
 begin
+
+  --debug
+  ila_clock_mon_i : clock_ila
+  PORT MAP (
+     clk => CLK2P5,
+     probe0 => ila_probe
+  );
+  ila_probe(0) <= DEVICE;
+  ila_probe(1) <= STROBE;
+  ila_probe(3 downto 2) <= "00";
+  ila_probe(13 downto 4) <= command;
+  ila_probe(17 downto 14) <= "0101";
+  ila_probe(33 downto 18) <= INDATA;
+  ila_probe(41 downto 34) <= read_byte;
+  ila_probe(42) <= rst_dtack or load_dtack or shift_dtack;
+  ila_probe(43) <= vme_cmd_reset;
+  ila_probe(44) <= vme_cmd_loadaddr;
+  ila_probe(45) <= vme_cmd_loadcmd;
+  ila_probe(46) <= vme_cmd_sendcmd;
+  ila_probe(47) <= vme_cmd_sendcmdnoaddr;
+  ila_probe(48) <= vme_cmd_sendcmdwrite;
+  ila_probe(49) <= cs_b_sync;
+  ila_probe(50) <= mosi_sync;
+  ila_probe(51) <= FPGA_IF1_MISO_IN;
+  ila_probe(56 downto 52) <= std_logic_vector(spi_counter);
+  ila_probe(64 downto 57) <= write_data;
+  ila_probe(72 downto 65) <= spi_cmd;
+  ila_probe(88 downto 73) <= spi_addr;
 
   --strobe and VME commands
   strobe_CDC0 : FD port map(D => STROBE, C => CLK2P5, Q => strobe_meta);
@@ -115,6 +155,8 @@ begin
   vme_cmd_loadcmd       <= '1' when (cmddev=x"1008" and strobe_sync='1') else '0';
   vme_cmd_sendcmd       <= '1' when (cmddev=x"100C" and strobe_sync='1') else '0';
   vme_cmd_sendcmdnoaddr <= '1' when (cmddev=x"1010" and strobe_sync='1') else '0';
+  vme_cmd_sendcmdwrite  <= '1' when (cmddev=x"1014" and strobe_sync='1') else '0';
+  vme_cmd_sendgeneral   <= vme_cmd_sendcmd or vme_cmd_sendcmdnoaddr or vme_cmd_sendcmdwrite;
 
   --handle reset command
   rst_ac   <= INDATA(2 downto 0);
@@ -170,10 +212,12 @@ begin
       read_byte <= read_byte;
       shift_dtack_en <= '0';
       spi_counter <= "00000";
-      if ((vme_cmd_sendcmd or vme_cmd_sendcmdnoaddr)='1' and shift_dtack='0') then
+      if (vme_cmd_sendgeneral='1' and shift_dtack='0') then
         spi_state <= S_SHIFT_CMD;
+        write_data <= INDATA(7 downto 0);
       else
         spi_state <= S_IDLE;
+        write_data <= write_data;
       end if;
 
     when S_SHIFT_CMD =>
@@ -183,9 +227,10 @@ begin
       addr_enable_shift <= '0';
       read_byte <= read_byte;
       shift_dtack_en <= '0';
+      write_data <= write_data;
       if (spi_counter = 7) then
         spi_counter <= "00000";
-        if (vme_cmd_sendcmd='1') then
+        if (vme_cmd_sendcmdnoaddr='0') then
           spi_state <= S_SHIFT_ADDR;
         elsif (WRITER='1') then
           spi_state <= S_READ;
@@ -204,9 +249,12 @@ begin
       addr_enable_shift <= '1';
       read_byte <= read_byte;
       shift_dtack_en <= '0';
+      write_data <= write_data;
       if (spi_counter = 15) then
         spi_counter <= "00000";
-        if (WRITER='1') then
+        if (vme_cmd_sendcmdwrite='1') then
+          spi_state <= S_WRITE;
+        elsif (WRITER='1') then
           spi_state <= S_READ;
         else
           spi_state <= S_SET_DTACK;
@@ -222,6 +270,7 @@ begin
       addr_enable_shift <= '0';
       read_byte <= read_byte(6 downto 0) & FPGA_IF1_MISO_IN;
       shift_dtack_en <= '0';
+      write_data <= write_data;
       if (spi_counter = 8) then
         cs_b <= '1';
         spi_counter <= "00000";
@@ -232,12 +281,30 @@ begin
         spi_state <= S_READ;
       end if;
 
+    when S_WRITE => 
+      mosi <= write_data(7);
+      cmd_enable_shift <= '0';
+      addr_enable_shift <= '0';
+      read_byte <= read_byte;
+      shift_dtack_en <= '0';
+      write_data <= write_data(6 downto 0) & write_data(7);
+      if (spi_counter = 8) then
+        cs_b <= '0';
+        spi_counter <= "00000";
+        spi_state <= S_SET_DTACK;
+      else
+        cs_b <= '0';
+        spi_counter <= spi_counter + 1;
+        spi_state <= S_WRITE;
+      end if;
+
     when S_SET_DTACK => 
       cs_b <= '1';
       mosi <= '0';
       cmd_enable_shift <= '0';
       addr_enable_shift <= '0';
       read_byte <= read_byte;
+      write_data <= write_data;
       if (spi_counter = 1) then
         shift_dtack_en <= '0';
         spi_counter <= "00000";
@@ -259,12 +326,12 @@ begin
 
   --assign output to clock chip
   RST_CLKS_B        <= (not rst_rst) when (vme_cmd_reset='1') else '1';
-  FPGA_SEL          <= '1' when ((vme_cmd_reset or vme_cmd_sendcmd or vme_cmd_sendcmdnoaddr)='1') else 
+  FPGA_SEL          <= '1' when ((vme_cmd_reset or vme_cmd_sendgeneral)='1') else 
                        '0';
-  FPGA_AC0          <= rst_ac(0) when (vme_cmd_reset='1') else '0';
-  FPGA_AC1          <= rst_ac(1) when (vme_cmd_reset='1') else '0';
-  FPGA_AC2          <= rst_ac(2) when (vme_cmd_reset='1') else '0';
-  FPGA_TEST         <= rst_test  when (vme_cmd_reset='1') else '0';
+  FPGA_AC0          <= rst_ac(0) when (vme_cmd_reset='1') else 'Z';
+  FPGA_AC1          <= rst_ac(1) when (vme_cmd_reset='1') else 'Z';
+  FPGA_AC2          <= rst_ac(2) when (vme_cmd_reset='1') else 'Z';
+  FPGA_TEST         <= rst_test  when (vme_cmd_reset='1') else 'Z';
   FPGA_IF0_CSN_B    <= rst_if(0) when (vme_cmd_reset='1') else cs_b_sync;
   FPGA_IF1_MISO_OUT <= rst_if(1) when (vme_cmd_reset='1') else '1';
   FPGA_MOSI         <= mosi_sync;
@@ -272,7 +339,8 @@ begin
   FPGA_MISO_DIR     <= '0' when (vme_cmd_reset='1') else '1';
 
   --VME output
-  OUTDATA <= x"00" & read_byte when ((vme_cmd_sendcmd or vme_cmd_sendcmdnoaddr)='1') else 
+  OUTDATA <= x"00" & read_byte when 
+             ((WRITER and (vme_cmd_sendcmd or vme_cmd_sendcmdnoaddr))='1') else 
              (others => 'Z');
   DTACK <= rst_dtack or load_dtack or shift_dtack;
 
