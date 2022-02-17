@@ -48,7 +48,7 @@ entity cafifo is
     cafifo_lost_pckt : out std_logic_vector(NCFEB+2 downto 1);
     cafifo_lone      : out std_logic;
 
-    cafifo_prev_next_l1a_match : out std_logic_vector(15 downto 0);
+    cafifo_prev_next_l1a_match : out std_logic_vector(NCFEB*2+1 downto 0);
     cafifo_prev_next_l1a       : out std_logic_vector(15 downto 0);
     control_debug              : in  std_logic_vector(143 downto 0);
     cafifo_debug               : out std_logic_vector(15 downto 0);
@@ -145,8 +145,19 @@ architecture cafifo_architecture of cafifo is
   signal timeout_current_state, timeout_next_state : timeout_state_vec;
 
   type timeout_array is array (NCFEB+2 downto 1) of integer range 0 to 5000;
-  signal timeout_cnt   : timeout_array := (0, 0, 0, 0, 0, 0, 0, 0, 0);
-  constant timeout_max : timeout_array := (480, 1500, 500, 500, 500, 500, 500, 500, 500);  -- GEM
+  signal timeout_cnt   : timeout_array := (others=>0);
+  type timeout_max_array is array (9 downto 1) of integer range 0 to 5000;
+  function timeout_max_setup(nfeb:integer range 1 to 7)
+    return timeout_max_array is
+  begin
+    if nfeb=7 then
+      return (480, 1500, 500, 500, 500, 500, 500, 500, 500);
+    else
+      return (0, 0, 480, 1500, 500, 500, 500, 500, 500);
+    end if;
+  end function;
+  constant timeout_max : timeout_max_array := timeout_max_setup(NCFEB);  -- GEM
+  --constant timeout_max : timeout_array := (NCFEB+2 => 480, NCFEB+1 => 1500, others => 500);  -- GEM
   --constant timeout_max : timeout_array := (480, 680, 500, 500, 500, 500, 500, 500, 500);  -- Normal length
   --constant timeout_max : timeout_array := (2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000);  --Debug
   --constant timeout_max : timeout_array := (70, 70, 18, 18, 18, 18, 18, 18, 18);
@@ -157,7 +168,7 @@ architecture cafifo_architecture of cafifo is
   signal timeout_cnt_en, timeout_cnt_rst  : std_logic_vector(NCFEB+2 downto 1);
   signal l1a_dav_en                       : std_logic_vector(NCFEB+2 downto 1);
   signal lost_pckt_en                     : std_logic_vector(NCFEB+2 downto 1);
-  signal wait_cnt                         : timeout_array := (0, 0, 0, 0, 0, 0, 0, 0, 0);
+  signal wait_cnt                         : timeout_array := (others => 0);
   signal wait_cnt_en, wait_cnt_rst        : std_logic_vector(NCFEB+2 downto 1);
 
   -- Declare the csp stuff here
@@ -546,11 +557,11 @@ begin
                       "00";
 
   cafifo_debug <= cafifo_empty & cafifo_full & cafifo_state_slv & timeout_state_1 & timeout_state_9
-                  & lone(rd_addr_out) & lost_pckt(rd_addr_out)(8 downto 2);
+                  & lone(rd_addr_out) & lost_pckt(rd_addr_out)(7 downto 1);
 
   prev_rd_addr               <= rd_addr_out-1 when rd_addr_out > 0             else CAFIFO_SIZE-1;
   next_rd_addr               <= rd_addr_out+1 when rd_addr_out < CAFIFO_SIZE-1 else 0;
-  cafifo_prev_next_l1a_match <= l1a_match(prev_rd_addr)(8 downto 1) & l1a_match(next_rd_addr)(8 downto 1);
+  cafifo_prev_next_l1a_match <= l1a_match(prev_rd_addr)(NCFEB+1 downto 1) & l1a_match(next_rd_addr)(NCFEB+1 downto 1);
   cafifo_prev_next_l1a       <= l1a_cnt(prev_rd_addr)(7 downto 0) & l1a_cnt(next_rd_addr)(7 downto 0);
 
   bad_l1a_lone <= not or_reduce(l1a_match_in_reg) and not lone_in_reg and cafifo_wren;
@@ -562,38 +573,38 @@ begin
                         bad_l1a_lone & bad_rdwr_addr & cafifo_full & control_debug(9) & cafifo_wren & cafifo_rden &
                         std_logic_vector(to_unsigned(rd_addr_out, 6)) &
                         std_logic_vector(to_unsigned(wr_addr_out, 6));
-  free_agent_la_data <= x"0000000000" & x"0000"
-                        & control_debug
-                        & l1acnt_dav_fifo_out(1)(4 downto 0)    -- [199:195]
-                        & wait_cnt_en(2) & wait_cnt_rst(2)  -- [194:193]
-                        & timeout_state_9  -- [192:191]
-                        & cafifo_state_slv & timeout_cnt_en(1)  -- [190:188]
-                        & timeout_state_1  -- [187:186]
-                        & wait_cnt_en(1) & wait_cnt_rst(1)  -- [185:184]
-                        & l1a_dav_en(1) & l1acnt_dav_fifo_rd_en(1)  -- [183:182]
-                        & lost_pckt_en(1) & timeout_cnt_en(1) & timeout_cnt_rst(1)  -- [181:179]
-                        & l1a_dav_en(9 downto 1) & lost_pckt(prev_rd_addr)  -- [178:161]
-                        & lost_pckt(next_rd_addr) & lost_pckt(rd_addr_out)  -- [160:143]
-                        & lone_in_reg & cafifo_wren & cafifo_rden & wr_addr_en & rd_addr_en  -- [142:138]
-                        & l1a_cnt_out(3 downto 0)       -- [137:134]
-                        & l1a_dav(prev_rd_addr)  -- [133:125]
-                        & l1a_dav(next_rd_addr) & l1a_dav(rd_addr_out)  -- [124:107]
-                        & lost_pckt_en(8 downto 1)      -- [106:99]
-                        & bad_rdwr_addr & l1a_match(prev_rd_addr)   -- [98:89]
-                        & l1a_match(next_rd_addr) & l1a_match(rd_addr_out)  -- [88:71]
-                        & bad_l1a_lone & lone(prev_rd_addr) & lone(next_rd_addr) & lone(rd_addr_out)  -- [70:67]
-                        & l1a_cnt(prev_rd_addr)(3 downto 0)     -- [66:63]
-                        & l1a_cnt(next_rd_addr)(3 downto 0) & l1a_cnt(rd_addr_out)(3 downto 0)  -- [62:55]
-                        & EOF_DATA      -- [54:46]
-                        -- & ALCT_DV & OTMB_DV & dcfeb_dv  -- [45:37]
-                        -- & DCFEB3_DATA(15 downto 12) & DCFEB2_DATA(15 downto 12)  -- [36:29]
-                        -- & DCFEB1_DATA(15 downto 12) & DCFEB0_DATA(15 downto 12)  -- [28:21]
-                        & '0' & x"00"    -- [45:37]
-                        & BC0 & BXRST & ccb_bx0_delayed & bx_cnt_clr -- [36:33]
-                        & bx_cnt_out -- [32:21]
-                        & L1A_MATCH_IN & L1A & POP      -- [20:10]
-                        & std_logic_vector(to_unsigned(wr_addr_out, 5))  -- [9:5]
-                        & std_logic_vector(to_unsigned(rd_addr_out, 5));  -- [4:0]
+--  free_agent_la_data <= x"0000000000" & x"0000"
+--                        & control_debug
+--                        & l1acnt_dav_fifo_out(1)(4 downto 0)    -- [199:195]
+--                        & wait_cnt_en(2) & wait_cnt_rst(2)  -- [194:193]
+--                        & timeout_state_9  -- [192:191]
+--                        & cafifo_state_slv & timeout_cnt_en(1)  -- [190:188]
+--                        & timeout_state_1  -- [187:186]
+--                        & wait_cnt_en(1) & wait_cnt_rst(1)  -- [185:184]
+--                        & l1a_dav_en(1) & l1acnt_dav_fifo_rd_en(1)  -- [183:182]
+--                        & lost_pckt_en(1) & timeout_cnt_en(1) & timeout_cnt_rst(1)  -- [181:179]
+--                        & "00" & l1a_dav_en(7 downto 1) & lost_pckt(prev_rd_addr)  -- [178:161]
+--                        & lost_pckt(next_rd_addr) & lost_pckt(rd_addr_out)  -- [160:143]
+--                        & lone_in_reg & cafifo_wren & cafifo_rden & wr_addr_en & rd_addr_en  -- [142:138]
+--                        & l1a_cnt_out(3 downto 0)       -- [137:134]
+--                        & l1a_dav(prev_rd_addr)  -- [133:125]
+--                        & l1a_dav(next_rd_addr) & l1a_dav(rd_addr_out)  -- [124:107]
+--                        & '0' & lost_pckt_en(7 downto 1)      -- [106:99]
+--                        & bad_rdwr_addr & l1a_match(prev_rd_addr)   -- [98:89]
+--                        & l1a_match(next_rd_addr) & l1a_match(rd_addr_out)  -- [88:71]
+--                        & bad_l1a_lone & lone(prev_rd_addr) & lone(next_rd_addr) & lone(rd_addr_out)  -- [70:67]
+--                        & l1a_cnt(prev_rd_addr)(3 downto 0)     -- [66:63]
+--                        & l1a_cnt(next_rd_addr)(3 downto 0) & l1a_cnt(rd_addr_out)(3 downto 0)  -- [62:55]
+--                        & EOF_DATA      -- [54:46]
+--                        -- & ALCT_DV & OTMB_DV & dcfeb_dv  -- [45:37]
+--                        -- & DCFEB3_DATA(15 downto 12) & DCFEB2_DATA(15 downto 12)  -- [36:29]
+--                        -- & DCFEB1_DATA(15 downto 12) & DCFEB0_DATA(15 downto 12)  -- [28:21]
+--                        & '0' & x"00"    -- [45:37]
+--                        & BC0 & BXRST & ccb_bx0_delayed & bx_cnt_clr -- [36:33]
+--                        & bx_cnt_out -- [32:21]
+--                        & L1A_MATCH_IN & L1A & POP      -- [20:10]
+--                        & std_logic_vector(to_unsigned(wr_addr_out, 5))  -- [9:5]
+--                        & std_logic_vector(to_unsigned(rd_addr_out, 5));  -- [4:0]
   
   cafifo_wr_addr <= std_logic_vector(to_unsigned(wr_addr_out, cafifo_wr_addr'length));
   cafifo_rd_addr <= std_logic_vector(to_unsigned(rd_addr_out, cafifo_rd_addr'length));

@@ -25,7 +25,7 @@ use work.ucsb_types.all;
 --! * W 1Y4C shift Y+1 instruction bits with JTAG header and special JTAG tailer
 entity CFEBJTAG is
   generic (
-    NCFEB   : integer range 1 to 7 := 7  -- Number of DCFEBS, 7 for ME1/1, 5
+    NCFEB   : integer range 1 to 7 := 7  -- Number of DCFEBS, 7 for ME1/1, 5 for MEX/1
     );
   port (
     FASTCLK : in std_logic;                           --! 40 MHz clock. Currently unused.
@@ -73,7 +73,8 @@ architecture CFEBJTAG_Arch of CFEBJTAG is
   
   --Signals for SELCFEB command
   signal ce_selfeb                                               : std_logic;
-  signal selfeb                                                  : std_logic_vector(7 downto 1);
+  signal selfeb                                                  : std_logic_vector(NCFEB downto 1);
+  signal selfeb_big                                              : std_logic_vector(7 downto 1)  := "0000000";
   signal d_dtack_selcfeb, dtack_selcfeb                          : std_logic;
   signal rst_init                                                : std_logic := '0';
   
@@ -182,7 +183,7 @@ begin
                    q2_shtail_tms when (shtail = '1') else 'Z'; --tms
   ila_probe(37) <= qv_tdi(0);
   ila_probe(38) <= tdo;
-  ila_probe(45 downto 39) <= selfeb;
+  --ila_probe(45 downto 39) <= selfeb;
   ila_probe(46) <= busy;
   ila_probe(47) <= d_dtack;
   ila_probe(48) <= dtack_shft;
@@ -237,13 +238,11 @@ begin
   -- Write SELFEB when SELCFEB=1 on first clock cycle after strobe. (The JTAG initialization should be broadcast)
   rst_init <= RST or INITJTAGS;
   ce_selfeb <= selcfeb and STROBE;
-  FDPE_selfeb1 : FDPE port map(D => INDATA(0), C => SLOWCLK, CE => ce_selfeb, PRE => rst_init, Q => selfeb(1));
-  FDPE_selfeb2 : FDPE port map(D => INDATA(1), C => SLOWCLK, CE => ce_selfeb, PRE => rst_init, Q => selfeb(2));
-  FDPE_selfeb3 : FDPE port map(D => INDATA(2), C => SLOWCLK, CE => ce_selfeb, PRE => rst_init, Q => selfeb(3));
-  FDPE_selfeb4 : FDPE port map(D => INDATA(3), C => SLOWCLK, CE => ce_selfeb, PRE => rst_init, Q => selfeb(4));
-  FDPE_selfeb5 : FDPE port map(D => INDATA(4), C => SLOWCLK, CE => ce_selfeb, PRE => rst_init, Q => selfeb(5));
-  FDPE_selfeb6 : FDPE port map(D => INDATA(5), C => SLOWCLK, CE => ce_selfeb, PRE => rst_init, Q => selfeb(6));
-  FDPE_selfeb7 : FDPE port map(D => INDATA(6), C => SLOWCLK, CE => ce_selfeb, PRE => rst_init, Q => selfeb(7));
+
+  GEN_FDPE_selfeb : for I in 1 to NCFEB generate
+  begin
+    FDPE_selfeb1 : FDPE port map(D => INDATA(I-1), C => SLOWCLK, CE => ce_selfeb, PRE => rst_init, Q => selfeb(I));
+  end generate GEN_FDPE_selfeb;
 
   -- Generate DTACK for SELCFEB command (0x1020) on clock cycle after strobe
   strobe_meta <= STROBE when rising_edge(SLOWCLK);
@@ -487,13 +486,10 @@ begin
   FDCE_tckglobal : FDCE port map(D => d_tck_global, C => SLOWCLK, CE => ce_tck_global, CLR => RST, Q => tck_global);
 
   -- Generate individual TCKs
-  TCK(1) <= tck_global when selfeb(1)='1' else '0';
-  TCK(2) <= tck_global when selfeb(2)='1' else '0';
-  TCK(3) <= tck_global when selfeb(3)='1' else '0';
-  TCK(4) <= tck_global when selfeb(4)='1' else '0';
-  TCK(5) <= tck_global when selfeb(5)='1' else '0';
-  TCK(6) <= tck_global when selfeb(6)='1' else '0';
-  TCK(7) <= tck_global when selfeb(7)='1' else '0';
+  GEN_TCK_assign : for I in 1 to NCFEB generate
+  begin
+    TCK(I) <= tck_global when selfeb(I)='1' else '0';
+  end generate GEN_TCK_assign;
 
   -- Generate TDI
   TDI <= qv_tdi(0);
@@ -501,13 +497,10 @@ begin
   SR16CLRE(SLOWCLK, ce_tdi, RST, load, qv_tdi(0), INDATA, qv_tdi, qv_tdi);
 
   -- Generate TDO and shift into OUTDATA
-  tdo <= FEBTDO(1) when SELFEB = "0000001" else
-         FEBTDO(2) when SELFEB = "0000010" else
-         FEBTDO(3) when SELFEB = "0000100" else
-         FEBTDO(4) when SELFEB = "0001000" else
-         FEBTDO(5) when SELFEB = "0010000" else
-         FEBTDO(6) when SELFEB = "0100000" else
-         FEBTDO(7) when SELFEB = "1000000" else '0';
+  GEN_TDO_assign : for I in 1 to NCFEB generate
+  begin
+    tdo <= FEBTDO(I) when SELFEB(I) = '1' else 'Z';
+  end generate GEN_TDO_assign;
   ce_shift1            <= shdata and not tck_global;
   SR16LCE(SLOWCLK, ce_shift1, RST, tdo, q_outdata, q_outdata);
 
@@ -516,7 +509,8 @@ begin
 
   -- Handle OUTDATA (includes  READCFEB command (0x1024), read TDO command (0x1014))
   rdtdodk <= '1' when (STROBE = '1' and readtdo = '1' and busyp1 = '0' and busy = '0') else '0';
-  OUTDATA <= "000000000" & selfeb(7 downto 1) when (STROBE = '1' and readcfeb = '1') else
+  selfeb_big(NCFEB downto 1) <= selfeb;
+  OUTDATA <= "000000000" & selfeb_big(7 downto 1) when (STROBE = '1' and readcfeb = '1') else
              q_outdata(15 downto 0) when (rdtdodk = '1') else (others => 'Z');
 
 
@@ -544,7 +538,7 @@ begin
   LED <= CE_SHIHEAD_TMS;  
 
   -- generate DIAGOUT
-  DIAGOUT(6 downto 0)  <= selfeb(7 downto 1);
+  DIAGOUT(6 downto 0)  <= selfeb_big(7 downto 1);
   DIAGOUT(7) <= RST;
   DIAGOUT(8) <= INITJTAGS;
   DIAGOUT(9) <= readcfeb;

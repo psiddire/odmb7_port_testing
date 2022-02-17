@@ -94,7 +94,7 @@ entity ODMB_CTRL is
 
     EOF_DATA    : in std_logic_vector(NCFEB+2 downto 1);
 
-    CAFIFO_PREV_NEXT_L1A_MATCH : out std_logic_vector(15 downto 0);
+    CAFIFO_PREV_NEXT_L1A_MATCH : out std_logic_vector(NCFEB*2+1 downto 0);
     CAFIFO_PREV_NEXT_L1A       : out std_logic_vector(15 downto 0);
     CONTROL_DEBUG              : out std_logic_vector(15 downto 0);
     CAFIFO_DEBUG               : out std_logic_vector(15 downto 0);
@@ -227,7 +227,7 @@ architecture Behavioral of ODMB_CTRL is
       cafifo_lost_pckt : out std_logic_vector(NCFEB+2 downto 1);
       cafifo_lone      : out std_logic;
 
-      cafifo_prev_next_l1a_match : out std_logic_vector(15 downto 0);
+      cafifo_prev_next_l1a_match : out std_logic_vector(NCFEB*2+1 downto 0);
       cafifo_prev_next_l1a       : out std_logic_vector(15 downto 0);
       control_debug              : in  std_logic_vector(143 downto 0);
       cafifo_debug               : out std_logic_vector(15 downto 0);
@@ -583,9 +583,9 @@ begin
 
   -- ILA
   ila_data1(3 downto 0)   <= otmb_dav & alct_dav & rawlct(0) & raw_l1a; -- raw signal
-  ila_data1(10 downto 4)  <= rawlct(7 downto 1);  
+  ila_data1(10 downto 4)   <= "00" & rawlct(5 downto 1);  
   ila_data1(28 downto 11) <= diag_trigctrl(17 downto 0);
-  ila_data1(37 downto 29) <= cafifo_l1a_match_in_inner(9 downto 1);
+  ila_data1(37 downto 29) <= "00" & cafifo_l1a_match_in_inner(7 downto 1);
   ila_data1(46 downto 38) <= control_debug_full(41 downto 33); -- CAFIFO_L1A_MATCH
   ila_data1(55 downto 47) <= control_debug_full(50 downto 42); -- CAFIFO_L1A_DAV
   ila_data1(56)           <= control_debug_full(16); -- dav_inner
