@@ -36,7 +36,7 @@ entity odmb_data is
 
     OTMB_DATA_IN        : in std_logic_vector(17 downto 0);
     ALCT_DATA_IN        : in std_logic_vector(17 downto 0);
-    DCFEB_DATA_IN       : in t_twobyte_arr(NCFEB downto 1);
+    DCFEB_DATA_IN       : in t_std16_array(NCFEB downto 1);
     DCFEB_DAV_IN        : in std_logic_vector(NCFEB downto 1);
 
     GEN_DCFEB_SEL       : in std_logic;
@@ -185,8 +185,8 @@ architecture ODMB_DATA_ARCH of odmb_data is
   constant push_dly    : integer := 63;  -- It needs to be > alct/otmb_push_dly
   constant push_dlyp4  : integer := push_dly+4;  -- push_dly+4
 
-  signal gen_dcfeb_data : t_twobyte_arr(NCFEB downto 1);
-  signal rx_dcfeb_data  : t_twobyte_arr(NCFEB downto 1);
+  signal gen_dcfeb_data : t_std16_array(NCFEB downto 1);
+  signal rx_dcfeb_data  : t_std16_array(NCFEB downto 1);
 
   signal gen_dcfeb_data_valid                 : std_logic_vector(NCFEB downto 1);
   signal dcfeb_data_valid_d, dcfeb_data_valid : std_logic_vector(NCFEB downto 1);
@@ -202,12 +202,12 @@ architecture ODMB_DATA_ARCH of odmb_data is
 
   signal gen_tdo : std_logic_vector(NCFEB downto 1) := (others => '0');
 
-  signal dcfeb_fifo_in : t_twobyte_arr(NCFEB downto 1);
-  signal dcfeb_data    : t_twobyte_arr(NCFEB downto 1);
+  signal dcfeb_fifo_in : t_std16_array(NCFEB downto 1);
+  signal dcfeb_data    : t_std16_array(NCFEB downto 1);
 
-  signal eofgen_dcfeb_fifo_in    : t_devdata_arr(NCFEB downto 1);
+  signal eofgen_dcfeb_fifo_in    : t_std18_array(NCFEB downto 1);
   signal eofgen_dcfeb_data_valid : std_logic_vector(NCFEB downto 1);
-  signal dcfeb_fifo_out          : t_devdata_arr(NCFEB downto 1);
+  signal dcfeb_fifo_out          : t_std18_array(NCFEB downto 1);
   signal alct_fifo_data_out      : std_logic_vector(17 downto 0);
   signal otmb_fifo_data_out      : std_logic_vector(17 downto 0);
 
