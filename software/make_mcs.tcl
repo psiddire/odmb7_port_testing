@@ -43,7 +43,8 @@ if { ![file exist $INFILE] } {
 } else {
     exec mkdir -p ${OUTDIR}/${VERSION}
     exec cp $INFILE ${OUTDIR}/${VERSION}/${BOARD}_${OUTNAME}.bit
-    exec cp [string map {.bit .bin} $INFILE] ${OUTDIR}/${VERSION}/${BOARD}_${OUTNAME}.bin
+    # exec cp [string map {.bit .bin} $INFILE] ${OUTDIR}/${VERSION}/${BOARD}_${OUTNAME}.bin
+    exec cp [string map {.bit .ltx} $INFILE] ${OUTDIR}/${VERSION}/${BOARD}_${OUTNAME}.ltx
 
     write_cfgmem -format mcs -interface SPIx8 -size 32 -loadbit "up 0 $INFILE" -file "$OUTFILE"
     exec rm ${OUTDIR}/${VERSION}/${BOARD}_${OUTNAME}_primary.prm

@@ -564,11 +564,6 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal cafifo_l1a_match_out : std_logic_vector(NCFEB+2 downto 1);
   signal dcfeb_fifo_rst   : std_logic_vector(NCFEB downto 1);
 
-  signal cafifo_prev_next_l1a_match : std_logic_vector(15 downto 0);
-  signal cafifo_prev_next_l1a       : std_logic_vector(15 downto 0);
-  signal cafifo_debug, control_debug : std_logic_vector(15 downto 0);
-  signal cafifo_wr_addr              : std_logic_vector(7 downto 0);
-  signal cafifo_rd_addr              : std_logic_vector(7 downto 0);
   signal cafifo_l1a_cnt       : std_logic_vector(23 downto 0);
   signal cafifo_l1a_dav       : std_logic_vector(NCFEB+2 downto 1);
   signal cafifo_bx_cnt        : std_logic_vector(11 downto 0);
@@ -1115,13 +1110,6 @@ begin
       RST        => reset,
 
       EOF_DATA   => eof_data,
-
-      CAFIFO_PREV_NEXT_L1A_MATCH => cafifo_prev_next_l1a_match,
-      CAFIFO_PREV_NEXT_L1A       => cafifo_prev_next_l1a,
-      CONTROL_DEBUG              => control_debug,
-      CAFIFO_DEBUG               => cafifo_debug,
-      CAFIFO_WR_ADDR             => cafifo_wr_addr,
-      CAFIFO_RD_ADDR             => cafifo_rd_addr,
 
       CAFIFO_L1A           => cafifo_l1a,
       CAFIFO_L1A_MATCH_IN  => cafifo_l1a_match_in,

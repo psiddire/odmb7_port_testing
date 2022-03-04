@@ -4,8 +4,6 @@ library ieee;
 library work;
 library unisim;
 library hdlmacro;
---use hdlmacro.hdlmacro.CB16CE;
---use hdlmacro.hdlmacro.IFD_1;
 use unisim.vcomponents.all;
 use work.ucsb_types.all;
 use ieee.std_logic_1164.all;
@@ -155,15 +153,6 @@ architecture CONTROL_arch of CONTROL_FSM is
 
 begin
 
-  -- csp ILA core
-  --csp_control_fsm_la_pm : csp_control_fsm_la
-  --  port map (
-  --    CONTROL => CSP_CONTROL_FSM_PORT_LA_CTRL,
-  --    CLK     => CLK,
-  --    DATA    => control_fsm_la_data,
-  --    TRIG0   => control_fsm_la_trig
-  --    );
-
   expect_pckt         <= or_reduce(cafifo_l1a_match);
   dev_cnt_svl         <= std_logic_vector(to_unsigned(dev_cnt, 5));
   hdr_tail_cnt_svl    <= std_logic_vector(to_unsigned(hdr_tail_cnt, 5));
@@ -175,23 +164,26 @@ begin
                               and control_current_state /= WAIT_IDLE) else '0';
   FDBADL1A : PULSE2SLOW port map(DOUT => bad_l1a_change40, CLK_DOUT => CLKCMS, CLK_DIN => CLK, RST => RST, DIN => bad_l1a_change);
 -- trigger assignments (8 bits)
-  control_fsm_la_trig <= expect_pckt & q_datain_last & bad_l1a_lone  & cafifo_lone & CAFIFO_L1A_CNT(3 downto 0);
---  control_fsm_la_data <= x"00" & std_logic_vector(to_unsigned(wait_dev_cnt, 4)) --[119:116]
---                         & bad_l1a_change --[115]
---                         & bad_l1a_lone & lone_cnt_svl & cafifo_lone & RST          -- [114:107]
---                         & std_logic_vector(to_unsigned(wait_cnt, 5))  -- [106:102]
---                         & CAFIFO_L1A_CNT(4 downto 0)          -- [101:97]
---                         & FFOR_B & cafifo_lost_pckt           -- [96:79]
---                         & next_state_svl & eof_inner & fifo_pop_inner & fifo_pop_80  -- [78:72]
---                         & oefifo_b_inner & renfifo_b_inner & dout_inner  -- [71:38]
---                         & '0' & hdr_tail_cnt_en & dev_cnt_en  -- [37:35]
---                         & CAFIFO_L1A_DAV & CAFIFO_L1A_MATCH   -- [34:17]
---                         & q_datain_last & expect_pckt         -- [16:15]
---                         & hdr_tail_cnt_svl & dev_cnt_svl      -- [14:5]
---                         & current_state_svl & dav_inner;      -- [4:0]
+  -- control_fsm_la_trig <= expect_pckt & q_datain_last & bad_l1a_lone  & cafifo_lone & CAFIFO_L1A_CNT(3 downto 0);
+  control_fsm_la_data(119 downto 116)     <= std_logic_vector(to_unsigned(wait_dev_cnt, 4)); --[119:116]
+  control_fsm_la_data(115 downto 107)     <= bad_l1a_change & bad_l1a_lone & lone_cnt_svl & cafifo_lone & RST; -- [115:107]
+  control_fsm_la_data(106 downto 102)     <= std_logic_vector(to_unsigned(wait_cnt, 5)); -- [106:102]
+  control_fsm_la_data(101 downto 97)      <= CAFIFO_L1A_CNT(4 downto 0); -- [101:97]
+  control_fsm_la_data(89+NCFEB downto 88) <= FFOR_B; -- [96:88]
+  control_fsm_la_data(80+NCFEB downto 79) <= cafifo_lost_pckt; -- [87:79]
+  control_fsm_la_data(78 downto 72)       <= next_state_svl & eof_inner & fifo_pop_inner & fifo_pop_80; -- [78:72]
+  control_fsm_la_data(64+NCFEB downto 63) <= oefifo_b_inner; -- [71:63]
+  control_fsm_la_data(55+NCFEB downto 54) <= renfifo_b_inner; -- [62:54]
+  control_fsm_la_data(53 downto 38)       <= dout_inner; -- [53:38]
+  control_fsm_la_data(37 downto 35)       <= '0' & hdr_tail_cnt_en & dev_cnt_en; -- [37:35]
+  control_fsm_la_data(17+NCFEB downto 26) <= CAFIFO_L1A_DAV; -- [34:26]
+  control_fsm_la_data(18+NCFEB downto 17) <= CAFIFO_L1A_MATCH; -- [25:17]
+  control_fsm_la_data(16 downto 15)       <= q_datain_last & expect_pckt; -- [16:15]
+  control_fsm_la_data(14 downto 5)        <= hdr_tail_cnt_svl & dev_cnt_svl; -- [14:5]
+  control_fsm_la_data(4 downto 0)         <= current_state_svl & dav_inner; -- [4:0]
 
---  control_debug <= control_fsm_la_data & '0' & dev_cnt_svl & bad_l1a_change40 & hdr_tail_cnt_svl
---                   & current_state_svl;
+  control_debug <= control_fsm_la_data & '0' & dev_cnt_svl & bad_l1a_change40 & hdr_tail_cnt_svl
+                   & current_state_svl;
 
 -- Needed because DATAIN_LAST does not arrive during the last word
   FDLAST : FD port map(Q => q_datain_last, C => clk, D => DATAIN_LAST);
