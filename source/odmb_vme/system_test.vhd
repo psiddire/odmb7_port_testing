@@ -67,7 +67,10 @@ entity SYSTEM_TEST is
 
     -- OTMB PRBS signals
     OTMB_TX : in  std_logic_vector(48 downto 0);              --! backplane PRBS signals from OTMB
-    OTMB_RX : out std_logic_vector(5 downto 0)                --! backplane PRBS signals to OTMB
+    OTMB_RX : out std_logic_vector(5 downto 0);               --! backplane PRBS signals to OTMB
+
+    -- Debug signals
+    DIAGOUT : out std_logic_vector(17 downto 0)               --! Debug signal
     );
 end SYSTEM_TEST;
 
@@ -84,12 +87,12 @@ architecture SYSTEM_TEST_Arch of SYSTEM_TEST is
   end component;
 
   -- Instantiate to help debugging
-  -- component ila_2 is
-  --   port (
-  --     clk : in std_logic := '0';
-  --     probe0 : in std_logic_vector(383 downto 0) := (others=> '0')
-  --     );
-  -- end component;
+   component ila_tmb is
+     port (
+       clk : in std_logic := '0';
+       probe0 : in std_logic_vector(383 downto 0) := (others=> '0')
+       );
+   end component;
 
   signal ila_data : std_logic_vector(383 downto 0) := (others => '0');
   signal outdata_inner : std_logic_vector(15 downto 0);
@@ -132,6 +135,7 @@ architecture SYSTEM_TEST_Arch of SYSTEM_TEST is
   signal pulse_otmb_prbs_rx_end                 : std_logic;
   signal otmb_prbs_tx_xor                       : std_logic_vector(48 downto 0);
   signal otmb_prbs_tx                           : std_logic;
+  signal q_otmb_prbs_tx                         : std_logic;
   signal otmb_prbs_tx_err                       : std_logic;
   signal w_otmb_prbs_en, r_otmb_prbs_err_cnt    : std_logic;
   signal r_otmb_prbs_good_cnt                   : std_logic;
@@ -273,9 +277,18 @@ begin
 
   PRBS_GEN_TX_PM   : PRBS_GEN port map (DOUT => otmb_prbs_tx, CLK => CLK, RST => otmb_prbs_tx_rst, ENABLE => otmb_prbs_tx_en);
   GEN_OTMB_PRBS_TX : for index in 48 downto 0 generate
-    FD_OTMB_TX : FD port map (Q => q_otmb_tx(index), C => CLK, D => OTMB_TX(index));
-    otmb_prbs_tx_xor(index) <= mux_otmb_tx(index) xor otmb_prbs_tx;
+    --FD_OTMB_TX : FD port map (Q => q_otmb_tx(index), C => CLK, D => OTMB_TX(index));
+    --otmb_prbs_tx_xor(index) <= q_otmb_otmb_tx(index) xor otmb_prbs_tx;
+    otmb_prbs_tx_xor(index) <= mux_otmb_tx(index) xor q_otmb_prbs_tx;
   end generate GEN_OTMB_PRBS_TX;
+  clock_otmb_tx : process (CLK)
+  begin
+    if falling_edge(CLK) then
+      q_otmb_tx <= OTMB_TX;
+      q_otmb_prbs_tx <= otmb_prbs_tx;
+    end if;
+  end process clock_otmb_tx;
+  
   otmb_prbs_tx_err <= or_reduce(otmb_prbs_tx_xor(47 downto 0));
 
   CNT_RST : PULSE_EDGE port map (DOUT => otmb_prbs_cnt_rst, PULSE1 => open, CLK => CLK, RST => RST, NPULSE => 2, DIN => w_otmb_prbs_cnt_rst);
@@ -288,7 +301,7 @@ begin
       otmb_tx_err_cntr      <= 0;
       otmb_tx_good_cntr_int <= 0;
       otmb_tx_good_cntr     <= 0;
-    elsif (falling_edge(CLK) and otmb_prbs_tx_en = '1') then
+    elsif (rising_edge(CLK) and otmb_prbs_tx_en = '1') then
       if otmb_prbs_tx_err = '1' then
         otmb_tx_err_cntr <= otmb_tx_err_cntr + 1;
       else
@@ -330,12 +343,25 @@ begin
   ila_data(175)            <= otmb_prbs_rx_en;
   ila_data(176)            <= otmb_prbs_rx;
   ila_data(177)            <= CLK;
+  ila_data(226 downto 178) <= q_otmb_tx;
 
-  -- ila_systest_inst : ila_2
-  --   port map (
-  --     clk    => CLK160,
-  --     probe0 => ila_data
-  --     );
+   ila_systest_inst : ila_tmb
+     port map (
+       clk    => CLK160,
+       probe0 => ila_data
+       );
 
+   DIAGOUT(0) <= CLK;
+   DIAGOUT(1) <= q_otmb_prbs_tx;
+   DIAGOUT(2) <= otmb_tx(43); --ALCT dav
+   DIAGOUT(3) <= q_otmb_tx(43);
+   DIAGOUT(4) <= q_otmb_tx(43) xor q_otmb_prbs_tx;
+   DIAGOUT(5) <= otmb_tx(40);
+   DIAGOUT(6) <= q_otmb_tx(40);
+   DIAGOUT(7) <= q_otmb_tx(40) xor q_otmb_prbs_tx;
+   DIAGOUT(8) <= otmb_tx(47);
+   DIAGOUT(9) <= q_otmb_tx(47);
+   DIAGOUT(10) <= q_otmb_tx(47) xor q_otmb_prbs_tx;
+   DIAGOUT(17 downto 11) <= (others => '0');
 
 end SYSTEM_TEST_Arch;

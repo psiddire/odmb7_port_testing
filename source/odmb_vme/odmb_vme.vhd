@@ -33,7 +33,7 @@ entity ODMB_VME is
     --------------------
     -- Clock
     --------------------
-    CLK160      : in std_logic;                                    --! 160 MHz clock used by SUSTEM_TEST for dcfeb prbs test.
+    CLK160      : in std_logic;                                    --! 160 MHz clock used by SYSTEM_TEST for dcfeb prbs test.
     CLK40       : in std_logic;                                    --! 40 MHz "fastclk" used for numerous purposes by VMEMON, VMECONFREGS, SYSTEM_TEST, COMMAND_MODULE, and SPI_CTRL
     CLK10       : in std_logic;                                    --! 10 MHz "midclk" currently unused
     CLK2P5      : in std_logic;                                    --! 2.5 MHz "slowclk" used for most slow control logic
@@ -527,7 +527,10 @@ architecture Behavioral of ODMB_VME is
 
       -- OTMB PRBS signals
       OTMB_TX : in  std_logic_vector(48 downto 0);
-      OTMB_RX : out std_logic_vector(5 downto 0)
+      OTMB_RX : out std_logic_vector(5 downto 0);
+
+      -- Debug signals
+      DIAGOUT : out std_logic_vector(17 downto 0)
       );
   end component;
 
@@ -1020,7 +1023,9 @@ begin
 
       --OTMB_PRBS signals
       OTMB_TX => otmb_tx,
-      OTMB_RX => otmb_rx
+      OTMB_RX => otmb_rx,
+
+      DIAGOUT => diagout_buf
       );
 
   COMMAND_PM : COMMAND_MODULE
@@ -1068,7 +1073,7 @@ begin
       FSM_DISABLE           => spi_disable,
       SPI_TIMER             => spi_timer,
       SPI_STATUS            => spi_status,
-      DIAGOUT               => diagout_buf
+      DIAGOUT               => open
       );
 
 end Behavioral;

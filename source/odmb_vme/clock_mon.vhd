@@ -162,9 +162,9 @@ begin
   rst_ac   <= INDATA(2 downto 0);
   rst_if   <= INDATA(4 downto 3);
   rst_test <= INDATA(5);
-  --from data sheet: resert should be asserted for at least 1us
+  --from data sheet: for clock chip, reset should be asserted for at least 1us, but MAX118 requires at least 10 us
   rst_puslse : NPULSE2SAME port map(DOUT => rst_rst, CLK_DOUT => CLK2P5, 
-                                    RST => '0', NPULSE => 4, DIN => vme_cmd_reset);
+                                    RST => '0', NPULSE => 30, DIN => vme_cmd_reset);
   rst_rst_q <= rst_rst when rising_edge(CLK2P5);
   rst_dtack_en <= rst_rst_q and not rst_rst;
   FDC_rst_dtack : FDCE port map(D => '1', C => CLK2P5, CE => rst_dtack_en, 

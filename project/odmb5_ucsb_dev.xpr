@@ -31,20 +31,20 @@
     <Option Name="IPUserFilesDir" Val="$PIPUSERFILESDIR"/>
     <Option Name="IPStaticSourceDir" Val="$PIPUSERFILESDIR/ipstatic"/>
     <Option Name="EnableBDX" Val="FALSE"/>
-    <Option Name="WTXSimLaunchSim" Val="232"/>
+    <Option Name="WTXSimLaunchSim" Val="239"/>
     <Option Name="WTModelSimLaunchSim" Val="0"/>
     <Option Name="WTQuestaLaunchSim" Val="0"/>
     <Option Name="WTIesLaunchSim" Val="0"/>
     <Option Name="WTVcsLaunchSim" Val="0"/>
     <Option Name="WTRivieraLaunchSim" Val="0"/>
     <Option Name="WTActivehdlLaunchSim" Val="0"/>
-    <Option Name="WTXSimExportSim" Val="167"/>
-    <Option Name="WTModelSimExportSim" Val="167"/>
-    <Option Name="WTQuestaExportSim" Val="167"/>
-    <Option Name="WTIesExportSim" Val="167"/>
-    <Option Name="WTVcsExportSim" Val="167"/>
-    <Option Name="WTRivieraExportSim" Val="167"/>
-    <Option Name="WTActivehdlExportSim" Val="167"/>
+    <Option Name="WTXSimExportSim" Val="168"/>
+    <Option Name="WTModelSimExportSim" Val="168"/>
+    <Option Name="WTQuestaExportSim" Val="168"/>
+    <Option Name="WTIesExportSim" Val="168"/>
+    <Option Name="WTVcsExportSim" Val="168"/>
+    <Option Name="WTRivieraExportSim" Val="168"/>
+    <Option Name="WTActivehdlExportSim" Val="168"/>
     <Option Name="GenerateIPUpgradeLog" Val="TRUE"/>
     <Option Name="XSimRadix" Val="hex"/>
     <Option Name="XSimTimeUnit" Val="ns"/>
@@ -685,8 +685,8 @@
         <Option Name="UseBlackboxStub" Val="1"/>
       </Config>
     </FileSet>
-    <FileSet Name="ila_spi" Type="BlockSrcs" RelSrcDir="$PSRCDIR/ila_spi">
-      <File Path="$PSRCDIR/sources_1/ip/ila_spi/ila_spi.xci">
+    <FileSet Name="ila_tmb" Type="BlockSrcs" RelSrcDir="$PSRCDIR/ila_tmb">
+      <File Path="$PSRCDIR/sources_1/ip/ila_tmb/ila_tmb.xci">
         <FileInfo>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
@@ -694,7 +694,7 @@
         </FileInfo>
       </File>
       <Config>
-        <Option Name="TopModule" Val="ila_spi"/>
+        <Option Name="TopModule" Val="ila_tmb"/>
         <Option Name="UseBlackboxStub" Val="1"/>
       </Config>
     </FileSet>
@@ -744,7 +744,7 @@
       <Report Name="ROUTE_DESIGN.REPORT_METHODOLOGY" Enabled="1"/>
       <RQSFiles/>
     </Run>
-    <Run Id="ila_spi_synth_1" Type="Ft3:Synth" SrcSet="ila_spi" Part="xcku035-ffva1156-1-c" ConstrsSet="ila_spi" Description="Vivado Synthesis Defaults" AutoIncrementalCheckpoint="false" WriteIncrSynthDcp="false" Dir="$PRUNDIR/ila_spi_synth_1" IncludeInArchive="true">
+    <Run Id="ila_tmb_synth_1" Type="Ft3:Synth" SrcSet="ila_tmb" Part="xcku035-ffva1156-1-c" ConstrsSet="ila_tmb" Description="Vivado Synthesis Defaults" AutoIncrementalCheckpoint="false" WriteIncrSynthDcp="false" Dir="$PRUNDIR/ila_tmb_synth_1" IncludeInArchive="true">
       <Strategy Version="1" Minor="2">
         <StratHandle Name="Vivado Synthesis Defaults" Flow="Vivado Synthesis 2019"/>
         <Step Id="synth_design"/>
@@ -829,7 +829,7 @@
       <Report Name="ROUTE_DESIGN.REPORT_METHODOLOGY" Enabled="1"/>
       <RQSFiles/>
     </Run>
-    <Run Id="ila_spi_impl_1" Type="Ft2:EntireDesign" Part="xcku035-ffva1156-1-c" ConstrsSet="ila_spi" Description="Default settings for Implementation." AutoIncrementalCheckpoint="false" WriteIncrSynthDcp="false" SynthRun="ila_spi_synth_1" IncludeInArchive="false" GenFullBitstream="true">
+    <Run Id="ila_tmb_impl_1" Type="Ft2:EntireDesign" Part="xcku035-ffva1156-1-c" ConstrsSet="ila_tmb" Description="Default settings for Implementation." AutoIncrementalCheckpoint="false" WriteIncrSynthDcp="false" SynthRun="ila_tmb_synth_1" IncludeInArchive="false" GenFullBitstream="true">
       <Strategy Version="1" Minor="2">
         <StratHandle Name="Vivado Implementation Defaults" Flow="Vivado Implementation 2019"/>
         <Step Id="init_design"/>

@@ -1088,6 +1088,18 @@ architecture Behavioral of odmb5_ucsb_dev is
 
 begin
 
+  -- Temporary OTMB debugging
+  --THTP(0) <= cmsclk;
+  --THTP(1) <= mgtclk1;
+  --THTP(2) <= LEGACY_ALCT_DAV; --through U3
+  --THTP(3) <= OTMB(35); --through U4
+  --THTP(5 downto 4) <= OTMB(17 downto 16); --through U1
+  --THTP(8 downto 6) <= OTMB(2 downto 0); --through U2
+  --THTP(9) <= OTMB_DAV; --through U4
+  --THTP(12 downto 10) <= RAWLCT(2 downto 0); --through U4
+  --THTP(15 downto 13) <= RSVTD(5 downto 3); --through U3 (2/5) and U4 (4)
+  THTP(15 downto 0) <= diagout_inner(15 downto 0);
+
   -------------------------------------------------------------------------------------------
   -- Handle clock chip signals
   -------------------------------------------------------------------------------------------
@@ -1418,7 +1430,7 @@ begin
       NCFEB => NCFEB
       )
     port map (
-      CLK160         => mgtclk1,
+      CLK160         => mgtclk1, --actually 80 MHz despite name
       CLK40          => cmsclk,
       CLK10          => sysclk10,
       CLK2P5         => sysclk2p5,
