@@ -129,7 +129,7 @@ entity ODMB_VME is
     --------------------
     -- VMECONFREGS Configuration signals for top level
     --------------------
-    LCT_L1A_DLY          : out std_logic_vector(5 downto 0);       --! VMECONFREGS register controlling LCT delay in CALIBTRG.
+    LCT_L1A_DLY          : out std_logic_vector(5 downto 0);       --! VMECONFREGS register controlling LCT delay in CALIBTRG and TRGCNTRL
     CABLE_DLY            : out integer range 0 to 1;               --! VMECONFERGS register controlling delay for DCFEB bound signals (L1A,L1A_MATCH,RESYNC,BC0) in top level.
     OTMB_PUSH_DLY        : out integer range 0 to 63;              --! VMECONFREGS register controlling delay between OTMBDAV and pushing to the FIFO in TRGCNTRL.
     ALCT_PUSH_DLY        : out integer range 0 to 63;              --! VMECONFREGS register controlling delay between ALCTDAV and pushing to the FIFO in TRGCNTRL.
