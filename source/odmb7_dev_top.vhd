@@ -18,6 +18,10 @@ use work.ucsb_types.all;
 --! hardware interfaces and performing most slow control functionality, however
 --! data acquisition firmware has not yet been developed
 entity odmb7_ucsb_dev is
+  generic (
+    NCFEB       : integer range 1 to 7 := 7;  -- Number of DCFEBS, 7 for ME1/1, 5
+    NQUAD       : integer range 0 to 4 := 4   -- Number of Quads used for IBERT
+  );
   port (
     --------------------
     -- Input clocks
@@ -160,8 +164,8 @@ entity odmb7_ucsb_dev is
 
     SPY_TX_P     : out std_logic;                          --! Finisar (spy) optical TX output to PC.
     SPY_TX_N     : out std_logic;                          --! Finisar (spy) optical TX output to PC.
-    -- DAQ_TX_P     : out std_logic_vector(4 downto 1);    --! B04 optical TX, output to FED.
-    -- DAQ_TX_N     : out std_logic_vector(4 downto 1);    --! B04 optical TX, output to FED.
+    DAQ_TX_P     : out std_logic_vector(4 downto 1);       --! B04 optical TX, output to FED.
+    DAQ_TX_N     : out std_logic_vector(4 downto 1);       --! B04 optical TX, output to FED.
 
     --------------------------------
     -- Optical control signals
@@ -248,7 +252,38 @@ entity odmb7_ucsb_dev is
 end odmb7_ucsb_dev;
 
 architecture Behavioral of odmb7_ucsb_dev is
-  constant NCFEB  : integer range 1 to 7 := 7;  -- Number of DCFEBS, 7 for ODMB7
+
+  --------------------------------------
+  -- Component and signals for the IBERT test
+  --------------------------------------
+  component ibert_odmb7_gth
+    port (
+      txn_o : out std_logic_vector(4*NQUAD-1 downto 0);
+      txp_o : out std_logic_vector(4*NQUAD-1 downto 0);
+      rxoutclk_o : out std_logic_vector(4*NQUAD-1 downto 0);
+      rxn_i : in std_logic_vector(4*NQUAD-1 downto 0);
+      rxp_i : in std_logic_vector(4*NQUAD-1 downto 0);
+      gtrefclk0_i : in std_logic_vector(NQUAD-1 downto 0);
+      gtrefclk1_i : in std_logic_vector(NQUAD-1 downto 0);
+      gtnorthrefclk0_i : in std_logic_vector(NQUAD-1 downto 0);
+      gtnorthrefclk1_i : in std_logic_vector(NQUAD-1 downto 0);
+      gtsouthrefclk0_i : in std_logic_vector(NQUAD-1 downto 0);
+      gtsouthrefclk1_i : in std_logic_vector(NQUAD-1 downto 0);
+      gtrefclk00_i : in std_logic_vector(NQUAD-1 downto 0);
+      gtrefclk10_i : in std_logic_vector(NQUAD-1 downto 0);
+      gtrefclk01_i : in std_logic_vector(NQUAD-1 downto 0);
+      gtrefclk11_i : in std_logic_vector(NQUAD-1 downto 0);
+      gtnorthrefclk00_i : in std_logic_vector(NQUAD-1 downto 0);
+      gtnorthrefclk10_i : in std_logic_vector(NQUAD-1 downto 0);
+      gtnorthrefclk01_i : in std_logic_vector(NQUAD-1 downto 0);
+      gtnorthrefclk11_i : in std_logic_vector(NQUAD-1 downto 0);
+      gtsouthrefclk00_i : in std_logic_vector(NQUAD-1 downto 0);
+      gtsouthrefclk10_i : in std_logic_vector(NQUAD-1 downto 0);
+      gtsouthrefclk01_i : in std_logic_vector(NQUAD-1 downto 0);
+      gtsouthrefclk11_i : in std_logic_vector(NQUAD-1 downto 0);
+      clk : in std_logic
+    );
+  end component;
 
   --------------------------------------
   -- Clock signals
@@ -429,6 +464,9 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal fw_rst_reg      : std_logic_vector(31 downto 0) := (others => '0');
   signal opt_rst_reg     : std_logic_vector(31 downto 0) := (others => '0');
   signal reset           : std_logic := '0';
+  signal dcfeb_done_q    : std_logic := '0';
+  signal dcfeb_done_cnt  : integer := 1;
+  signal dcfeb_done_cntr : std_logic_vector(19 downto 0);
 
   --------------------------------------
   -- MGT PRBS signals as place holder
@@ -589,6 +627,29 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal otmb_push_dly : integer range 0 to 63;
   signal test_otmb_dav, test_alct_dav              : std_logic := '0';
 
+  signal gth_txn_o : std_logic_vector(4*NQUAD-1 downto 0);
+  signal gth_txp_o : std_logic_vector(4*NQUAD-1 downto 0);
+  signal gth_rxn_i : std_logic_vector(4*NQUAD-1 downto 0);
+  signal gth_rxp_i : std_logic_vector(4*NQUAD-1 downto 0);
+  signal gth_qrefclk0_i : std_logic_vector(NQUAD-1 downto 0);
+  signal gth_qrefclk1_i : std_logic_vector(NQUAD-1 downto 0);
+  signal gth_qnorthrefclk0_i : std_logic_vector(NQUAD-1 downto 0);
+  signal gth_qnorthrefclk1_i : std_logic_vector(NQUAD-1 downto 0);
+  signal gth_qsouthrefclk0_i : std_logic_vector(NQUAD-1 downto 0);
+  signal gth_qsouthrefclk1_i : std_logic_vector(NQUAD-1 downto 0);
+  signal gth_qrefclk00_i : std_logic_vector(NQUAD-1 downto 0);
+  signal gth_qrefclk10_i : std_logic_vector(NQUAD-1 downto 0);
+  signal gth_qrefclk01_i : std_logic_vector(NQUAD-1 downto 0);
+  signal gth_qrefclk11_i : std_logic_vector(NQUAD-1 downto 0);
+  signal gth_qnorthrefclk00_i : std_logic_vector(NQUAD-1 downto 0);
+  signal gth_qnorthrefclk10_i : std_logic_vector(NQUAD-1 downto 0);
+  signal gth_qnorthrefclk01_i : std_logic_vector(NQUAD-1 downto 0);
+  signal gth_qnorthrefclk11_i : std_logic_vector(NQUAD-1 downto 0);
+  signal gth_qsouthrefclk00_i : std_logic_vector(NQUAD-1 downto 0);
+  signal gth_qsouthrefclk10_i : std_logic_vector(NQUAD-1 downto 0);
+  signal gth_qsouthrefclk01_i : std_logic_vector(NQUAD-1 downto 0);
+  signal gth_qsouthrefclk11_i : std_logic_vector(NQUAD-1 downto 0);
+
 begin
 
   -------------------------------------------------------------------------------------------
@@ -600,45 +661,45 @@ begin
   -------------------------------------------------------------------------------------------
   -- Handle incoming data from OTMB/ALCT/DCFEBs
   -------------------------------------------------------------------------------------------
-  MBD : entity work.odmb_data
-    generic map (
-      NCFEB => NCFEB
-      )
-    port map (
-      CMSCLK              => cmsclk,
-      DDUCLK              => usrclk_spy_tx,
-      DCFEBCLK            => usrclk_mgtc,
-      RESET               => reset,
-      L1ACNT_RST          => l1acnt_rst,
-      KILL                => kill,
-      CAFIFO_L1A          => cafifo_l1a, -- from cafifo.vhd
-      CAFIFO_L1A_MATCH_IN => cafifo_l1a_match_in, -- from cafifo.vhd
-      DCFEB_L1A           => odmbctrl_l1a, -- for dcfeb in simulation
-      DCFEB_L1A_MATCH     => odmbctrl_l1a_match, -- for dcfeb in simulation
-      NWORDS_DUMMY        => nwords_dummy,
+--  MBD : entity work.odmb_data
+--    generic map (
+--      NCFEB => NCFEB
+--      )
+--    port map (
+--      CMSCLK              => cmsclk,
+--      DDUCLK              => usrclk_spy_tx,
+--      DCFEBCLK            => usrclk_mgtc,
+--      RESET               => reset,
+--      L1ACNT_RST          => l1acnt_rst,
+--      KILL                => kill,
+--      CAFIFO_L1A          => cafifo_l1a, -- from cafifo.vhd
+--      CAFIFO_L1A_MATCH_IN => cafifo_l1a_match_in, -- from cafifo.vhd
+--      DCFEB_L1A           => odmbctrl_l1a, -- for dcfeb in simulation
+--      DCFEB_L1A_MATCH     => odmbctrl_l1a_match, -- for dcfeb in simulation
+--      NWORDS_DUMMY        => nwords_dummy,
 
-      DCFEB_TCK           => dcfeb_tck,
-      DCFEB_TDO           => gen_dcfeb_tdo,
-      DCFEB_TMS           => dcfeb_tms,
-      DCFEB_TDI           => dcfeb_tdi,
+--      DCFEB_TCK           => dcfeb_tck,
+--      DCFEB_TDO           => gen_dcfeb_tdo,
+--      DCFEB_TMS           => dcfeb_tms,
+--      DCFEB_TDI           => dcfeb_tdi,
 
-      DCFEB_FIFO_RST      => "0000000", -- auto-kill related
-      EOF_DATA            => eof_data,
-      INTO_FIFO_DAV       => into_fifo_dav,
+--      DCFEB_FIFO_RST      => "0000000", -- auto-kill related
+--      EOF_DATA            => eof_data,
+--      INTO_FIFO_DAV       => into_fifo_dav,
 
-      OTMB_DATA_IN        => OTMB(17 downto 0),
-      ALCT_DATA_IN        => OTMB(35 downto 18),
-      DCFEB_DATA_IN       => dcfeb_rxdata,
-      DCFEB_DAV_IN        => dcfeb_rxd_valid,
+--      OTMB_DATA_IN        => OTMB(17 downto 0),
+--      ALCT_DATA_IN        => OTMB(35 downto 18),
+--      DCFEB_DATA_IN       => dcfeb_rxdata,
+--      DCFEB_DAV_IN        => dcfeb_rxd_valid,
 
-      GEN_DCFEB_SEL       => odmb_ctrl_reg(7),
+--      GEN_DCFEB_SEL       => odmb_ctrl_reg(7),
 
-      FIFO_RE_B           => fifo_re_b,
-      FIFO_OE_B           => fifo_oe_b,
-      FIFO_DOUT           => fifo_dout,
-      FIFO_EMPTY          => fifo_empty,
-      FIFO_HALF_FULL      => fifo_half_full
-      );
+--      FIFO_RE_B           => fifo_re_b,
+--      FIFO_OE_B           => fifo_oe_b,
+--      FIFO_DOUT           => fifo_dout,
+--      FIFO_EMPTY          => fifo_empty,
+--      FIFO_HALF_FULL      => fifo_half_full
+--      );
 
   -------------------------------------------------------------------------------------------
   -- Handle clock synthesizer signals and generate clocks
@@ -920,6 +981,17 @@ begin
                  opt_rst_reg(30 downto 0) & '0' when rising_edge(cmsclk) else
                  opt_rst_reg;
   opt_reset <= opt_rst_reg(31) or pon_reset or mgt_reset;  -- Optical reset
+  
+  -- dcfeb_done_q <= DCFEB_DONE(1) or DCFEB_DONE(2) or DCFEB_DONE(3) or DCFEB_DONE(4) or DCFEB_DONE(5) or DCFEB_DONE(6) or DCFEB_DONE(7);
+  dcfeb_done_q <= DCFEB_DONE(1) and DCFEB_DONE(2) and DCFEB_DONE(3) and DCFEB_DONE(4) and DCFEB_DONE(5) and DCFEB_DONE(6) and DCFEB_DONE(7);
+
+  proc_dcfeb_donecnt : process (cmsclk)
+  begin
+    if rising_edge(cmsclk) and dcfeb_done_q='0' then
+      dcfeb_done_cnt <= dcfeb_done_cnt + 1;
+    end if;
+  end process;
+  dcfeb_done_cntr <= std_logic_vector(to_unsigned(dcfeb_done_cnt, 20));
 
   -------------------------------------------------------------------------------------------
   -- Sub-modules
@@ -1052,89 +1124,89 @@ begin
       PON_RESET => pon_reset
       );
 
-  MBC : entity work.ODMB_CTRL
-    generic map (
-      NCFEB => NCFEB,
-      CAFIFO_SIZE => 32
-      )
-    port map (
-      DDUCLK    => usrclk_spy_tx,
-      CMSCLK    => cmsclk,
+--  MBC : entity work.ODMB_CTRL
+--    generic map (
+--      NCFEB => NCFEB,
+--      CAFIFO_SIZE => 32
+--      )
+--    port map (
+--      DDUCLK    => usrclk_spy_tx,
+--      CMSCLK    => cmsclk,
 
-      CCB_CMD      => ccb_cmd,
-      CCB_CMD_S    => ccb_cmd_s,
-      CCB_DATA     => ccb_data,
-      CCB_DATA_S   => ccb_data_s,
-      CCB_BX0_B    => ccb_bx0_b,
-      CCB_BXRST_B  => ccb_bx_rst_b,
-      CCB_L1ARST_B => ccb_l1a_rst_b,
-      CCB_CLKEN    => ccb_clken,
+--      CCB_CMD      => ccb_cmd,
+--      CCB_CMD_S    => ccb_cmd_s,
+--      CCB_DATA     => ccb_data,
+--      CCB_DATA_S   => ccb_data_s,
+--      CCB_BX0_B    => ccb_bx0_b,
+--      CCB_BXRST_B  => ccb_bx_rst_b,
+--      CCB_L1ARST_B => ccb_l1a_rst_b,
+--      CCB_CLKEN    => ccb_clken,
 
-      TEST_CCBINJ => test_inj,
-      TEST_CCBPLS => test_pls,
-      TEST_CCBPED => test_ped,
+--      TEST_CCBINJ => test_inj,
+--      TEST_CCBPLS => test_pls,
+--      TEST_CCBPED => test_ped,
 
-      LCT_L1A_DLY => lct_l1a_dly,
-      INJ_DLY     => inj_dly,
-      EXT_DLY     => ext_dly,
-      CALLCT_DLY  => callct_dly,
-      OTMB_PUSH_DLY => otmb_push_dly,
-      ALCT_PUSH_DLY => alct_push_dly,
-      PUSH_DLY      => push_dly,
+--      LCT_L1A_DLY => lct_l1a_dly,
+--      INJ_DLY     => inj_dly,
+--      EXT_DLY     => ext_dly,
+--      CALLCT_DLY  => callct_dly,
+--      OTMB_PUSH_DLY => otmb_push_dly,
+--      ALCT_PUSH_DLY => alct_push_dly,
+--      PUSH_DLY      => push_dly,
 
-      CAL_MODE => odmb_ctrl_reg(0),
-      PEDESTAL => odmb_ctrl_reg(13),
-      PEDESTAL_OTMB => odmb_ctrl_reg(14),
+--      CAL_MODE => odmb_ctrl_reg(0),
+--      PEDESTAL => odmb_ctrl_reg(13),
+--      PEDESTAL_OTMB => odmb_ctrl_reg(14),
 
-      RAW_L1A => raw_l1a,
-      RAWLCT  => raw_lct,
+--      RAW_L1A => raw_l1a,
+--      RAWLCT  => raw_lct,
 
-      OTMB_DAV => int_otmb_dav,         -- lctdav1 - from J4
-      ALCT_DAV => int_alct_dav,         -- lctdav2 - from J4
+--      OTMB_DAV => int_otmb_dav,         -- lctdav1 - from J4
+--      ALCT_DAV => int_alct_dav,         -- lctdav2 - from J4
 
-      DCFEB_INJPULSE  => premask_injpls,
-      DCFEB_EXTPULSE  => premask_extpls,
-      DCFEB_L1A       => odmbctrl_l1a,
-      DCFEB_L1A_MATCH => odmbctrl_l1a_match,
+--      DCFEB_INJPULSE  => premask_injpls,
+--      DCFEB_EXTPULSE  => premask_extpls,
+--      DCFEB_L1A       => odmbctrl_l1a,
+--      DCFEB_L1A_MATCH => odmbctrl_l1a_match,
 
-      ALCT_DAV_SYNC_OUT => open,
-      OTMB_DAV_SYNC_OUT => open,
+--      ALCT_DAV_SYNC_OUT => open,
+--      OTMB_DAV_SYNC_OUT => open,
 
-      DIAGOUT => open,
-      KILL    => kill,
-      LCT_ERR => open,            -- To an LED in the original design
+--      DIAGOUT => open,
+--      KILL    => kill,
+--      LCT_ERR => open,            -- To an LED in the original design
 
-      BX_DLY     => bx_dly,
-      L1ACNT_RST => l1acnt_rst,
-      BXCNT_RST  => bxcnt_rst,
-      RST        => reset,
+--      BX_DLY     => bx_dly,
+--      L1ACNT_RST => l1acnt_rst,
+--      BXCNT_RST  => bxcnt_rst,
+--      RST        => reset,
 
-      EOF_DATA   => eof_data,
+--      EOF_DATA   => eof_data,
 
-      CAFIFO_L1A           => cafifo_l1a,
-      CAFIFO_L1A_MATCH_IN  => cafifo_l1a_match_in,
-      CAFIFO_L1A_MATCH_OUT => cafifo_l1a_match_out,
-      CAFIFO_L1A_CNT       => cafifo_l1a_cnt,
-      CAFIFO_L1A_DAV       => cafifo_l1a_dav,
-      CAFIFO_BX_CNT        => cafifo_bx_cnt,
+--      CAFIFO_L1A           => cafifo_l1a,
+--      CAFIFO_L1A_MATCH_IN  => cafifo_l1a_match_in,
+--      CAFIFO_L1A_MATCH_OUT => cafifo_l1a_match_out,
+--      CAFIFO_L1A_CNT       => cafifo_l1a_cnt,
+--      CAFIFO_L1A_DAV       => cafifo_l1a_dav,
+--      CAFIFO_BX_CNT        => cafifo_bx_cnt,
 
-      -- To GigaLinks
-      DDU_DATA            => ddu_data,
-      DDU_DATA_VALID      => ddu_data_valid,
+--      -- To GigaLinks
+--      DDU_DATA            => ddu_data,
+--      DDU_DATA_VALID      => ddu_data_valid,
 
-      -- For headers/trailers
-      GA => vme_ga_b,
-      CRATEID => crateid,
-      AUTOKILLED_DCFEBS  => "0000000",
+--      -- For headers/trailers
+--      GA => vme_ga_b,
+--      CRATEID => crateid,
+--      AUTOKILLED_DCFEBS  => "0000000",
 
-      -- From/To Data FIFOs
-      FIFO_RE_B  => fifo_re_b,
-      FIFO_OE_B  => fifo_oe_b,
-      FIFO_DOUT  => fifo_dout,
-      -- FIFO_EOF => fifo_eof,
-      FIFO_EMPTY   => fifo_empty,  -- emptyf*(7 DOWNTO 1) - from FIFOs
-      FIFO_HALF_FULL => fifo_half_full
-      );
+--      -- From/To Data FIFOs
+--      FIFO_RE_B  => fifo_re_b,
+--      FIFO_OE_B  => fifo_oe_b,
+--      FIFO_DOUT  => fifo_dout,
+--      -- FIFO_EOF => fifo_eof,
+--      FIFO_EMPTY   => fifo_empty,  -- emptyf*(7 DOWNTO 1) - from FIFOs
+--      FIFO_HALF_FULL => fifo_half_full
+--      );
 
 
   -------------------------------------------------------------------------------------------
@@ -1199,66 +1271,171 @@ begin
   -------------------------------------------------------------------------------------------
   -- Optical communication with the SPY ports
   -------------------------------------------------------------------------------------------
-  DAQ_SPY_SEL <= SPY_SEL; -- set for constant
-  spy_rx_n <= DAQ_SPY_RX_N when SPY_SEL = '1' else '0';
-  spy_rx_p <= DAQ_SPY_RX_P when SPY_SEL = '1' else '0';
+--  DAQ_SPY_SEL <= SPY_SEL; -- set for constant
+--  spy_rx_n <= DAQ_SPY_RX_N when SPY_SEL = '1' else '0';
+--  spy_rx_p <= DAQ_SPY_RX_P when SPY_SEL = '1' else '0';
 
-  -- Run3 format: sending DAQ data to DDU via the SPY ports
-  GTH_DDU : entity work.mgt_spy
-    port map (
-      mgtrefclk       => mgtrefclk0_226, -- for 1.6 Gb/s DDU transmission, mgtrefclk1_226 is sourced from the 125 MHz crystal
-      txusrclk        => usrclk_spy_tx,  -- 80 MHz for 1.6 Gb/s with 8b/10b encoding, 62.5 MHz for 1.25 Gb/s
-      rxusrclk        => usrclk_spy_rx,
-      sysclk          => cmsclk,    -- maximum DRP clock frequency 62.5 MHz for 1.25 Gb/s line rate
-      spy_rx_n        => spy_rx_n,
-      spy_rx_p        => spy_rx_p,
-      spy_tx_n        => SPY_TX_N,
-      spy_tx_p        => SPY_TX_P,
-      txready         => spy_txready,
-      rxready         => spy_rxready,
-      txdata          => ddu_data, --spy_txdata,
-      txd_valid       => ddu_data_valid, --spy_txd_valid,
-      txdiffctrl      => spy_txdiffctrl,
-      loopback        => spy_loopback,
-      rxdata          => spy_rxdata,
-      rxd_valid       => spy_rxd_valid,
-      bad_rx          => spy_bad_rx,
-      prbs_type       => mgt_prbs_type,
-      prbs_tx_en      => spy_prbs_tx_en,
-      prbs_rx_en      => spy_prbs_rx_en,
-      prbs_tst_cnt    => spy_prbs_tst_cnt,
-      prbs_err_cnt    => spy_prbs_err_cnt,
-      reset           => opt_reset
-      );
+--  -- Run3 format: sending DAQ data to DDU via the SPY ports
+--  GTH_DDU : entity work.mgt_spy
+--    port map (
+--      mgtrefclk       => mgtrefclk0_226, -- for 1.6 Gb/s DDU transmission, mgtrefclk1_226 is sourced from the 125 MHz crystal
+--      txusrclk        => usrclk_spy_tx,  -- 80 MHz for 1.6 Gb/s with 8b/10b encoding, 62.5 MHz for 1.25 Gb/s
+--      rxusrclk        => usrclk_spy_rx,
+--      sysclk          => cmsclk,    -- maximum DRP clock frequency 62.5 MHz for 1.25 Gb/s line rate
+--      spy_rx_n        => spy_rx_n,
+--      spy_rx_p        => spy_rx_p,
+--      spy_tx_n        => SPY_TX_N,
+--      spy_tx_p        => SPY_TX_P,
+--      txready         => spy_txready,
+--      rxready         => spy_rxready,
+--      txdata          => ddu_data, --spy_txdata,
+--      txd_valid       => ddu_data_valid, --spy_txd_valid,
+--      txdiffctrl      => spy_txdiffctrl,
+--      loopback        => spy_loopback,
+--      rxdata          => spy_rxdata,
+--      rxd_valid       => spy_rxd_valid,
+--      bad_rx          => spy_bad_rx,
+--      prbs_type       => mgt_prbs_type,
+--      prbs_tx_en      => spy_prbs_tx_en,
+--      prbs_rx_en      => spy_prbs_rx_en,
+--      prbs_tst_cnt    => spy_prbs_tst_cnt,
+--      prbs_err_cnt    => spy_prbs_err_cnt,
+--      reset           => opt_reset
+--      );
 
   -------------------------------------------------
   -- DCFEB receiver for ODMB7
   -------------------------------------------------
-  GTH_DCFEB : entity work.mgt_cfeb
-    generic map (
-      NLINK        => 7,  -- number of links
-      DATAWIDTH    => 16  -- user data width
-      )
+--  GTH_DCFEB : entity work.mgt_cfeb
+--    generic map (
+--      NLINK        => 7,  -- number of links
+--      DATAWIDTH    => 16  -- user data width
+--      )
+--    port map (
+--      mgtrefclk    => mgtrefclk0_224,
+--      rxusrclk     => usrclk_mgtc,
+--      sysclk       => sysclk80,
+--      daq_rx_n     => DAQ_RX_N(6 downto 0),
+--      daq_rx_p     => DAQ_RX_P(6 downto 0),
+--      rxdata_cfeb  => dcfeb_rxdata,
+--      rxd_valid    => dcfeb_rxd_valid,
+--      crc_valid    => dcfeb_crc_valid,
+--      rxready      => dcfeb_rxready,
+--      bad_rx       => dcfeb_bad_rx,
+--      kill_rxout   => kill(7 downto 1),
+--      kill_rxpd    => (others => '0'),
+--      fifo_full    => dcfeb_datafifo_full,
+--      fifo_afull   => dcfeb_datafifo_afull,
+--      prbs_type    => mgt_prbs_type,
+--      prbs_rx_en   => dcfeb_prbs_rx_en,
+--      prbs_tst_cnt => dcfeb_prbs_tst_cnt,
+--      prbs_err_cnt => dcfeb_prbs_err_cnt,
+--      reset        => opt_reset,
+--      done         => dcfeb_done_q,
+--      donecnt      => dcfeb_done_cntr
+--      );
+
+  -- MGT I/O pins assignment
+  sig_asgn_224 : if NQUAD >= 4 generate 
+    gth_rxp_i(4*NQUAD-13 downto 4*NQUAD-16) <= DAQ_RX_P(3 downto 0);
+    gth_rxn_i(4*NQUAD-13 downto 4*NQUAD-16) <= DAQ_RX_N(3 downto 0);
+
+    -- Quad 225: refclk0
+    gth_qrefclk0_i(NQUAD-4) <= mgtrefclk0_224;
+    gth_qrefclk1_i(NQUAD-4) <= '0';
+    gth_qrefclk00_i(NQUAD-4) <= mgtrefclk0_224;
+    gth_qrefclk01_i(NQUAD-4) <= mgtrefclk0_224;
+    gth_qrefclk10_i(NQUAD-4) <= '0';
+    gth_qrefclk11_i(NQUAD-4) <= '0';
+  end generate;
+
+  sig_asgn_225 : if NQUAD >= 3 generate 
+    gth_rxp_i(4*NQUAD-9 downto 4*NQUAD-12) <= DAQ_RX_P(7 downto 4);
+    gth_rxn_i(4*NQUAD-9 downto 4*NQUAD-12) <= DAQ_RX_N(7 downto 4);
+
+    -- Clocks for Quad 225 refclk0 <-- use refclk4
+    gth_qrefclk0_i(NQUAD-3) <= mgtrefclk0_225;
+    gth_qrefclk1_i(NQUAD-3) <= '0';
+    gth_qrefclk00_i(NQUAD-3) <= mgtrefclk0_225;
+    gth_qrefclk01_i(NQUAD-3) <= mgtrefclk0_225;
+    gth_qrefclk10_i(NQUAD-3) <= '0';
+    gth_qrefclk11_i(NQUAD-3) <= '0';
+  end generate;
+
+  sig_asgn_226 : if NQUAD >= 2 generate 
+    gth_rxp_i(4*NQUAD-6 downto 4*NQUAD-8) <= DAQ_RX_P(10 downto 8);
+    gth_rxn_i(4*NQUAD-6 downto 4*NQUAD-8) <= DAQ_RX_N(10 downto 8);
+    gth_rxp_i(4*NQUAD-5) <= DAQ_SPY_RX_P;
+    gth_rxn_i(4*NQUAD-5) <= DAQ_SPY_RX_N;
+    SPY_TX_P <= gth_txp_o(4*NQUAD-5);
+    SPY_TX_N <= gth_txn_o(4*NQUAD-5);
+
+    -- Clocks for Quad 226 refclk0 <-- use refclk3
+    gth_qrefclk0_i(NQUAD-2) <= mgtrefclk0_226;
+    gth_qrefclk1_i(NQUAD-2) <= mgtrefclk1_226;
+    gth_qrefclk00_i(NQUAD-2) <= mgtrefclk0_226;
+    gth_qrefclk01_i(NQUAD-2) <= mgtrefclk0_226;
+    gth_qrefclk10_i(NQUAD-2) <= mgtrefclk1_226;
+    gth_qrefclk11_i(NQUAD-2) <= mgtrefclk1_226;
+  end generate;
+
+  -- Quad 227 <-- there should be at least 1 quad
+  gth_rxp_i(4*NQUAD-4) <= BCK_PRS_P;
+  gth_rxn_i(4*NQUAD-4) <= BCK_PRS_N;
+  gth_rxp_i(4*NQUAD-1 downto 4*NQUAD-3) <= B04_RX_P;
+  gth_rxn_i(4*NQUAD-1 downto 4*NQUAD-3) <= B04_RX_N;
+
+  DAQ_TX_P <= gth_txp_o(4*NQUAD-1  downto 4*NQUAD-4);
+  DAQ_TX_N <= gth_txn_o(4*NQUAD-1  downto 4*NQUAD-4);
+
+  -- Clocks for Quad 227 refclk0 <-- use refclk2
+  gth_qrefclk0_i(NQUAD-1) <= mgtrefclk0_227;
+  gth_qrefclk1_i(NQUAD-1) <= mgtrefclk1_227;
+  gth_qrefclk00_i(NQUAD-1) <= mgtrefclk0_227;
+  gth_qrefclk01_i(NQUAD-1) <= mgtrefclk0_227;
+  gth_qrefclk10_i(NQUAD-1) <= mgtrefclk1_227;
+  gth_qrefclk11_i(NQUAD-1) <= mgtrefclk1_227;
+
+  -- Refclk1 for all quads
+  gth_qnorthrefclk0_i <= (others => '0');
+  gth_qsouthrefclk0_i <= (others => '0');
+  gth_qnorthrefclk1_i <= (others => '0');
+  gth_qsouthrefclk1_i <= (others => '0');
+  gth_qnorthrefclk00_i <= (others => '0');
+  gth_qnorthrefclk01_i <= (others => '0');
+  gth_qsouthrefclk00_i <= (others => '0');
+  gth_qsouthrefclk01_i <= (others => '0');
+  gth_qnorthrefclk10_i <= (others => '0');
+  gth_qnorthrefclk11_i <= (others => '0');
+  gth_qsouthrefclk10_i <= (others => '0');
+  gth_qsouthrefclk11_i <= (others => '0');
+
+  u_ibert_gth_core : ibert_odmb7_gth
     port map (
-      mgtrefclk    => mgtrefclk0_224,
-      rxusrclk     => usrclk_mgtc,
-      sysclk       => sysclk80,
-      daq_rx_n     => DAQ_RX_N(6 downto 0),
-      daq_rx_p     => DAQ_RX_P(6 downto 0),
-      rxdata_cfeb  => dcfeb_rxdata,
-      rxd_valid    => dcfeb_rxd_valid,
-      crc_valid    => dcfeb_crc_valid,
-      rxready      => dcfeb_rxready,
-      bad_rx       => dcfeb_bad_rx,
-      kill_rxout   => kill(7 downto 1),
-      kill_rxpd    => (others => '0'),
-      fifo_full    => dcfeb_datafifo_full,
-      fifo_afull   => dcfeb_datafifo_afull,
-      prbs_type    => mgt_prbs_type,
-      prbs_rx_en   => dcfeb_prbs_rx_en,
-      prbs_tst_cnt => dcfeb_prbs_tst_cnt,
-      prbs_err_cnt => dcfeb_prbs_err_cnt,
-      reset        => opt_reset
+      txn_o => gth_txn_o,
+      txp_o => gth_txp_o,
+      rxn_i => gth_rxn_i,
+      rxp_i => gth_rxp_i,
+      clk => clk_gp6,
+      gtrefclk0_i => gth_qrefclk0_i,
+      gtrefclk1_i => gth_qrefclk1_i,
+      gtnorthrefclk0_i => gth_qnorthrefclk0_i,
+      gtnorthrefclk1_i => gth_qnorthrefclk1_i,
+      gtsouthrefclk0_i => gth_qsouthrefclk0_i,
+      gtsouthrefclk1_i => gth_qsouthrefclk1_i,
+      gtrefclk00_i => gth_qrefclk00_i,
+      gtrefclk10_i => gth_qrefclk10_i,
+      gtrefclk01_i => gth_qrefclk01_i,
+      gtrefclk11_i => gth_qrefclk11_i,
+      gtnorthrefclk00_i => gth_qnorthrefclk00_i,
+      gtnorthrefclk10_i => gth_qnorthrefclk10_i,
+      gtnorthrefclk01_i => gth_qnorthrefclk01_i,
+      gtnorthrefclk11_i => gth_qnorthrefclk11_i,
+      gtsouthrefclk00_i => gth_qsouthrefclk00_i,
+      gtsouthrefclk10_i => gth_qsouthrefclk10_i,
+      gtsouthrefclk01_i => gth_qsouthrefclk01_i,
+      gtsouthrefclk11_i => gth_qsouthrefclk11_i
       );
+
 
 end Behavioral;

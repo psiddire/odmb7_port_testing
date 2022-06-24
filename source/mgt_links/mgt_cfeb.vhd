@@ -51,7 +51,9 @@ entity mgt_cfeb is
     prbs_err_cnt : out std_logic_vector(15 downto 0);     --! TODO: PRBS bit error count
 
     -- Reset
-    reset        : in  std_logic                          --! The Global reset signal
+    reset        : in  std_logic;                         --! The Global reset signal
+    done         : in  std_logic;                         --! DCFEB_DONE signal
+    donecnt      : in  std_logic_vector(19 downto 0)      --! DCFEB_DONE Counter
     );
 end mgt_cfeb;
 
@@ -136,13 +138,13 @@ architecture Behavioral of mgt_cfeb is
       );
   end component;
 
-  -- -- Temporary debugging
-  -- component ila_2 is
-  --   port (
-  --     clk : in std_logic := '0';
-  --     probe0 : in std_logic_vector(383 downto 0) := (others=> '0')
-  --     );
-  -- end component;
+   -- Temporary debugging
+   component ila_2 is
+     port (
+       clk : in std_logic := '0';
+       probe0 : in std_logic_vector(383 downto 0) := (others=> '0')
+       );
+   end component;
 
   -- Synchronize the latched link down reset input and the VIO-driven signal into the free-running clock domain
   -- signals passed to wizard
@@ -299,7 +301,7 @@ begin
   gtwiz_userclk_rx_reset_int <= nand_reduce(rxpmaresetdone_int);
 
   -- Only use one big global reset and leave out the specific subcomponent reset for now
-  gtwiz_reset_all_int <= RESET;
+  gtwiz_reset_all_int <= RESET or not done;
   rxprbscntreset_int <= (others => RESET);
   
   -- gtwiz_reset_rx_datapath_int <= rx_datapath_reset; -- Potential useful individual reset signals
@@ -387,14 +389,15 @@ begin
   end generate ila_data_assign;
 
   -- Input control signals
-  -- ila_data_rx(352 downto 346) <= kill_rxout;
-  -- ila_data_rx(359 downto 353) <= kill_rxpd;
-  -- ila_data_rx(360)            <= reset;
+   ila_data_rx(352 downto 346) <= kill_rxout;
+   ila_data_rx(359 downto 353) <= kill_rxpd;
+   ila_data_rx(360)            <= reset;
+   ila_data_rx(380 downto 361) <= donecnt;
 
-  -- mgt_cfeb_ila_inst : ila_2
-  --   port map(
-  --     clk => gtwiz_userclk_rx_usrclk2_int,
-  --     probe0 => ila_data_rx
-  --     );
+   mgt_cfeb_ila_inst : ila_2
+     port map(
+       clk => gtwiz_userclk_rx_usrclk2_int,
+       probe0 => ila_data_rx
+       );
 
 end Behavioral;
