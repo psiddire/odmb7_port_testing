@@ -1720,32 +1720,33 @@ begin
   spy_rx_n <= DAQ_SPY_RX_N when SPY_SEL = '1' else '0';
   spy_rx_p <= DAQ_SPY_RX_P when SPY_SEL = '1' else '0';
 
+
   -- Connet to DDU via the spy ports
   GTH_DDU : mgt_spy
     port map (
       mgtrefclk       => mgtrefclk0_226, -- for 1.6 Gb/s DDU transmission, mgtrefclk1_226 is sourced from the 125 MHz crystal
       txusrclk        => usrclk_spy_tx,  -- 80 MHz for 1.6 Gb/s with 8b/10b encoding, 62.5 MHz for 1.25 Gb/s
-      rxusrclk        => usrclk_spy_rx,
+      rxusrclk        => usrclk_spy_rx, --output rx clock
       sysclk          => cmsclk,    -- maximum DRP clock frequency 62.5 MHz for 1.25 Gb/s line rate
-      spy_rx_n        => spy_rx_n,
-      spy_rx_p        => spy_rx_p,
-      spy_tx_n        => SPY_TX_N,
-      spy_tx_p        => SPY_TX_P,
-      txready         => spy_txready,
-      rxready         => spy_rxready,
-      txdata          => ddu_data, --spy_txdata,
+      spy_rx_n        => spy_rx_n, --to pins
+      spy_rx_p        => spy_rx_p, --to pins
+      spy_tx_n        => SPY_TX_N, --to pins
+      spy_tx_p        => SPY_TX_P, --to pins
+      txready         => spy_txready, --unused
+      rxready         => spy_rxready, --unused
+      txdata          => ddu_data,  --spy_txdata,
       txd_valid       => ddu_data_valid, --spy_txd_valid,
-      txdiffctrl      => spy_txdiffctrl,
-      loopback        => spy_loopback,
-      rxdata          => spy_rxdata,
-      rxd_valid       => spy_rxd_valid,
-      bad_rx          => spy_bad_rx,
-      prbs_type       => mgt_prbs_type,
-      prbs_tx_en      => spy_prbs_tx_en,
-      prbs_rx_en      => spy_prbs_rx_en,
-      prbs_tst_cnt    => spy_prbs_tst_cnt,
-      prbs_err_cnt    => spy_prbs_err_cnt,
-      reset           => opt_reset
+      txdiffctrl      => spy_txdiffctrl,   --unused
+      loopback        => spy_loopback,     --unused
+      rxdata          => spy_rxdata,       --unused
+      rxd_valid       => spy_rxd_valid,    --unused
+      bad_rx          => spy_bad_rx,       --unused
+      prbs_type       => mgt_prbs_type,    --from ODMB_VME
+      prbs_tx_en      => spy_prbs_tx_en,   --from ODMB_VME
+      prbs_rx_en      => spy_prbs_rx_en,   --from ODMB_VME
+      prbs_tst_cnt    => spy_prbs_tst_cnt, --from ODMB_VME
+      prbs_err_cnt    => spy_prbs_err_cnt, --from ODMB_VME
+      reset           => opt_reset         --reset signal
       );
 
   GTH_DCFEB : mgt_cfeb

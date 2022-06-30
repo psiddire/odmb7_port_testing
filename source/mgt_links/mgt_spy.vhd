@@ -60,6 +60,18 @@ end mgt_spy;
 architecture Behavioral of mgt_spy is
   constant NLINK : integer range 1 to 20 := 1;  --! Number of links
 
+  --temporary eth_debugger
+  component eth_debugger
+    port (
+      RST : in std_logic;
+      CLK : in std_logic;
+      SPY_TXDATA : out std_logic_vector(15 downto 0);
+      SPY_TXD_VALID : out std_logic_vector(1 downto 0);
+      SPY_RXDATA : in std_logic_vector(15 downto 0);
+      SPY_RXD_VALID : in std_logic
+      );
+    end component;
+
   --------------------------------------------------------------------------
   -- Component declaration for the GTH transceiver container
   --------------------------------------------------------------------------
@@ -218,6 +230,10 @@ architecture Behavioral of mgt_spy is
   signal hb_gtwiz_reset_rx_pll_and_datapath_vio_int: std_logic;
   signal rxdata_errctr_reset_vio_int : std_logic;
 
+  --temporary for ethernet_dev
+  signal spy_txdata : std_logic_vector(DATAWIDTH-1 downto 0);
+  signal spy_txd_valid : std_logic_vector(1 downto 0);
+
 begin
 
   -- Serial ports connection
@@ -229,9 +245,28 @@ begin
   ---------------------------------------------------------------------------------------------------------------------
   -- User data ports
   ---------------------------------------------------------------------------------------------------------------------
-  gtwiz_userdata_tx_int(DATAWIDTH-1 downto 0) <= TXDATA when TXD_VALID = '1' else IDLE;
-  txctrl2_int(0) <= '0' when TXD_VALID = '1' else '1';
-  txctrl2_int(7 downto 1) <= (others => '0');
+
+  -- temporary for ethernet_dev
+  ETH_DEBUGGER_I : eth_debugger
+    port map (
+      RST => RESET,
+      CLK => gtwiz_userclk_tx_usrclk2_int,
+      SPY_TXDATA => spy_txdata,
+      SPY_TXD_VALID => spy_txd_valid, --(0) indicate K-character on lower 8 bits, (1) on upper
+      SPY_RXDATA => gtwiz_userdata_rx_int(DATAWIDTH-1 downto 0),
+      SPY_RXD_VALID => rxd_valid_int
+      );
+
+  ---------------------------------------------------------------------------------------------------------------------
+  -- User data ports
+  ---------------------------------------------------------------------------------------------------------------------
+
+  --temporary for ethernet_dev
+  --gtwiz_userdata_tx_int(DATAWIDTH-1 downto 0) <= TXDATA when TXD_VALID = '1' else IDLE;
+  --txctrl2_int(0) <= '0' when TXD_VALID = '1' else '1';
+  --txctrl2_int(7 downto 1) <= (others => '0');
+  gtwiz_userdata_tx_int(DATAWIDTH-1 downto 0) <= spy_txdata when (spy_txd_valid /= x"00") else IDLE;
+  txctrl2_int <= "000000" & spy_txd_valid;
 
   RXDATA <= gtwiz_userdata_rx_int(DATAWIDTH-1 downto 0);
 
