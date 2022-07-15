@@ -14,6 +14,7 @@ use work.ucsb_types.all;
 
 entity ODMB_CTRL is
   generic (
+    NFIFO       : integer range 1 to 16 := 16; -- Number of FIFOs in PCFIFO
     NCFEB       : integer range 1 to 7 := 7;  -- Number of DCFEBS, 7 for ME1/1, 5
     CAFIFO_SIZE : integer range 1 to 128 := 32  -- Number FIFO words in CAFIFO
   );
@@ -23,6 +24,7 @@ entity ODMB_CTRL is
     --------------------
     DDUCLK       : in std_logic;
     CMSCLK       : in std_logic;
+    PCCLK        : in std_logic;
 
     CCB_CMD      : in  std_logic_vector (5 downto 0);  -- ccbcmnd(5 downto 0) - from J3
     CCB_CMD_S    : in  std_logic;       -- ccbcmnd(6) - from J3
@@ -109,9 +111,14 @@ entity ODMB_CTRL is
     CAFIFO_L1A_DAV       : out std_logic_vector(NCFEB+2 downto 1);
     CAFIFO_BX_CNT        : out std_logic_vector(11 downto 0);
 
+    -- For PCFIFO
+    GL_PC_TX_ACK : in std_logic;
+
     -- From GigaLinks
     DDU_DATA       : out std_logic_vector(15 downto 0);
     DDU_DATA_VALID : out std_logic;
+    PC_DATA        : out std_logic_vector(15 downto 0);
+    PC_DATA_VALID  : out std_logic;
 
     -- For headers/trailers
     --DAQMBID : in std_logic_vector(11 downto 0);  -- From CRATEID in SETFEBDLY, and GA
@@ -235,6 +242,27 @@ architecture Behavioral of ODMB_CTRL is
       cafifo_rd_addr             : out std_logic_vector(7 downto 0)
       );
 
+  end component;
+
+  component PCFIFO is
+    generic (
+      NFIFO : integer range 1 to 16 := 8  -- Number of FIFOs in PCFIFO
+      );  
+    port(
+
+      clk_in  : in std_logic;
+      clk_out : in std_logic;
+      rst     : in std_logic;
+
+      tx_ack : in std_logic;
+
+      dv_in   : in std_logic;
+      ld_in   : in std_logic;
+      data_in : in std_logic_vector(15 downto 0);
+
+      dv_out   : out std_logic;
+      data_out : out std_logic_vector(15 downto 0)
+      );
   end component;
 
   component CONTROL_FSM is
@@ -541,6 +569,25 @@ begin
       cafifo_bx_cnt    => cafifo_bx_cnt_out,
       cafifo_lost_pckt => cafifo_lost_pckt_out,
       cafifo_lone      => cafifo_lone
+      );
+
+  PCFIFO_PM : PCFIFO
+    generic map (NFIFO => NFIFO)
+
+    port map(
+
+      clk_in  => DDUCLK,
+      clk_out => PCCLK,
+      rst     => l1acnt_rst,
+
+      tx_ack => GL_PC_TX_ACK,
+
+      data_in => ddu_data_inner,
+      dv_in   => ddu_data_valid_inner,
+      ld_in   => eof,
+
+      dv_out   => PC_DATA_VALID,
+      data_out => PC_DATA
       );
 
   CCBCODE_PM : CCBCODE

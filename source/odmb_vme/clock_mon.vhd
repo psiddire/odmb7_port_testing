@@ -102,44 +102,8 @@ architecture CLOCK_MON_Arch of CLOCK_MON is
                              
   type spi_states is (S_IDLE, S_SHIFT_CMD, S_SHIFT_ADDR, S_READ, S_WRITE, S_SET_DTACK);
   signal spi_state : spi_states := S_IDLE;
-  
-  component clock_ila
-  port (
-    clk : in std_logic;
-    probe0 : in std_logic_vector(511 downto 0)
-    );
-  end component;
-  signal ila_probe : std_logic_vector(511 downto 0);
 
 begin
-
-  --debug
-  ila_clock_mon_i : clock_ila
-  PORT MAP (
-     clk => CLK2P5,
-     probe0 => ila_probe
-  );
-  ila_probe(0) <= DEVICE;
-  ila_probe(1) <= STROBE;
-  ila_probe(3 downto 2) <= "00";
-  ila_probe(13 downto 4) <= command;
-  ila_probe(17 downto 14) <= "0101";
-  ila_probe(33 downto 18) <= INDATA;
-  ila_probe(41 downto 34) <= read_byte;
-  ila_probe(42) <= rst_dtack or load_dtack or shift_dtack;
-  ila_probe(43) <= vme_cmd_reset;
-  ila_probe(44) <= vme_cmd_loadaddr;
-  ila_probe(45) <= vme_cmd_loadcmd;
-  ila_probe(46) <= vme_cmd_sendcmd;
-  ila_probe(47) <= vme_cmd_sendcmdnoaddr;
-  ila_probe(48) <= vme_cmd_sendcmdwrite;
-  ila_probe(49) <= cs_b_sync;
-  ila_probe(50) <= mosi_sync;
-  ila_probe(51) <= FPGA_IF1_MISO_IN;
-  ila_probe(56 downto 52) <= std_logic_vector(spi_counter);
-  ila_probe(64 downto 57) <= write_data;
-  ila_probe(72 downto 65) <= spi_cmd;
-  ila_probe(88 downto 73) <= spi_addr;
 
   --strobe and VME commands
   strobe_CDC0 : FD port map(D => STROBE, C => CLK2P5, Q => strobe_meta);

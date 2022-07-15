@@ -495,6 +495,7 @@ architecture Behavioral of odmb7_ucsb_dev is
       --------------------
       DDUCLK       : in std_logic;
       CMSCLK       : in std_logic;
+      PCCLK        : in std_logic;
 
       CCB_CMD      : in  std_logic_vector(5 downto 0);  -- ccbcmnd(5 downto 0) - from J3
       CCB_CMD_S    : in  std_logic;       -- ccbcmnd(6) - from J3
@@ -582,9 +583,14 @@ architecture Behavioral of odmb7_ucsb_dev is
       CAFIFO_L1A_DAV       : out std_logic_vector(NCFEB+2 downto 1);
       CAFIFO_BX_CNT        : out std_logic_vector(11 downto 0);
 
+      -- For PCFIFO
+      GL_PC_TX_ACK : in std_logic;
+
       -- From GigaLinks
       DDU_DATA       : out std_logic_vector(15 downto 0);
       DDU_DATA_VALID : out std_logic;
+      PC_DATA        : out std_logic_vector(15 downto 0);
+      PC_DATA_VALID  : out std_logic;
 
       -- For headers/trailers
       GA             : in std_logic_vector(4 downto 0);
@@ -687,7 +693,7 @@ architecture Behavioral of odmb7_ucsb_dev is
       );
   end component;
 
-  component mgt_spy is
+  component mgt_pc is
     port (
       mgtrefclk       : in  std_logic; -- buffer'ed reference clock signal
       txusrclk        : out std_logic; -- USRCLK for TX data preparation
@@ -701,6 +707,7 @@ architecture Behavioral of odmb7_ucsb_dev is
       rxready         : out std_logic; -- Flag for rx reset done
       txdata          : in std_logic_vector(15 downto 0);  -- Data to be transmitted
       txd_valid       : in std_logic;   -- Flag for tx data valid
+      end_of_header   : out std_logic;
       txdiffctrl      : in std_logic_vector(3 downto 0);   -- Controls the TX voltage swing
       loopback        : in std_logic_vector(2 downto 0);   -- For internal loopback tests
       rxdata          : out std_logic_vector(15 downto 0);  -- Data received
@@ -714,6 +721,34 @@ architecture Behavioral of odmb7_ucsb_dev is
       reset           : in  std_logic
       );
   end component;
+
+  --component mgt_ddu is
+  --  port (
+  --    mgtrefclk       : in  std_logic; -- buffer'ed reference clock signal
+  --    txusrclk        : out std_logic; -- USRCLK for TX data preparation
+  --    rxusrclk        : out std_logic; -- USRCLK for RX data readout
+  --    sysclk          : in  std_logic; -- clock for the helper block, 80 MHz
+  --    spy_rx_n        : in  std_logic;
+  --    spy_rx_p        : in  std_logic;
+  --    spy_tx_n        : out std_logic;
+  --    spy_tx_p        : out std_logic;
+  --    txready         : out std_logic; -- Flag for tx reset done
+  --    rxready         : out std_logic; -- Flag for rx reset done
+  --    txdata          : in std_logic_vector(15 downto 0);  -- Data to be transmitted
+  --    txd_valid       : in std_logic;   -- Flag for tx data valid
+  --    txdiffctrl      : in std_logic_vector(3 downto 0);   -- Controls the TX voltage swing
+  --    loopback        : in std_logic_vector(2 downto 0);   -- For internal loopback tests
+  --    rxdata          : out std_logic_vector(15 downto 0);  -- Data received
+  --    rxd_valid       : out std_logic;   -- Flag for valid data;
+  --    bad_rx          : out std_logic;   -- Flag for fiber errors;
+  --    prbs_type       : in  std_logic_vector(3 downto 0);
+  --    prbs_tx_en      : in  std_logic;
+  --    prbs_rx_en      : in  std_logic;
+  --    prbs_tst_cnt    : in  std_logic_vector(15 downto 0);
+  --    prbs_err_cnt    : out std_logic_vector(15 downto 0);
+  --    reset           : in  std_logic
+  --    );
+  --end component;
 
   component mgt_cfeb is
     generic (
@@ -958,6 +993,9 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal spy_rxd_valid : std_logic;   -- Flag for valid data;
   signal spy_bad_rx : std_logic;   -- Flag for fiber errors;
   signal spy_reset : std_logic;
+  
+  signal usrclk_pc : std_logic;
+  signal usrclk_ddu : std_logic;
 
   signal spy_prbs_tx_en : std_logic;
   signal spy_prbs_rx_en : std_logic;
@@ -1085,6 +1123,10 @@ architecture Behavioral of odmb7_ucsb_dev is
 
   signal ddu_data                : std_logic_vector(15 downto 0);
   signal ddu_data_valid, ddu_eof : std_logic;
+  signal pc_data                 : std_logic_vector(15 downto 0);
+  signal pc_data_valid           : std_logic;
+
+  signal gl_pc_tx_ack            : std_logic;
 
   -- for TRGCNTRL
   constant push_dly    : integer := 63;  -- It needs to be > alct/otmb_push_dly
@@ -1568,8 +1610,9 @@ begin
       CAFIFO_SIZE => 32
       )
     port map (
-      DDUCLK    => usrclk_spy_tx,
+      DDUCLK    => usrclk_ddu,
       CMSCLK    => cmsclk,
+      PCCLK     => usrclk_pc,
 
       CCB_CMD      => ccb_cmd,
       CCB_CMD_S    => ccb_cmd_s,
@@ -1635,9 +1678,14 @@ begin
       CAFIFO_L1A_DAV       => cafifo_l1a_dav,
       CAFIFO_BX_CNT        => cafifo_bx_cnt,
 
+      -- For PCFIFO
+      GL_PC_TX_ACK        => gl_pc_tx_ack,
+
       -- To GigaLinks
       DDU_DATA            => ddu_data,
       DDU_DATA_VALID      => ddu_data_valid,
+      PC_DATA             => pc_data,
+      PC_DATA_VALID       => pc_data_valid,
 
       -- For headers/trailers
       GA => vme_ga_b,
@@ -1721,8 +1769,11 @@ begin
   spy_rx_p <= DAQ_SPY_RX_P when SPY_SEL = '1' else '0';
 
 
-  -- Connet to DDU via the spy ports
-  GTH_DDU : mgt_spy
+  -- This module can have two configurations
+  -- The first is "run 3 configuration" where the SPY port is used to send packets to DDU
+  -- The second is "SPY configuration" where the SPY port is used to send packets to PC
+  -- To switch between the two, one should uncomment one set of lines and re-comment the other
+  GTH_PC : mgt_pc
     port map (
       mgtrefclk       => mgtrefclk0_226, -- for 1.6 Gb/s DDU transmission, mgtrefclk1_226 is sourced from the 125 MHz crystal
       txusrclk        => usrclk_spy_tx,  -- 80 MHz for 1.6 Gb/s with 8b/10b encoding, 62.5 MHz for 1.25 Gb/s
@@ -1734,8 +1785,9 @@ begin
       spy_tx_p        => SPY_TX_P, --to pins
       txready         => spy_txready, --unused
       rxready         => spy_rxready, --unused
-      txdata          => ddu_data,  --spy_txdata,
-      txd_valid       => ddu_data_valid, --spy_txd_valid,
+      txdata          => pc_data,  --spy_txdata,
+      txd_valid       => pc_data_valid, --spy_txd_valid,
+      end_of_header   => gl_pc_tx_ack,     --end of header signal to PCFIFO
       txdiffctrl      => spy_txdiffctrl,   --unused
       loopback        => spy_loopback,     --unused
       rxdata          => spy_rxdata,       --unused
@@ -1748,6 +1800,37 @@ begin
       prbs_err_cnt    => spy_prbs_err_cnt, --from ODMB_VME
       reset           => opt_reset         --reset signal
       );
+  usrclk_ddu <= sysclk80;
+  usrclk_pc <= usrclk_spy_tx;
+  --GTH_DDU : mgt_ddu
+  --  port map (
+  --    mgtrefclk       => mgtrefclk1_226, -- for 1.6 Gb/s DDU transmission, mgtrefclk1_226 is sourced from the 125 MHz crystal
+  --    txusrclk        => usrclk_spy_tx,  -- 80 MHz for 1.6 Gb/s with 8b/10b encoding, 62.5 MHz for 1.25 Gb/s
+  --    rxusrclk        => usrclk_spy_rx, --output rx clock
+  --    sysclk          => cmsclk,    -- maximum DRP clock frequency 62.5 MHz for 1.25 Gb/s line rate
+  --    spy_rx_n        => spy_rx_n, --to pins
+  --    spy_rx_p        => spy_rx_p, --to pins
+  --    spy_tx_n        => SPY_TX_N, --to pins
+  --    spy_tx_p        => SPY_TX_P, --to pins
+  --    txready         => spy_txready, --unused
+  --    rxready         => spy_rxready, --unused
+  --    txdata          => ddu_data,  --spy_txdata,
+  --    txd_valid       => ddu_data_valid, --spy_txd_valid,
+  --    txdiffctrl      => spy_txdiffctrl,   --unused
+  --    loopback        => spy_loopback,     --unused
+  --    rxdata          => spy_rxdata,       --unused
+  --    rxd_valid       => spy_rxd_valid,    --unused
+  --    bad_rx          => spy_bad_rx,       --unused
+  --    prbs_type       => mgt_prbs_type,    --from ODMB_VME
+  --    prbs_tx_en      => spy_prbs_tx_en,   --from ODMB_VME
+  --    prbs_rx_en      => spy_prbs_rx_en,   --from ODMB_VME
+  --    prbs_tst_cnt    => spy_prbs_tst_cnt, --from ODMB_VME
+  --    prbs_err_cnt    => spy_prbs_err_cnt, --from ODMB_VME
+  --    reset           => opt_reset         --reset signal
+  --    );
+  --usrclk_ddu <= usrclk_spy_tx;
+  --usrclk_pc <= sysclk80;
+
 
   GTH_DCFEB : mgt_cfeb
     generic map (
