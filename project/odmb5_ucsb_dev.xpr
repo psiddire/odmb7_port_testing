@@ -3,7 +3,7 @@
 <!--                                                         -->
 <!-- Copyright 1986-2019 Xilinx, Inc. All Rights Reserved.   -->
 
-<Project Version="7" Minor="44" Path="/net/top/homes/oshiro/odmb/firmware/odmb5_ucsb_dev/odmb7_port_testing/project/odmb5_ucsb_dev.xpr">
+<Project Version="7" Minor="44" Path="project/odmb5_ucsb_dev.xpr">
   <DefaultLaunch Dir="$PRUNDIR"/>
   <Configuration>
     <Option Name="Id" Val="02a0cd2a8365429ea80c210fe1a78257"/>
@@ -31,20 +31,20 @@
     <Option Name="IPUserFilesDir" Val="$PIPUSERFILESDIR"/>
     <Option Name="IPStaticSourceDir" Val="$PIPUSERFILESDIR/ipstatic"/>
     <Option Name="EnableBDX" Val="FALSE"/>
-    <Option Name="WTXSimLaunchSim" Val="245"/>
+    <Option Name="WTXSimLaunchSim" Val="250"/>
     <Option Name="WTModelSimLaunchSim" Val="0"/>
     <Option Name="WTQuestaLaunchSim" Val="0"/>
     <Option Name="WTIesLaunchSim" Val="0"/>
     <Option Name="WTVcsLaunchSim" Val="0"/>
     <Option Name="WTRivieraLaunchSim" Val="0"/>
     <Option Name="WTActivehdlLaunchSim" Val="0"/>
-    <Option Name="WTXSimExportSim" Val="171"/>
-    <Option Name="WTModelSimExportSim" Val="171"/>
-    <Option Name="WTQuestaExportSim" Val="171"/>
-    <Option Name="WTIesExportSim" Val="171"/>
-    <Option Name="WTVcsExportSim" Val="171"/>
-    <Option Name="WTRivieraExportSim" Val="171"/>
-    <Option Name="WTActivehdlExportSim" Val="171"/>
+    <Option Name="WTXSimExportSim" Val="173"/>
+    <Option Name="WTModelSimExportSim" Val="173"/>
+    <Option Name="WTQuestaExportSim" Val="173"/>
+    <Option Name="WTIesExportSim" Val="173"/>
+    <Option Name="WTVcsExportSim" Val="173"/>
+    <Option Name="WTRivieraExportSim" Val="173"/>
+    <Option Name="WTActivehdlExportSim" Val="173"/>
     <Option Name="GenerateIPUpgradeLog" Val="TRUE"/>
     <Option Name="XSimRadix" Val="hex"/>
     <Option Name="XSimTimeUnit" Val="ns"/>
@@ -364,6 +364,13 @@
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
+      <File Path="$PPRDIR/../source/mgt_links/mgt_pc.vhd">
+        <FileInfo>
+          <Attr Name="Library" Val="xil_defaultlib"/>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
       <File Path="$PPRDIR/../source/utils/npulse2fast.vhd">
         <FileInfo>
           <Attr Name="UsedIn" Val="synthesis"/>
@@ -558,7 +565,7 @@
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
-      <File Path="$PPRDIR/../../../../../../../../../higgs-data/oshiro/firmware/odmb5_ucsb_dev/odmb7_port_testing/source/mgt_links/crc_gen.v">
+      <File Path="$PPRDIR/../source/mgt_links/crc_gen.v">
         <FileInfo>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
@@ -572,25 +579,19 @@
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
-      <File Path="$PPRDIR/../../../../../../../../../higgs-data/oshiro/firmware/odmb5_ucsb_dev/odmb7_port_testing/source/mgt_links/ethernet_frame.vhd">
+      <File Path="$PPRDIR/../source/mgt_links/ethernet_frame.vhd">
         <FileInfo>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
-      <File Path="$PPRDIR/../../../../../../../../../higgs-data/oshiro/firmware/odmb5_ucsb_dev/odmb7_port_testing/source/mgt_links/mgt_pc.vhd">
+      <File Path="$PPRDIR/../source/odmb_ctrl/pcfifo.vhd">
         <FileInfo>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
-      <File Path="$PPRDIR/../../../../../../../../../higgs-data/oshiro/firmware/odmb5_ucsb_dev/odmb7_port_testing/source/odmb_ctrl/pcfifo.vhd">
-        <FileInfo>
-          <Attr Name="UsedIn" Val="synthesis"/>
-          <Attr Name="UsedIn" Val="simulation"/>
-        </FileInfo>
-      </File>
-      <File Path="$PPRDIR/../../../../../../../../../higgs-data/oshiro/firmware/odmb5_ucsb_dev/odmb7_port_testing/ip/pc_eth_packet_fifo/pc_eth_packet_fifo.xci">
+      <File Path="$PPRDIR/../ip/pc_eth_packet_fifo/pc_eth_packet_fifo.xci">
         <FileInfo>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
@@ -772,9 +773,7 @@
     </Run>
     <Run Id="gtwiz_cfeb_r5_synth_1" Type="Ft3:Synth" SrcSet="gtwiz_cfeb_r5" Part="xcku035-ffva1156-1-c" ConstrsSet="gtwiz_cfeb_r5" Description="Vivado Synthesis Defaults" AutoIncrementalCheckpoint="false" WriteIncrSynthDcp="false" Dir="$PRUNDIR/gtwiz_cfeb_r5_synth_1" IncludeInArchive="true">
       <Strategy Version="1" Minor="2">
-        <StratHandle Name="Vivado Synthesis Defaults" Flow="Vivado Synthesis 2019">
-          <Desc>Vivado Synthesis Defaults</Desc>
-        </StratHandle>
+        <StratHandle Name="Vivado Synthesis Defaults" Flow="Vivado Synthesis 2019"/>
         <Step Id="synth_design"/>
       </Strategy>
       <GeneratedRun Dir="$PRUNDIR" File="gen_run.xml"/>
@@ -799,7 +798,7 @@
       <Report Name="ROUTE_DESIGN.REPORT_METHODOLOGY" Enabled="1"/>
       <RQSFiles/>
     </Run>
-    <Run Id="impl_3" Type="Ft2:EntireDesign" Part="xcku035-ffva1156-1-c" ConstrsSet="constrs_1" Description="Default settings for Implementation." AutoIncrementalCheckpoint="false" WriteIncrSynthDcp="false" State="current" Dir="$PRUNDIR/impl_3" SynthRun="synth_1" IncludeInArchive="true" GenFullBitstream="true">
+    <Run Id="impl_3" Type="Ft2:EntireDesign" Part="xcku035-ffva1156-1-c" ConstrsSet="constrs_1" Description="Default settings for Implementation." AutoIncrementalCheckpoint="false" WriteIncrSynthDcp="false" State="current" SynthRun="synth_1" IncludeInArchive="true" GenFullBitstream="true">
       <Strategy Version="1" Minor="2">
         <StratHandle Name="Vivado Implementation Defaults" Flow="Vivado Implementation 2019"/>
         <Step Id="init_design"/>
@@ -814,16 +813,13 @@
           <Option Id="BinFile">1</Option>
         </Step>
       </Strategy>
-      <GeneratedRun Dir="$PRUNDIR" File="gen_run.xml"/>
       <ReportStrategy Name="Vivado Implementation Default Reports" Flow="Vivado Implementation 2019"/>
       <Report Name="ROUTE_DESIGN.REPORT_METHODOLOGY" Enabled="1"/>
       <RQSFiles/>
     </Run>
     <Run Id="gtwiz_cfeb_r5_impl_1" Type="Ft2:EntireDesign" Part="xcku035-ffva1156-1-c" ConstrsSet="gtwiz_cfeb_r5" Description="Default settings for Implementation." AutoIncrementalCheckpoint="false" WriteIncrSynthDcp="false" SynthRun="gtwiz_cfeb_r5_synth_1" IncludeInArchive="false" GenFullBitstream="true">
       <Strategy Version="1" Minor="2">
-        <StratHandle Name="Vivado Implementation Defaults" Flow="Vivado Implementation 2019">
-          <Desc>Default settings for Implementation.</Desc>
-        </StratHandle>
+        <StratHandle Name="Vivado Implementation Defaults" Flow="Vivado Implementation 2019"/>
         <Step Id="init_design"/>
         <Step Id="opt_design"/>
         <Step Id="power_opt_design"/>
