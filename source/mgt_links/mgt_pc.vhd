@@ -80,7 +80,7 @@ architecture Behavioral of mgt_pc is
   --------------------------------------------------------------------------
   -- Component declaration for the GTH transceiver container
   --------------------------------------------------------------------------
-  component gtwiz_spy_ddu_example_wrapper
+  component gtwiz_spy_pc_example_wrapper
     port (
       gthrxn_in : in std_logic_vector(NLINK-1 downto 0);
       gthrxp_in : in std_logic_vector(NLINK-1 downto 0);
@@ -338,7 +338,7 @@ begin
   ---------------------------------------------------------------------------------------------------------------------
   -- EXAMPLE WRAPPER INSTANCE
   ---------------------------------------------------------------------------------------------------------------------
-  spy_wrapper_inst : gtwiz_spy_ddu_example_wrapper
+  spy_wrapper_inst : gtwiz_spy_pc_example_wrapper
     port map (
       gthrxn_in                          => gthrxn_int,
       gthrxp_in                          => gthrxp_int,

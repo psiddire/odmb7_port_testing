@@ -294,8 +294,8 @@ begin
 
   oscclk160_p <= not cmsclk160_p after 3.125 ns;
   oscclk160_n <= not cmsclk160_n after 3.125 ns;
-  oscclk125_p <= not cmsclk160_p after 4 ns;
-  oscclk125_n <= not cmsclk160_n after 4 ns;
+  oscclk125_p <= not oscclk125_p after 4 ns;
+  oscclk125_n <= not oscclk125_n after 4 ns;
 
   -- -- Input LUTs
   -- lut_input1_i: lut_input1

@@ -102,7 +102,7 @@ architecture CFEBJTAG_Arch of CFEBJTAG is
   
   --Signals for new_strobe
   signal new_strobe, new_strobe_q, new_strobe_qq             : std_logic;
-  signal strobe_meta, strobe_sync : std_logic := '0';
+  signal strobe_meta, strobe_sync                            : std_logic := '0';
   
   --Signals for load
   signal d1_load, d2_load, ce_load, clr_load, q_load, load      : std_logic;

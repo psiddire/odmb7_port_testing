@@ -18,6 +18,9 @@ use work.ucsb_types.all;
 --! hardware interfaces and performing most slow control functionality, however
 --! data acquisition firmware has not yet been developed
 entity odmb5_ucsb_dev is
+  generic (
+    ENABLE_SPY_TO_DDU : std_logic := '0'
+    );
   port (
     --------------------
     -- Input clocks
@@ -159,6 +162,8 @@ entity odmb5_ucsb_dev is
 
     SPY_TX_P     : out std_logic;                          --! Finisar (spy) optical TX output to PC.
     SPY_TX_N     : out std_logic;                          --! Finisar (spy) optical TX output to PC.
+    DAQ_TX_P     : out std_logic_vector(2 downto 2);       --! B04 optical TX, output to FED.
+    DAQ_TX_N     : out std_logic_vector(2 downto 2);       --! B04 optical TX, output to FED.
     -- DAQ_TX_P     : out std_logic_vector(4 downto 1);    --! B04 optical TX, output to FED.
     -- DAQ_TX_N     : out std_logic_vector(4 downto 1);    --! B04 optical TX, output to FED.
 
@@ -414,6 +419,7 @@ architecture Behavioral of odmb5_ucsb_dev is
   -- Clock synth signals
   --------------------------------------
   signal fpga_if1_miso_in, fpga_if1_miso_out, fpga_if1_miso_dir : std_logic := '1';
+  signal fpga_mosi_inner : std_logic := '0';
 
   --------------------------------------
   -- Reset signals
@@ -445,6 +451,8 @@ architecture Behavioral of odmb5_ucsb_dev is
 
   signal usrclk_spy_tx : std_logic; -- USRCLK for TX data preparation
   signal usrclk_spy_rx : std_logic; -- USRCLK for RX data readout
+  signal usrclk_daq_tx : std_logic;
+  signal usrclk_daq_rx : std_logic;
   signal spy_rx_n : std_logic;
   signal spy_rx_p : std_logic;
   signal spy_txready : std_logic; -- Flag for tx reset done
@@ -596,24 +604,13 @@ architecture Behavioral of odmb5_ucsb_dev is
 
 begin
 
-  -- Temporary OTMB debugging
-  --THTP(0) <= cmsclk;
-  --THTP(1) <= mgtclk1;
-  --THTP(2) <= LEGACY_ALCT_DAV; --through U3
-  --THTP(3) <= OTMB(35); --through U4
-  --THTP(5 downto 4) <= OTMB(17 downto 16); --through U1
-  --THTP(8 downto 6) <= OTMB(2 downto 0); --through U2
-  --THTP(9) <= OTMB_DAV; --through U4
-  --THTP(12 downto 10) <= RAWLCT(2 downto 0); --through U4
-  --THTP(15 downto 13) <= RSVTD(5 downto 3); --through U3 (2/5) and U4 (4)
-  THTP(15 downto 0) <= diagout_inner(15 downto 0);
-
   -------------------------------------------------------------------------------------------
   -- Handle clock chip signals
   -------------------------------------------------------------------------------------------
   --FPGA_SEL <= '0';
   --RST_CLKS_B <= '1';
   FPGA_MISO_BUF : IOBUF port map(O => fpga_if1_miso_in, IO => FPGA_IF1_MISO, I => fpga_if1_miso_out, T => fpga_if1_miso_dir);
+  FPGA_MOSI_BUF : IOBUF port map(O => open, IO => FPGA_MOSI, I => fpga_mosi_inner, T => '0');
 
   -------------------------------------------------------------------------------------------
   -- Handle incoming data from OTMB/ALCT/DCFEBs
@@ -1032,7 +1029,7 @@ begin
       FPGA_IF0_CSN      => FPGA_IF0_CSN,
       FPGA_IF1_MISO_IN  => fpga_if1_miso_in,
       FPGA_IF1_MISO_OUT => fpga_if1_miso_out,
-      FPGA_MOSI         => FPGA_MOSI,
+      FPGA_MOSI         => fpga_mosi_inner,
       FPGA_SCLK         => FPGA_SCLK,
       FPGA_MISO_DIR     => fpga_if1_miso_dir,
 
@@ -1217,75 +1214,110 @@ begin
   SPY_TDIS <= '0';
 
   -------------------------------------------------------------------------------------------
-  -- Optical ports for the SPY channel
+  -- Optical communication with the SPY ports
   -------------------------------------------------------------------------------------------
   DAQ_SPY_SEL <= SPY_SEL; -- set for constant
   spy_rx_n <= DAQ_SPY_RX_N when SPY_SEL = '1' else '0';
   spy_rx_p <= DAQ_SPY_RX_P when SPY_SEL = '1' else '0';
 
   -- This module can have two configurations
-  -- The first is "run 3 configuration" where the SPY port is used to send packets to DDU
-  -- The second is "SPY configuration" where the SPY port is used to send packets to PC
-  -- To switch between the two, one should uncomment one set of lines and re-comment the other
-  GTH_PC : entity work.mgt_pc
-    port map (
-      mgtrefclk       => mgtrefclk0_226, -- for 1.6 Gb/s DDU transmission, mgtrefclk1_226 is sourced from the 125 MHz crystal
-      txusrclk        => usrclk_spy_tx,  -- 80 MHz for 1.6 Gb/s with 8b/10b encoding, 62.5 MHz for 1.25 Gb/s
-      rxusrclk        => usrclk_spy_rx, --output rx clock
-      sysclk          => cmsclk,    -- maximum DRP clock frequency 62.5 MHz for 1.25 Gb/s line rate
-      spy_rx_n        => spy_rx_n, --to pins
-      spy_rx_p        => spy_rx_p, --to pins
-      spy_tx_n        => SPY_TX_N, --to pins
-      spy_tx_p        => SPY_TX_P, --to pins
-      txready         => spy_txready, --unused
-      rxready         => spy_rxready, --unused
-      txdata          => pc_data,  --spy_txdata,
-      txd_valid       => pc_data_valid, --spy_txd_valid,
-      end_of_header   => gl_pc_tx_ack,     --end of header signal to PCFIFO
-      txdiffctrl      => spy_txdiffctrl,   --unused
-      loopback        => spy_loopback,     --unused
-      rxdata          => spy_rxdata,       --unused
-      rxd_valid       => spy_rxd_valid,    --unused
-      bad_rx          => spy_bad_rx,       --unused
-      prbs_type       => mgt_prbs_type,    --from ODMB_VME
-      prbs_tx_en      => spy_prbs_tx_en,   --from ODMB_VME
-      prbs_rx_en      => spy_prbs_rx_en,   --from ODMB_VME
-      prbs_tst_cnt    => spy_prbs_tst_cnt, --from ODMB_VME
-      prbs_err_cnt    => spy_prbs_err_cnt, --from ODMB_VME
-      reset           => opt_reset         --reset signal
-      );
-  usrclk_ddu <= sysclk80;
-  usrclk_pc <= usrclk_spy_tx;
-  --GTH_DDU : entity work.mgt_ddu
-  --  port map (
-  --    mgtrefclk       => mgtrefclk1_226, -- for 1.6 Gb/s DDU transmission, mgtrefclk1_226 is sourced from the 125 MHz crystal
-  --    txusrclk        => usrclk_spy_tx,  -- 80 MHz for 1.6 Gb/s with 8b/10b encoding, 62.5 MHz for 1.25 Gb/s
-  --    rxusrclk        => usrclk_spy_rx, --output rx clock
-  --    sysclk          => cmsclk,    -- maximum DRP clock frequency 62.5 MHz for 1.25 Gb/s line rate
-  --    spy_rx_n        => spy_rx_n, --to pins
-  --    spy_rx_p        => spy_rx_p, --to pins
-  --    spy_tx_n        => SPY_TX_N, --to pins
-  --    spy_tx_p        => SPY_TX_P, --to pins
-  --    txready         => spy_txready, --unused
-  --    rxready         => spy_rxready, --unused
-  --    txdata          => ddu_data,  --spy_txdata,
-  --    txd_valid       => ddu_data_valid, --spy_txd_valid,
-  --    txdiffctrl      => spy_txdiffctrl,   --unused
-  --    loopback        => spy_loopback,     --unused
-  --    rxdata          => spy_rxdata,       --unused
-  --    rxd_valid       => spy_rxd_valid,    --unused
-  --    bad_rx          => spy_bad_rx,       --unused
-  --    prbs_type       => mgt_prbs_type,    --from ODMB_VME
-  --    prbs_tx_en      => spy_prbs_tx_en,   --from ODMB_VME
-  --    prbs_rx_en      => spy_prbs_rx_en,   --from ODMB_VME
-  --    prbs_tst_cnt    => spy_prbs_tst_cnt, --from ODMB_VME
-  --    prbs_err_cnt    => spy_prbs_err_cnt, --from ODMB_VME
-  --    reset           => opt_reset         --reset signal
-  --    );
-  --usrclk_ddu <= usrclk_spy_tx;
-  --usrclk_pc <= sysclk80;
+  -- The first is "SPY configuration" where the SPY port is used to send packets to PC and B04 to DDU
+  -- The second is "run 3 configuration" where the SPY port is used to send packets to DDU
+  generate_spy_pc : if ENABLE_SPY_TO_DDU = '0' generate
+    GTH_PC : entity work.mgt_pc
+      port map (
+        mgtrefclk       => mgtrefclk1_226, -- mgtrefclk1_226 is sourced from the 125 MHz crystal for 1.25 Gb/s
+        txusrclk        => usrclk_spy_tx,  -- 125 MHz for 1.25 Gb/s with 8b/10b encoding
+        rxusrclk        => usrclk_spy_rx, --output rx clock
+        sysclk          => cmsclk,    -- maximum DRP clock frequency 62.5 MHz for 1.25 Gb/s line rate
+        spy_rx_n        => spy_rx_n, --to pins
+        spy_rx_p        => spy_rx_p, --to pins
+        spy_tx_n        => SPY_TX_N, --to pins
+        spy_tx_p        => SPY_TX_P, --to pins
+        txready         => open,     --unused
+        rxready         => open,     --unused
+        txdata          => pc_data,  --spy_txdata,
+        txd_valid       => pc_data_valid, --spy_txd_valid,
+        end_of_header   => gl_pc_tx_ack,     --end of header signal to PCFIFO
+        txdiffctrl      => spy_txdiffctrl,   --unused
+        loopback        => spy_loopback,     --unused
+        rxdata          => open,             --unused
+        rxd_valid       => open,             --unused
+        bad_rx          => open,             --unused
+        prbs_type       => mgt_prbs_type,    --from ODMB_VME
+        prbs_tx_en      => spy_prbs_tx_en,   --from ODMB_VME
+        prbs_rx_en      => spy_prbs_rx_en,   --from ODMB_VME
+        prbs_tst_cnt    => spy_prbs_tst_cnt, --from ODMB_VME
+        prbs_err_cnt    => open,             --from ODMB_VME
+        reset           => opt_reset         --reset signal
+        );
+    GTH_DDU : entity work.mgt_ddu
+      generic map (
+        CHANN_IDX       => 13
+      )
+      port map (
+        mgtrefclk       => mgtrefclk0_226, -- 160 MHz for 1.6 Gb/s DDU transmission
+        txusrclk        => usrclk_daq_tx,  -- 80 MHz for 1.6 Gb/s with 8b/10b encoding
+        rxusrclk        => usrclk_daq_rx, --output rx clock
+        sysclk          => cmsclk,    -- maximum DRP clock frequency 62.5 MHz for 1.25 Gb/s line rate
+        daq_rx_n        => B04_RX_N(2), --to pins
+        daq_rx_p        => B04_RX_P(2), --to pins
+        daq_tx_n        => DAQ_TX_N(2), --to pins
+        daq_tx_p        => DAQ_TX_P(2), --to pins
+        txready         => spy_txready, --unused
+        rxready         => spy_rxready, --unused
+        txdata          => ddu_data,  --spy_txdata,
+        txd_valid       => ddu_data_valid, --spy_txd_valid,
+        txdiffctrl      => spy_txdiffctrl,   --unused
+        loopback        => spy_loopback,     --unused
+        rxdata          => spy_rxdata,       --unused
+        rxd_valid       => spy_rxd_valid,    --unused
+        bad_rx          => spy_bad_rx,       --unused
+        prbs_type       => mgt_prbs_type,    --from ODMB_VME
+        prbs_tx_en      => spy_prbs_tx_en,   --from ODMB_VME
+        prbs_rx_en      => spy_prbs_rx_en,   --from ODMB_VME
+        prbs_tst_cnt    => spy_prbs_tst_cnt, --from ODMB_VME
+        prbs_err_cnt    => spy_prbs_err_cnt, --from ODMB_VME
+        reset           => opt_reset         --reset signal
+        );
+    usrclk_ddu <= usrclk_daq_tx;
+    usrclk_pc <= usrclk_spy_tx;
+  end generate generate_spy_pc;
+  generate_spy_ddu : if ENABLE_SPY_TO_DDU = '1' generate
+    GTH_DDU_SPY : entity work.mgt_ddu
+      generic map (
+        CHANN_IDX       => 11
+      )
+      port map (
+        mgtrefclk       => mgtrefclk0_226, -- 160 MHz for 1.6 Gb/s DDU transmission
+        txusrclk        => usrclk_daq_tx,  -- 80 MHz for 1.6 Gb/s with 8b/10b encoding
+        rxusrclk        => usrclk_daq_rx, --output rx clock
+        sysclk          => cmsclk,    -- maximum DRP clock frequency 62.5 MHz for 1.25 Gb/s line rate
+        daq_rx_n        => spy_rx_n, --to pins
+        daq_rx_p        => spy_rx_p, --to pins
+        daq_tx_n        => SPY_TX_N, --to pins
+        daq_tx_p        => SPY_TX_P, --to pins
+        txready         => spy_txready, --unused
+        rxready         => spy_rxready, --unused
+        txdata          => ddu_data,  --spy_txdata,
+        txd_valid       => ddu_data_valid, --spy_txd_valid,
+        txdiffctrl      => spy_txdiffctrl,   --unused
+        loopback        => spy_loopback,     --unused
+        rxdata          => spy_rxdata,       --unused
+        rxd_valid       => spy_rxd_valid,    --unused
+        bad_rx          => spy_bad_rx,       --unused
+        prbs_type       => mgt_prbs_type,    --from ODMB_VME
+        prbs_tx_en      => spy_prbs_tx_en,   --from ODMB_VME
+        prbs_rx_en      => spy_prbs_rx_en,   --from ODMB_VME
+        prbs_tst_cnt    => spy_prbs_tst_cnt, --from ODMB_VME
+        prbs_err_cnt    => spy_prbs_err_cnt, --from ODMB_VME
+        reset           => opt_reset         --reset signal
+        );
+    gl_pc_tx_ack <= '1';
+    usrclk_ddu <= usrclk_spy_tx;
+    usrclk_pc <= mgtclk125;
+  end generate generate_spy_ddu;
 
-  --temporary: remove mgt_cfeb for ODMB5 firmware for now until we find a long term solution for number of links differing
   GTH_DCFEB : entity work.mgt_cfeb
     generic map (
       NLINK        => NCFEB,  -- number of links
