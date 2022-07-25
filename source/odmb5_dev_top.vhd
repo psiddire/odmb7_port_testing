@@ -432,6 +432,10 @@ architecture Behavioral of odmb5_ucsb_dev is
   signal fw_rst_reg      : std_logic_vector(31 downto 0) := (others => '0');
   signal opt_rst_reg     : std_logic_vector(31 downto 0) := (others => '0');
   signal reset           : std_logic := '0';
+  signal lf_counter       : integer := 0;
+  signal done_reset       : std_logic := '0';
+  signal done_reset_pulse : std_logic := '0';
+  signal done_enable      : std_logic := '1';
 
   --------------------------------------
   -- MGT PRBS signals as place holder
@@ -901,6 +905,23 @@ begin
   -------------------------------------------------------------------------------------------
   -- Handle reset signals
   -------------------------------------------------------------------------------------------
+  proc_done_rst : process (clk_lfclk)
+  begin
+    if rising_edge(clk_lfclk) then
+      if done_reset = '1' then
+        done_reset <= '0';
+        done_enable <= '0';
+      end if;
+      if done_enable = '1' then
+        if lf_counter = 1200 then
+          done_reset <= '1';
+          lf_counter <= 0;
+        else
+          lf_counter <= lf_counter + 1;
+        end if;
+      end if;
+    end if;
+  end process;
 
   FD_CCB_SOFTRST : FD generic map(INIT => '1') port map (Q => ccb_softrst_b_q, C => cmsclk, D => CCB_SOFT_RST_B);
 
@@ -917,11 +938,12 @@ begin
 
   reset <= fw_rst_reg(31) or pon_rst_reg(31);   -- Firmware reset
 
+  PLS_DONERESET : PULSE2FAST port map(DOUT => done_reset_pulse, CLK_DOUT => cmsclk, RST => reset, DIN => done_reset);
   FD_OPT_RESET : FD port map(Q => opt_reset_pulse_q, C => cmsclk, D => opt_reset_pulse);
   opt_rst_reg <= x"3FFFF000" when (opt_reset_pulse_q = '0' and opt_reset_pulse = '1') else
                  opt_rst_reg(30 downto 0) & '0' when rising_edge(cmsclk) else
                  opt_rst_reg;
-  opt_reset <= opt_rst_reg(31) or pon_reset or mgt_reset;  -- Optical reset
+  opt_reset <= opt_rst_reg(31) or pon_reset or mgt_reset or done_reset_pulse;  -- Optical reset
 
 
   -------------------------------------------------------------------------------------------

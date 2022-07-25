@@ -12,6 +12,7 @@ set_clock_groups -group [get_clocks cms_clk -include_generated_clocks] -asynchro
 set_clock_groups -group [get_clocks gp_clk_6 -include_generated_clocks] -asynchronous
 set_clock_groups -group [get_clocks gp_clk_7 -include_generated_clocks] -asynchronous
 set_clock_groups -group [get_clocks lf_clk -include_generated_clocks] -asynchronous
+set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets {LF_CLK_IBUF_inst/O}]
 
 # ----------------------------------
 # Debug core configs
