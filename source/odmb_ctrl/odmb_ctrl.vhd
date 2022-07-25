@@ -20,9 +20,9 @@ entity ODMB_CTRL is
     --------------------
     -- Clock
     --------------------
-    DDUCLK       : in std_logic;                      --! 80/160 MHz clock to FED gth domain
+    DDUCLK       : in std_logic;                      --! 80 MHz clock to FED gth domain
     CMSCLK       : in std_logic;                      --! ~40 MHz clock
-    PCCLK        : in std_logic;                      --! 125 MHz clock for PC ethernet gth
+    PCCLK        : in std_logic;                      --! 62.5 MHz clock for PC ethernet gth
 
     CCB_CMD      : in  std_logic_vector (5 downto 0); --! CCB command to CCBCODE
     CCB_CMD_S    : in  std_logic;                     --! CCB strobe to CCBCODE

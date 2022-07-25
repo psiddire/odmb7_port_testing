@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wave_config>
+   <wave_state>
+   </wave_state>
+   <db_ref_list>
+      <db_ref path="Firmware_tb_behav.wdb" id="1">
+         <top_modules>
+            <top_module name="Firmware_tb" />
+            <top_module name="glbl" />
+            <top_module name="latches_flipflops" />
+            <top_module name="ucsb_types" />
+            <top_module name="vcomponents" />
+         </top_modules>
+      </db_ref>
+   </db_ref_list>
+   <zoom_setting>
+      <ZoomStartTime time="13941800fs"></ZoomStartTime>
+      <ZoomEndTime time="14066401fs"></ZoomEndTime>
+      <Cursor1Time time="13987600fs"></Cursor1Time>
+   </zoom_setting>
+   <column_width_setting>
+      <NameColumnWidth column_width="130"></NameColumnWidth>
+      <ValueColumnWidth column_width="66"></ValueColumnWidth>
+   </column_width_setting>
+   <WVObjectSize size="22" />
+   <wvobject fp_name="divider412" type="divider">
+      <obj_property name="label">Clocks</obj_property>
+      <obj_property name="DisplayName">label</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/cmsclk">
+      <obj_property name="ElementShortName">cmsclk</obj_property>
+      <obj_property name="ObjectShortName">cmsclk</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/usrclk_ddu">
+      <obj_property name="ElementShortName">usrclk_ddu</obj_property>
+      <obj_property name="ObjectShortName">usrclk_ddu</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/usrclk_pc">
+      <obj_property name="ElementShortName">usrclk_pc</obj_property>
+      <obj_property name="ObjectShortName">usrclk_pc</obj_property>
+   </wvobject>
+   <wvobject fp_name="divider412" type="divider">
+      <obj_property name="label">VME</obj_property>
+      <obj_property name="DisplayName">label</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/MBV/strobe">
+      <obj_property name="ElementShortName">strobe</obj_property>
+      <obj_property name="ObjectShortName">strobe</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/Firmware_tb/odmb_i/MBV/DEV1_CFEBJTAG/cmddev">
+      <obj_property name="ElementShortName">cmddev[15:0]</obj_property>
+      <obj_property name="ObjectShortName">cmddev[15:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/Firmware_tb/odmb_i/MBV/VME_DATA_IN">
+      <obj_property name="ElementShortName">VME_DATA_IN[15:0]</obj_property>
+      <obj_property name="ObjectShortName">VME_DATA_IN[15:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/Firmware_tb/odmb_i/MBV/VME_DATA_OUT">
+      <obj_property name="ElementShortName">VME_DATA_OUT[15:0]</obj_property>
+      <obj_property name="ObjectShortName">VME_DATA_OUT[15:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/MBV/DEV3_VMEMON/TEST_LCT">
+      <obj_property name="ElementShortName">TEST_LCT</obj_property>
+      <obj_property name="ObjectShortName">TEST_LCT</obj_property>
+   </wvobject>
+   <wvobject fp_name="divider412" type="divider">
+      <obj_property name="label">DAQ</obj_property>
+      <obj_property name="DisplayName">label</obj_property>
+   </wvobject>
+   <wvobject fp_name="divider412" type="divider">
+      <obj_property name="label">TRGCNTRL</obj_property>
+      <obj_property name="DisplayName">label</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/raw_l1a">
+      <obj_property name="ElementShortName">raw_l1a</obj_property>
+      <obj_property name="ObjectShortName">raw_l1a</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/Firmware_tb/odmb_i/MBC/TRGCNTRL_PM/RAW_LCT">
+      <obj_property name="ElementShortName">RAW_LCT[7:0]</obj_property>
+      <obj_property name="ObjectShortName">RAW_LCT[7:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/Firmware_tb/odmb_i/MBC/TRGCNTRL_PM/KILL">
+      <obj_property name="ElementShortName">KILL[9:1]</obj_property>
+      <obj_property name="ObjectShortName">KILL[9:1]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/MBC/TRGCNTRL_PM/FIFO_PUSH">
+      <obj_property name="ElementShortName">FIFO_PUSH</obj_property>
+      <obj_property name="ObjectShortName">FIFO_PUSH</obj_property>
+   </wvobject>
+   <wvobject fp_name="divider412" type="divider">
+      <obj_property name="label">CAFIFO</obj_property>
+      <obj_property name="DisplayName">label</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/MBC/CAFIFO_PM/l1a">
+      <obj_property name="ElementShortName">l1a</obj_property>
+      <obj_property name="ObjectShortName">l1a</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/Firmware_tb/odmb_i/MBC/CAFIFO_PM/l1a_match_in">
+      <obj_property name="ElementShortName">l1a_match_in[9:1]</obj_property>
+      <obj_property name="ObjectShortName">l1a_match_in[9:1]</obj_property>
+   </wvobject>
+   <wvobject fp_name="divider412" type="divider">
+      <obj_property name="label">CONTROL_FSM</obj_property>
+      <obj_property name="DisplayName">label</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/Firmware_tb/odmb_i/MBC/CONTROL_FSM_PM/DAV">
+      <obj_property name="ElementShortName">DAV</obj_property>
+      <obj_property name="ObjectShortName">DAV</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/Firmware_tb/odmb_i/MBC/CONTROL_FSM_PM/DOUT">
+      <obj_property name="ElementShortName">DOUT[15:0]</obj_property>
+      <obj_property name="ObjectShortName">DOUT[15:0]</obj_property>
+   </wvobject>
+</wave_config>
