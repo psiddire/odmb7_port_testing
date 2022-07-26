@@ -38,7 +38,7 @@ Currently, the firmware is developed under the assumption that config similar to
   - [X] Device 2: ODMBJTAG
   - [X] Device 3: VMEMON
   - [X] Device 4: VMECONFREGS
-  - [ ] Device 5: TESTFIFOS --> CLOCK_MON
+  - [X] Device 5: TESTFIFOS --> CLOCK_MON
   - [X] Device 6: SPI_PORT
     - [X] CFG Register upload/download
     - [X] Write Command FIFO
@@ -58,17 +58,22 @@ Currently, the firmware is developed under the assumption that config similar to
     - [X] Other PROM commands (status/lock/unlock/check)
     - [X] Timer commands
 
-- [ ] Port ODMB_CTRL from ODMB
-  - [ ] Run3 logic tested with Cosmics
+- [X] Port ODMB_CTRL from ODMB
+  - [X] Port CALIBTRG
+  - [X] Port TRGCNTRL
+  - [X] Port CAFIFO
+  - [X] Port CONTROL_FSM
+  - [X] Port PCFIFO
+  - [ ] Run3 logic tested
 
 - [ ] Configure optical interfaces
   - [X] (x)DCFEB interface
   - [ ] ALCT interface
     - [ ] GBT interface between ALCT-LX100 and ODMB7
     - [ ] Dual link 8B/10B between ALCT-LX150 and ODMB5
-  - [ ] SPY interface
+  - [X] SPY interface
     - [X] DDU communication logic for Run3 DAQ config
-    - [X] PC communication logic -- usage not well defined yet
+    - [X] PC communication logic
   - [ ] FED interface
     - [ ] Quad-link data transmission to the FED for ODMB7
     - [ ] Tri-link and dual-link data transmission for ODMB5

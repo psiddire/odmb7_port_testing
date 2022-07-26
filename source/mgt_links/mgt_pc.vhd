@@ -13,7 +13,7 @@ use UNISIM.VComponents.all;
 
 use ieee.std_logic_misc.all;
 
-entity mgt_spy is
+entity mgt_pc is
   generic (
     DATAWIDTH : integer := 16    --! User data width
     );
@@ -35,10 +35,11 @@ entity mgt_spy is
     rxready     : out std_logic; --! Flag for RX reset done
 
     -- Transmitter signals
-    txdata      : in std_logic_vector(DATAWIDTH-1 downto 0);  --! Data to be transmitted
-    txd_valid   : in std_logic;                               --! Flag for TX data valid
-    txdiffctrl  : in std_logic_vector(3 downto 0);            --! Controls the TX voltage swing
-    loopback    : in std_logic_vector(2 downto 0);            --! For internal loopback tests
+    txdata        : in std_logic_vector(DATAWIDTH-1 downto 0);  --! Data to be transmitted
+    txd_valid     : in std_logic;                               --! Flag for TX data valid
+    end_of_header : out std_logic;                              --! Indicates to PCFIFO to transfer payload
+    txdiffctrl    : in std_logic_vector(3 downto 0);            --! Controls the TX voltage swing
+    loopback      : in std_logic_vector(2 downto 0);            --! For internal loopback tests
 
     -- Receiver signals
     rxdata      : out std_logic_vector(DATAWIDTH-1 downto 0); --! Data received
@@ -55,15 +56,31 @@ entity mgt_spy is
     -- Clock for the gtwizard system
     reset           : in  std_logic                           --! The Global reset signal
     );
-end mgt_spy;
+end mgt_pc;
 
-architecture Behavioral of mgt_spy is
+architecture Behavioral of mgt_pc is
   constant NLINK : integer range 1 to 20 := 1;  --! Number of links
+
+  component ETHERNET_FRAME is
+  port (
+    CLK : in std_logic;                 -- User clock
+    RST : in std_logic;                 -- Reset
+
+    TXD_VLD : in std_logic;                      -- Flag for valid data
+    TXD     : in std_logic_vector(15 downto 0);  -- Data with no frame
+
+    ROM_CNT_OUT : out std_logic_vector(2 downto 0);
+
+    TXD_ACK   : out std_logic;                     -- TX acknowledgement
+    TXD_ISK   : out std_logic_vector(1 downto 0);  -- Data is K character
+    TXD_FRAME : out std_logic_vector(15 downto 0)  -- Data to be transmitted
+    );
+  end component;
 
   --------------------------------------------------------------------------
   -- Component declaration for the GTH transceiver container
   --------------------------------------------------------------------------
-  component gtwiz_spy_ddu_example_wrapper
+  component gtwiz_spy_pc_example_wrapper
     port (
       gthrxn_in : in std_logic_vector(NLINK-1 downto 0);
       gthrxp_in : in std_logic_vector(NLINK-1 downto 0);
@@ -218,6 +235,10 @@ architecture Behavioral of mgt_spy is
   signal hb_gtwiz_reset_rx_pll_and_datapath_vio_int: std_logic;
   signal rxdata_errctr_reset_vio_int : std_logic;
 
+  --temporary for ethernet_dev
+  signal spy_txdata : std_logic_vector(DATAWIDTH-1 downto 0);
+  signal spy_txd_valid : std_logic_vector(1 downto 0);
+
 begin
 
   -- Serial ports connection
@@ -226,12 +247,31 @@ begin
   spy_tx_n <= gthtxn_int(0);
   spy_tx_p <= gthtxp_int(0);
 
+  ETHERNET_FRAME_PM : ETHERNET_FRAME
+    port map (
+      CLK => gtwiz_userclk_tx_usrclk2_int,
+      RST => RESET,
+
+      TXD_VLD => TXD_VALID,
+      TXD     => TXDATA,
+
+      ROM_CNT_OUT => open,
+
+      TXD_ACK   => END_OF_HEADER,
+      TXD_ISK   => spy_txd_valid,
+      TXD_FRAME => spy_txdata
+      );
+
   ---------------------------------------------------------------------------------------------------------------------
   -- User data ports
   ---------------------------------------------------------------------------------------------------------------------
-  gtwiz_userdata_tx_int(DATAWIDTH-1 downto 0) <= TXDATA when TXD_VALID = '1' else IDLE;
-  txctrl2_int(0) <= '0' when TXD_VALID = '1' else '1';
-  txctrl2_int(7 downto 1) <= (others => '0');
+
+  --temporary for ethernet_dev
+  --gtwiz_userdata_tx_int(DATAWIDTH-1 downto 0) <= TXDATA when TXD_VALID = '1' else IDLE;
+  --txctrl2_int(0) <= '0' when TXD_VALID = '1' else '1';
+  --txctrl2_int(7 downto 1) <= (others => '0');
+  gtwiz_userdata_tx_int(DATAWIDTH-1 downto 0) <= spy_txdata; -- when (spy_txd_valid = x"00") else IDLE;
+  txctrl2_int <= "000000" & spy_txd_valid;
 
   RXDATA <= gtwiz_userdata_rx_int(DATAWIDTH-1 downto 0);
 
@@ -298,7 +338,7 @@ begin
   ---------------------------------------------------------------------------------------------------------------------
   -- EXAMPLE WRAPPER INSTANCE
   ---------------------------------------------------------------------------------------------------------------------
-  spy_wrapper_inst : gtwiz_spy_ddu_example_wrapper
+  spy_wrapper_inst : gtwiz_spy_pc_example_wrapper
     port map (
       gthrxn_in                          => gthrxn_int,
       gthrxp_in                          => gthrxp_int,

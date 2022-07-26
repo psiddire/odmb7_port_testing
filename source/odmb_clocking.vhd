@@ -122,6 +122,7 @@ begin
   ------------------------------------------
 
   -- Special IBUF for MGT reference clocks
+  -- Note attribute REFCLK_HROW_CK_SEL defaultly set to make ODIV2 same freq as O
   u_buf_gth_q0_clk0 : IBUFDS_GTE3
     port map (
       O     => mgtrefclk0_224,

@@ -1,5 +1,3 @@
--- CONTROL: Monitor state of the nine data FIFOs and create DDU packet when FIFOs are non-empty.
-
 library ieee;
 library work;
 library unisim;
@@ -13,64 +11,66 @@ use ieee.std_logic_misc.xor_reduce;
 use ieee.numeric_std.all;
 use ieee.std_logic_unsigned.all;
 
+--! @brief Monitor state of the nine data FIFOs and create DDU packet when FIFOs are non-empty.
+--! @details CONTROL_FSM: builds packets to DDU as data becomes available
 entity CONTROL_FSM is
   generic (
-    NCFEB : integer range 1 to 7 := 7  -- Number of DCFEBS, 7 in the final design
+    NCFEB : integer range 1 to 7 := 7  --! Number of DCFEBS, 7/5
     );  
   port (
 
     -- Chip Scope Pro Logic Analyzer control
     -- CSP_CONTROL_FSM_PORT_LA_CTRL : inout std_logic_vector(35 downto 0);
 
-    RST    : in std_logic;
-    CLKCMS : in std_logic;              -- 40 MHz CMS clock
-    CLK    : in std_logic;              -- 80 MHz doubled clock
-    STATUS : in std_logic_vector(47 downto 0);
+    RST    : in std_logic;                     --! From RESET or VMEMON L1A reset
+    CLKCMS : in std_logic;                     --! 40.079 MHz CMS clock
+    CLK    : in std_logic;                     --! DDU clock (typ 80 MHz)
+    STATUS : in std_logic_vector(47 downto 0); --! Unused
 
     -- From DMB_VME
-    RDFFNXT : in std_logic;
-    KILL    : in std_logic_vector(NCFEB+2 downto 1);
+    RDFFNXT : in std_logic;                          --! Fixed to '0', unused
+    KILL    : in std_logic_vector(NCFEB+2 downto 1); --! Killed FEBs, from VMECONFREGS
 
     -- to GigaBit Link
-    DOUT : out std_logic_vector(15 downto 0);
-    DAV  : out std_logic;
+    DOUT : out std_logic_vector(15 downto 0); --! Output data to GTX
+    DAV  : out std_logic;                     --! Data available signal to GTX
 
     -- to FIFOs
-    OEFIFO_B  : out std_logic_vector(NCFEB+2 downto 1);
-    RENFIFO_B : out std_logic_vector(NCFEB+2 downto 1);
+    OEFIFO_B  : out std_logic_vector(NCFEB+2 downto 1); --! selects FIFO to read in ODMB_DATA, set by FSM
+    RENFIFO_B : out std_logic_vector(NCFEB+2 downto 1); --! read enable for FIFOs in ODMB_DATA, set by FSM
 
     -- from FIFOs
-    FIFO_HALF_FULL : in std_logic_vector(NCFEB+2 downto 1);
-    FFOR_B         : in std_logic_vector(NCFEB+2 downto 1);
-    DATAIN         : in std_logic_vector(15 downto 0);
-    DATAIN_LAST    : in std_logic;
+    FIFO_HALF_FULL : in std_logic_vector(NCFEB+2 downto 1); --! for status words, programmable full signal
+    FFOR_B         : in std_logic_vector(NCFEB+2 downto 1); --! debug signal, fifo empty signal
+    DATAIN         : in std_logic_vector(15 downto 0); --! data from FIFO (lower 15 bits in FIFOs)
+    DATAIN_LAST    : in std_logic; --! indicates last word, top bit in data FIFOs
 
     -- From JTAGCOM
-    JOEF : in std_logic_vector(NCFEB+2 downto 1);
+    JOEF : in std_logic_vector(NCFEB+2 downto 1); --! unused, not connected (in legacy design, from LOADFIFO)
 
     -- For headers/trailers
-    DAQMBID : in std_logic_vector(11 downto 0);
-    AUTOKILLED_DCFEBS  : in std_logic_vector(NCFEB downto 1);
+    DAQMBID : in std_logic_vector(11 downto 0); --! board ID from vmeconfregs for header/tailer
+    AUTOKILLED_DCFEBS  : in std_logic_vector(NCFEB downto 1); --! not currently used, tied to 0 in top
 
     -- FROM SW1
-    GIGAEN : in std_logic;
+    GIGAEN : in std_logic; --! unused, tied to 1
 
     -- TO CAFIFO
-    FIFO_POP : out std_logic;
+    FIFO_POP : out std_logic; --! Signal to advance to next event in CAFIFO
 
     -- TO DDUFIFO
-    EOF : out std_logic;
+    EOF : out std_logic; --! to PCFIFO, sent at end of packet
 
     -- DEBUG
-    control_debug : out std_logic_vector(143 downto 0);
+    control_debug : out std_logic_vector(143 downto 0); --! debug signal
 
     -- FROM CAFIFO
-    cafifo_l1a_dav   : in std_logic_vector(NCFEB+2 downto 1);
-    cafifo_l1a_match : in std_logic_vector(NCFEB+2 downto 1);
-    cafifo_l1a_cnt   : in std_logic_vector(23 downto 0);
-    cafifo_bx_cnt    : in std_logic_vector(11 downto 0);
-    cafifo_lost_pckt : in std_logic_vector(NCFEB+2 downto 1);
-    cafifo_lone      : in std_logic
+    cafifo_l1a_dav   : in std_logic_vector(NCFEB+2 downto 1); --! Which data has arrived for current event, from CAFIFO
+    cafifo_l1a_match : in std_logic_vector(NCFEB+2 downto 1); --! Current event's L1A matches, from CAFIFO
+    cafifo_l1a_cnt   : in std_logic_vector(23 downto 0);      --! Current event's L1A #, from CAFIFO
+    cafifo_bx_cnt    : in std_logic_vector(11 downto 0);      --! Current event's BX #, from CAFIFO
+    cafifo_lost_pckt : in std_logic_vector(NCFEB+2 downto 1); --! Current event's lost packets, from CAFIFO
+    cafifo_lone      : in std_logic                           --! Current event is matchless, from CAFIFO
 
     );
 end CONTROL_FSM;
@@ -176,7 +176,7 @@ begin
   control_fsm_la_data(55+NCFEB downto 54) <= renfifo_b_inner; -- [62:54]
   control_fsm_la_data(53 downto 38)       <= dout_inner; -- [53:38]
   control_fsm_la_data(37 downto 35)       <= '0' & hdr_tail_cnt_en & dev_cnt_en; -- [37:35]
-  control_fsm_la_data(17+NCFEB downto 26) <= CAFIFO_L1A_DAV; -- [34:26]
+  control_fsm_la_data(27+NCFEB downto 26) <= CAFIFO_L1A_DAV; -- [34:26]
   control_fsm_la_data(18+NCFEB downto 17) <= CAFIFO_L1A_MATCH; -- [25:17]
   control_fsm_la_data(16 downto 15)       <= q_datain_last & expect_pckt; -- [16:15]
   control_fsm_la_data(14 downto 5)        <= hdr_tail_cnt_svl & dev_cnt_svl; -- [14:5]

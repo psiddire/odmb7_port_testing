@@ -66,7 +66,7 @@ entity VMEMON is
     OTMB_EXT_TRIG   : out std_logic;                        --! External trigger request signal to OTMB.
 
     --internal register outputs
-    ODMB_CAL        : out std_logic;                        --! Sets calibration mode (L1A generated with INJPLS) in TRGCTRL.
+    ODMB_CAL        : out std_logic;                        --! Sets calibration mode (L1A generated with calibration LCT) in TRGCTRL.
     TP_SEL          : out std_logic_vector(15 downto 0);    --! Test point select signal.
     MAX_WORDS_DCFEB : out std_logic_vector(15 downto 0);    --! Maximum number of words before an (x)DCFEB is marked as bad.
     LOOPBACK        : out std_logic_vector(2 downto 0);     --! For internal loopback tests, currently unused.

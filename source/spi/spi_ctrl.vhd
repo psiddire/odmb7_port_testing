@@ -3,7 +3,7 @@ library work;
 library unisim;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use work.ucsb_types.all;
+--use work.ucsb_types.all;
 use unisim.vcomponents.all;
 
 --! @brief Module that interprets PROM commands and controls post-startup communication with EPROMs

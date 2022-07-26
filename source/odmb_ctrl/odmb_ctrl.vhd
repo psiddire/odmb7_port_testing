@@ -1,7 +1,3 @@
-------------------------------
--- ODMB_CTRL: controls triggers, calibration, and the data path
-------------------------------
-
 library IEEE;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -12,112 +8,121 @@ use unisim.vcomponents.all;
 use work.ucsb_types.all;
 -- use work.odmb7_components.all;
 
+--! @brief module that controls trigger, calibration, and DAQ path
+--! @details
 entity ODMB_CTRL is
   generic (
-    NCFEB       : integer range 1 to 7 := 7;  -- Number of DCFEBS, 7 for ME1/1, 5
-    CAFIFO_SIZE : integer range 1 to 128 := 32  -- Number FIFO words in CAFIFO
+    NFIFO       : integer range 1 to 16 := 16; --! Number of FIFOs in PCFIFO, not currently used
+    NCFEB       : integer range 1 to 7 := 7;   --! Number of DCFEBS, 7/5
+    CAFIFO_SIZE : integer range 1 to 128 := 32 --! Number FIFO words in CAFIFO
   );
   PORT (
     --------------------
     -- Clock
     --------------------
-    DDUCLK       : in std_logic;
-    CMSCLK       : in std_logic;
+    DDUCLK       : in std_logic;                      --! 80 MHz clock to FED gth domain
+    CMSCLK       : in std_logic;                      --! ~40 MHz clock
+    PCCLK        : in std_logic;                      --! 62.5 MHz clock for PC ethernet gth
 
-    CCB_CMD      : in  std_logic_vector (5 downto 0);  -- ccbcmnd(5 downto 0) - from J3
-    CCB_CMD_S    : in  std_logic;       -- ccbcmnd(6) - from J3
-    CCB_DATA     : in  std_logic_vector (7 downto 0);  -- ccbdata(7 downto 0) - from J3
-    CCB_DATA_S   : in  std_logic;       -- ccbdata(8) - from J3
-    CCB_BX0_B    : in  std_logic;       -- bx0 - from J3
-    CCB_BXRST_B  : in  std_logic;       -- bxrst - from J3
-    CCB_L1ARST_B : in  std_logic;       -- l1rst - from J3
-    CCB_CLKEN    : in  std_logic;       -- clken - from J3
+    CCB_CMD      : in  std_logic_vector (5 downto 0); --! CCB command to CCBCODE
+    CCB_CMD_S    : in  std_logic;                     --! CCB strobe to CCBCODE
+    CCB_DATA     : in  std_logic_vector (7 downto 0); --! CCB data to CCBCODE
+    CCB_DATA_S   : in  std_logic;                     --! CCB data strobe to CCBCODE
+    CCB_BX0_B    : in  std_logic;                     --! CCB BX counter reset (delayed by PUSH_DLY)
+    CCB_BXRST_B  : in  std_logic;                     --! CCB BX counter reset
+    CCB_L1ARST_B : in  std_logic;                     --! Sent to CCBCODE but not used
+    CCB_CLKEN    : in  std_logic;                     --! Sent to CCBCODE, but not used
     --------------------
     -- ODMB VME <-> CALIBTRIG
     --------------------
-    TEST_CCBINJ   : in std_logic;
-    TEST_CCBPLS   : in std_logic;
-    TEST_CCBPED   : in std_logic;
+    TEST_CCBINJ   : in std_logic;                     --! VME signal to generate INJPLS, to CALIBTRG
+    TEST_CCBPLS   : in std_logic;                     --! VME signal to generate EXTPLS, to CALIBTRG
+    TEST_CCBPED   : in std_logic;                     --! VME signal to enable INJPLS, to CALIBTRG
 
     --------------------
     -- Delay registers (from VMECONFREGS)
     --------------------
-    LCT_L1A_DLY   : in std_logic_vector(5 downto 0);
-    INJ_DLY       : in std_logic_vector(4 downto 0);
-    EXT_DLY       : in std_logic_vector(4 downto 0);
-    CALLCT_DLY    : in std_logic_vector(3 downto 0);
-    OTMB_PUSH_DLY : in integer range 0 to 63;
-    ALCT_PUSH_DLY : in integer range 0 to 63;
-    PUSH_DLY      : in integer range 0 to 63;
+    LCT_L1A_DLY   : in std_logic_vector(5 downto 0);  --! VME LCT->L1A delay, to TRGCNTRL/CALIBTRG
+    INJ_DLY       : in std_logic_vector(4 downto 0);  --! VME INJPLS delay, to CALIBTRG
+    EXT_DLY       : in std_logic_vector(4 downto 0);  --! VME EXTPLS delay, to CALIBTRG
+    CALLCT_DLY    : in std_logic_vector(3 downto 0);  --! VME calibration LCT delay, to CALIBTRG
+    OTMB_PUSH_DLY : in integer range 0 to 63;         --! VME OTMBDAV->Fifo push delay, to TRGCNTRL
+    ALCT_PUSH_DLY : in integer range 0 to 63;         --! VME ALCTDAV->Fifo push delay, to TRGCNTRL
+    PUSH_DLY      : in integer range 0 to 63;         --! Currently hardcoded to 63, to TRGCNTRL
 
     --------------------
     -- Configuration
     --------------------
-    CAL_MODE      : in std_logic;
-    PEDESTAL      : in std_logic;
-    PEDESTAL_OTMB   : in  std_logic;
+    CAL_MODE      : in std_logic;                     --! VME signal, makes L1A from INJPLS, to TRGCNTRL
+    PEDESTAL      : in std_logic;                     --! From VMEMON to TRGCNTRL, forces L1A_MATCH
+    PEDESTAL_OTMB   : in  std_logic;                  --! From VMEMON to TRGCNTRL, forces TMB/ALCT DAV
 
     --------------------
     -- TRGCNTRL
     --------------------
-    RAW_L1A       : in std_logic;
-    RAWLCT        : in std_logic_vector (NCFEB downto 0);
+    RAW_L1A       : in std_logic;                         --! L1A from VMEMON or CCB to TRGCNTRL
+    RAWLCT        : in std_logic_vector (NCFEB downto 0); --! LCT from VMEMON or OTMB to TRGCNTRL
     
     --------------------
     -- DAV 
     --------------------
-    OTMB_DAV : in std_logic;            
-    ALCT_DAV : in std_logic;            
+    OTMB_DAV : in std_logic;                          --! OTMB_DAV from OTMB or VMEMON
+    ALCT_DAV : in std_logic;                          --! LEGACY_ALCT_DAV from OTMB or VMEMON
 
     --------------------
     -- To/From DCFEBs (FF-EMU-MOD)
     --------------------
-    DCFEB_INJPULSE  : out std_logic;
-    DCFEB_EXTPULSE  : out std_logic;
-    DCFEB_L1A       : out std_logic;
-    DCFEB_L1A_MATCH : out std_logic_vector(NCFEB downto 1);
+    DCFEB_INJPULSE  : out std_logic;                        --! INJPLS signal to DCFEBs from CALIBTRG
+    DCFEB_EXTPULSE  : out std_logic;                        --! EXTPLS signal to DCFEBs from CALIBTRG
+    DCFEB_L1A       : out std_logic;                        --! L1A signal to DCFEBs from TRGCNTRL
+    DCFEB_L1A_MATCH : out std_logic_vector(NCFEB downto 1); --! L1A_MATCH signal to DCFEBs from TRGCNTRL
 
-    ALCT_DAV_SYNC_OUT : out std_logic;
-    OTMB_DAV_SYNC_OUT : out std_logic;
+    ALCT_DAV_SYNC_OUT : out std_logic;                      --! Delayed ALCT_DAV from TRGCNTRL, unused
+    OTMB_DAV_SYNC_OUT : out std_logic;                      --! Delayed OTMB_DAV from TRGCNTRL, unused
 
     --------------------
     -- Other
     --------------------
-    DIAGOUT     : out std_logic_vector (17 downto 0); -- for debugging
-    KILL        : in std_logic_vector(NCFEB+2 downto 1);
-    LCT_ERR     : out std_logic;            -- To an LED in the original design
+    DIAGOUT     : out std_logic_vector (17 downto 0);    --! Debug signal
+    KILL        : in std_logic_vector(NCFEB+2 downto 1); --! FE mask signal to TRGCNTRL and CONTROLFSM
+    LCT_ERR     : out std_logic;                         --! From TRGCNTRL, to LED in original design
 
-    BX_DLY      : in integer range 0 to 4095;
-    L1ACNT_RST  : in std_logic;
-    BXCNT_RST   : in std_logic;
-    RST         : in std_logic;
+    BX_DLY      : in integer range 0 to 4095;            --! VME BX delay to CAFIFO, unused
+    L1ACNT_RST  : in std_logic;                          --! L1A count reset to CAFIFO from RESET or VME
+    BXCNT_RST   : in std_logic;                          --! BX count reset from CCB to CAFIFO
+    RST         : in std_logic;                          --! Reset signal, used in CALIBTRIG
 
-    EOF_DATA    : in std_logic_vector(NCFEB+2 downto 1);
+    EOF_DATA    : in std_logic_vector(NCFEB+2 downto 1); --! FE end of packet from ODMB_DATA to CAFIFO
 
     -- From CAFIFO to Data FIFOs
-    CAFIFO_L1A           : out std_logic;
-    CAFIFO_L1A_MATCH_IN  : out std_logic_vector(NCFEB+2 downto 1);  -- From TRGCNTRL to CAFIFO to generate Data  
-    CAFIFO_L1A_MATCH_OUT : out std_logic_vector(NCFEB+2 downto 1);  -- From CAFIFO to CONTROL  
-    CAFIFO_L1A_CNT       : out std_logic_vector(23 downto 0);
-    CAFIFO_L1A_DAV       : out std_logic_vector(NCFEB+2 downto 1);
-    CAFIFO_BX_CNT        : out std_logic_vector(11 downto 0);
+    CAFIFO_L1A           : out std_logic;                          --! CAFIFO push to simulated FEBs
+    CAFIFO_L1A_MATCH_IN  : out std_logic_vector(NCFEB+2 downto 1); --! From TRGCNTRL unused in ODMB_DATA
+    CAFIFO_L1A_MATCH_OUT : out std_logic_vector(NCFEB+2 downto 1); --! From CAFIFO to CONTROL_FSM
+    CAFIFO_L1A_CNT       : out std_logic_vector(23 downto 0);      --! Current CAFIFO L1A #, to status
+    CAFIFO_L1A_DAV       : out std_logic_vector(NCFEB+2 downto 1); --! CAFIFO data arrived, to status
+    CAFIFO_BX_CNT        : out std_logic_vector(11 downto 0);      --! CAFIFO BX #, to status
 
-    -- From GigaLinks
-    DDU_DATA       : out std_logic_vector(15 downto 0);
-    DDU_DATA_VALID : out std_logic;
+    -- For PCFIFO
+    GL_PC_TX_ACK : in std_logic;                                   --! Ack from ETHERNET_FRAMEto PCFIFO
+
+    -- To GigaLinks
+    DDU_DATA       : out std_logic_vector(15 downto 0);       --! Data to DDU gth from CONTROL_FSM 
+    DDU_DATA_VALID : out std_logic;                           --! Data valid to DDU gth from CONTROL_FSM
+    PC_DATA        : out std_logic_vector(15 downto 0);       --! Data to PC gth from PCFIFO
+    PC_DATA_VALID  : out std_logic;                           --! Data valid to PC gth from PCFIFO
 
     -- For headers/trailers
     --DAQMBID : in std_logic_vector(11 downto 0);  -- From CRATEID in SETFEBDLY, and GA
-    GA : in std_logic_vector(4 downto 0);
-    CRATEID : in std_logic_vector(7 downto 0);  -- From CRATEID in SETFEBDLY, and GA
-    AUTOKILLED_DCFEBS  : in std_logic_vector(NCFEB downto 1);
+    GA : in std_logic_vector(4 downto 0);                     --! VME GA pins for CONTROL_FSM
+    CRATEID : in std_logic_vector(7 downto 0);                --! CRATEID from VME for CONTROL_FSM
+    AUTOKILLED_DCFEBS  : in std_logic_vector(NCFEB downto 1); --! For CONTROL_FSM, hardcoded to 000...
       
-    -- From/To Data FIFOs
-    FIFO_RE_B      : out std_logic_vector(NCFEB+2 downto 1);
-    FIFO_OE_B      : out std_logic_vector(NCFEB+2 downto 1);
-    FIFO_DOUT      : in std_logic_vector(17 downto 0);
-    FIFO_EMPTY     : in std_logic_vector(NCFEB+2 downto 1);  -- emptyf*(7 DOWNTO 1) - from FIFOs
-    FIFO_HALF_FULL : in std_logic_vector(NCFEB+2 downto 1)  -- 
+    -- From/To Data FIFOs 
+    FIFO_RE_B      : out std_logic_vector(NCFEB+2 downto 1);  --! From CONTROL_FSM to read FE FIFO
+    FIFO_OE_B      : out std_logic_vector(NCFEB+2 downto 1);  --! From CONTROL_FSM to select FE FIFO
+    FIFO_DOUT      : in std_logic_vector(17 downto 0);        --! Output from FE FIFOs to CONTROL_FSM
+    FIFO_EMPTY     : in std_logic_vector(NCFEB+2 downto 1);   --! Empty from FE FIFOs to CONTROL_FSM
+    FIFO_HALF_FULL : in std_logic_vector(NCFEB+2 downto 1)    --! Full from FE FIFOs to CONTROL_FSM
     );
 end ODMB_CTRL;
 
@@ -223,6 +228,27 @@ architecture Behavioral of ODMB_CTRL is
       control_debug    : in  std_logic_vector(143 downto 0)
       );
 
+  end component;
+
+  component PCFIFO is
+    generic (
+      NFIFO : integer range 1 to 16 := 8  -- Number of FIFOs in PCFIFO
+      );  
+    port(
+
+      clk_in  : in std_logic;
+      clk_out : in std_logic;
+      rst     : in std_logic;
+
+      tx_ack : in std_logic;
+
+      dv_in   : in std_logic;
+      ld_in   : in std_logic;
+      data_in : in std_logic_vector(15 downto 0);
+
+      dv_out   : out std_logic;
+      data_out : out std_logic_vector(15 downto 0)
+      );
   end component;
 
   component CONTROL_FSM is
@@ -524,6 +550,25 @@ begin
       cafifo_bx_cnt    => cafifo_bx_cnt_out,
       cafifo_lost_pckt => cafifo_lost_pckt_out,
       cafifo_lone      => cafifo_lone
+      );
+
+  PCFIFO_PM : PCFIFO
+    generic map (NFIFO => NFIFO)
+
+    port map(
+
+      clk_in  => DDUCLK,
+      clk_out => PCCLK,
+      rst     => l1acnt_rst,
+
+      tx_ack => GL_PC_TX_ACK,
+
+      data_in => ddu_data_inner,
+      dv_in   => ddu_data_valid_inner,
+      ld_in   => eof,
+
+      dv_out   => PC_DATA_VALID,
+      data_out => PC_DATA
       );
 
   CCBCODE_PM : CCBCODE
