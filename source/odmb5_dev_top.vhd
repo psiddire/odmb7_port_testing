@@ -453,10 +453,6 @@ architecture Behavioral of odmb5_ucsb_dev is
   --------------------------------------
   constant SPY_SEL : std_logic := '1';
 
-  signal usrclk_spy_tx : std_logic; -- USRCLK for TX data preparation
-  signal usrclk_spy_rx : std_logic; -- USRCLK for RX data readout
-  signal usrclk_daq_tx : std_logic;
-  signal usrclk_daq_rx : std_logic;
   signal spy_rx_n : std_logic;
   signal spy_rx_p : std_logic;
   signal spy_txready : std_logic; -- Flag for tx reset done
@@ -625,7 +621,7 @@ begin
       )
     port map (
       CMSCLK              => cmsclk,
-      DDUCLK              => usrclk_spy_tx,
+      DDUCLK              => usrclk_ddu,
       DCFEBCLK            => usrclk_mgtc,
       RESET               => reset,
       L1ACNT_RST          => l1acnt_rst,
@@ -1192,7 +1188,7 @@ begin
       ODMB_STAT_DATA   => odmb_status_data,
 
       CMSCLK           => cmsclk,
-      DDUCLK           => usrclk_spy_tx,
+      DDUCLK           => usrclk_ddu,
       DCFEBCLK         => usrclk_mgtc,
 
       DCFEB_CRC_VALID  => dcfeb_crc_valid,
@@ -1247,10 +1243,13 @@ begin
   -- The second is "run 3 configuration" where the SPY port is used to send packets to DDU
   generate_spy_pc : if ENABLE_SPY_TO_DDU = '0' generate
     GTH_PC : entity work.mgt_pc
+      generic map (
+        CHANN_IDX       => 11
+      )
       port map (
         mgtrefclk       => mgtrefclk1_226, -- mgtrefclk1_226 is sourced from the 125 MHz crystal for 1.25 Gb/s
-        txusrclk        => usrclk_spy_tx,  -- 125 MHz for 1.25 Gb/s with 8b/10b encoding
-        rxusrclk        => usrclk_spy_rx, --output rx clock
+        txusrclk        => usrclk_pc,  -- 125 MHz for 1.25 Gb/s with 8b/10b encoding
+        rxusrclk        => open, --output rx clock
         sysclk          => cmsclk,    -- maximum DRP clock frequency 62.5 MHz for 1.25 Gb/s line rate
         spy_rx_n        => spy_rx_n, --to pins
         spy_rx_p        => spy_rx_p, --to pins
@@ -1279,8 +1278,8 @@ begin
       )
       port map (
         mgtrefclk       => mgtrefclk0_226, -- 160 MHz for 1.6 Gb/s DDU transmission
-        txusrclk        => usrclk_daq_tx,  -- 80 MHz for 1.6 Gb/s with 8b/10b encoding
-        rxusrclk        => usrclk_daq_rx, --output rx clock
+        txusrclk        => usrclk_ddu,  -- 80 MHz for 1.6 Gb/s with 8b/10b encoding
+        rxusrclk        => open, --output rx clock
         sysclk          => cmsclk,    -- maximum DRP clock frequency 62.5 MHz for 1.25 Gb/s line rate
         daq_rx_n        => B04_RX_N(2), --to pins
         daq_rx_p        => B04_RX_P(2), --to pins
@@ -1302,18 +1301,46 @@ begin
         prbs_err_cnt    => spy_prbs_err_cnt, --from ODMB_VME
         reset           => opt_reset         --reset signal
         );
-    usrclk_ddu <= usrclk_daq_tx;
-    usrclk_pc <= usrclk_spy_tx;
   end generate generate_spy_pc;
   generate_spy_ddu : if ENABLE_SPY_TO_DDU = '1' generate
+    GTH_PC : entity work.mgt_pc
+      generic map (
+        CHANN_IDX       => 13
+      )
+      port map (
+        mgtrefclk       => mgtrefclk1_226, -- mgtrefclk1_226 is sourced from the 125 MHz crystal for 1.25 Gb/s
+        txusrclk        => usrclk_pc,  -- 125 MHz for 1.25 Gb/s with 8b/10b encoding
+        rxusrclk        => open, --output rx clock
+        sysclk          => cmsclk,    -- maximum DRP clock frequency 62.5 MHz for 1.25 Gb/s line rate
+        spy_rx_n        => B04_RX_N(2), --to pins
+        spy_rx_p        => B04_RX_P(2), --to pins
+        spy_tx_n        => DAQ_TX_N(2), --to pins
+        spy_tx_p        => DAQ_TX_P(2), --to pins
+        txready         => open,     --unused
+        rxready         => open,     --unused
+        txdata          => pc_data,  --spy_txdata,
+        txd_valid       => pc_data_valid, --spy_txd_valid,
+        end_of_header   => gl_pc_tx_ack,     --end of header signal to PCFIFO
+        txdiffctrl      => spy_txdiffctrl,   --unused
+        loopback        => spy_loopback,     --unused
+        rxdata          => open,             --unused
+        rxd_valid       => open,             --unused
+        bad_rx          => open,             --unused
+        prbs_type       => mgt_prbs_type,    --from ODMB_VME
+        prbs_tx_en      => spy_prbs_tx_en,   --from ODMB_VME
+        prbs_rx_en      => spy_prbs_rx_en,   --from ODMB_VME
+        prbs_tst_cnt    => spy_prbs_tst_cnt, --from ODMB_VME
+        prbs_err_cnt    => open,             --from ODMB_VME
+        reset           => opt_reset         --reset signal
+        );
     GTH_DDU_SPY : entity work.mgt_ddu
       generic map (
         CHANN_IDX       => 11
       )
       port map (
         mgtrefclk       => mgtrefclk0_226, -- 160 MHz for 1.6 Gb/s DDU transmission
-        txusrclk        => usrclk_daq_tx,  -- 80 MHz for 1.6 Gb/s with 8b/10b encoding
-        rxusrclk        => usrclk_daq_rx, --output rx clock
+        txusrclk        => usrclk_ddu,  -- 80 MHz for 1.6 Gb/s with 8b/10b encoding
+        rxusrclk        => open, --output rx clock
         sysclk          => cmsclk,    -- maximum DRP clock frequency 62.5 MHz for 1.25 Gb/s line rate
         daq_rx_n        => spy_rx_n, --to pins
         daq_rx_p        => spy_rx_p, --to pins
@@ -1335,9 +1362,6 @@ begin
         prbs_err_cnt    => spy_prbs_err_cnt, --from ODMB_VME
         reset           => opt_reset         --reset signal
         );
-    gl_pc_tx_ack <= '1';
-    usrclk_ddu <= usrclk_spy_tx;
-    usrclk_pc <= mgtclk125;
   end generate generate_spy_ddu;
 
   GTH_DCFEB : entity work.mgt_cfeb

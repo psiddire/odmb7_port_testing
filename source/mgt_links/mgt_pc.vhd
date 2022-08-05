@@ -15,6 +15,7 @@ use ieee.std_logic_misc.all;
 
 entity mgt_pc is
   generic (
+    CHANN_IDX : integer := 11;   --! 11: SPY port, 13: B04 - link 2
     DATAWIDTH : integer := 16    --! User data width
     );
   port (
@@ -80,7 +81,10 @@ architecture Behavioral of mgt_pc is
   --------------------------------------------------------------------------
   -- Component declaration for the GTH transceiver container
   --------------------------------------------------------------------------
-  component gtwiz_spy_pc_example_wrapper
+  component gtwiz_pc_example_wrapper
+    generic (
+      P_CHANN_IDX : integer := 11
+      );
     port (
       gthrxn_in : in std_logic_vector(NLINK-1 downto 0);
       gthrxp_in : in std_logic_vector(NLINK-1 downto 0);
@@ -338,7 +342,10 @@ begin
   ---------------------------------------------------------------------------------------------------------------------
   -- EXAMPLE WRAPPER INSTANCE
   ---------------------------------------------------------------------------------------------------------------------
-  spy_wrapper_inst : gtwiz_spy_pc_example_wrapper
+  pc_wrapper_inst : gtwiz_pc_example_wrapper
+    generic map (
+      P_CHANN_IDX                        => CHANN_IDX
+      )
     port map (
       gthrxn_in                          => gthrxn_int,
       gthrxp_in                          => gthrxp_int,

@@ -332,19 +332,19 @@ architecture Behavioral of ODMB_CTRL is
   end component;
 
   -- Temporary debugging
-  component ila_1 is
-    port (
-      clk : in std_logic := '0';
-      probe0 : in std_logic_vector(127 downto 0) := (others=> '0')
-      );
-  end component;
+  --component ila_1 is
+  --  port (
+  --    clk : in std_logic := '0';
+  --    probe0 : in std_logic_vector(127 downto 0) := (others=> '0')
+  --    );
+  --end component;
 
-  component ila_2 is
-    port (
-      clk : in std_logic := '0';
-      probe0 : in std_logic_vector(383 downto 0) := (others=> '0')
-      );
-  end component;
+  --component ila_2 is
+  --  port (
+  --    clk : in std_logic := '0';
+  --    probe0 : in std_logic_vector(383 downto 0) := (others=> '0')
+  --    );
+  --end component;
 
   signal LOGICL : std_logic := '0';
   signal LOGICH : std_logic := '1';
@@ -609,31 +609,31 @@ begin
   daqmbid(3 downto 0)  <= not ga(4 downto 1);  -- GA0 not included so that this is ODMB counter
 
   -- ILA
-  ila_data1(3 downto 0)         <= otmb_dav & alct_dav & rawlct(0) & raw_l1a; -- raw signal
-  ila_data1(3+NCFEB downto 4)   <= rawlct(NCFEB downto 1);  
-  ila_data1(28 downto 11)       <= diag_trigctrl(17 downto 0);
-  ila_data1(30+NCFEB downto 29) <= cafifo_l1a_match_in_inner(NCFEB+2 downto 1);
-  ila_data1(46 downto 38)       <= control_debug_full(41 downto 33); -- CAFIFO_L1A_MATCH
-  ila_data1(55 downto 47)       <= control_debug_full(50 downto 42); -- CAFIFO_L1A_DAV
-  ila_data1(56)                 <= control_debug_full(16); -- dav_inner
-  ila_data1(59 downto 57)       <= cal_lct & cal_gtrg & cal_mode;
-  ila_data1(66 downto 61)       <= LCT_L1A_DLY;
-  ila_data1(72 downto 67)       <= std_logic_vector(to_unsigned(OTMB_PUSH_DLY, 6));
-  ila_data1(78 downto 73)       <= std_logic_vector(to_unsigned(ALCT_PUSH_DLY, 6));
-  ila_data1(84 downto 79)       <= std_logic_vector(to_unsigned(PUSH_DLY, 6));
-  ila_data1(100 downto 85)      <= control_debug_full(69 downto 54); -- dout_inner
-  ila_data1(104 downto 101)     <= control_debug_full(20 downto 17); -- current_state_svl
-  ila_data1(109 downto 105)     <= control_debug_full(25 downto 21); -- dev_cnt_svl
-  ila_data1(110)                <= control_debug_full(32);           -- q_datain_last
-  ila_data1(113 downto 111)     <= diag_trigctrl(20 downto 18);      -- raw_l1a_q, l1a_in, raw_l1a
+  --ila_data1(3 downto 0)         <= otmb_dav & alct_dav & rawlct(0) & raw_l1a; -- raw signal
+  --ila_data1(3+NCFEB downto 4)   <= rawlct(NCFEB downto 1);  
+  --ila_data1(28 downto 11)       <= diag_trigctrl(17 downto 0);
+  --ila_data1(30+NCFEB downto 29) <= cafifo_l1a_match_in_inner(NCFEB+2 downto 1);
+  --ila_data1(46 downto 38)       <= control_debug_full(41 downto 33); -- CAFIFO_L1A_MATCH
+  --ila_data1(55 downto 47)       <= control_debug_full(50 downto 42); -- CAFIFO_L1A_DAV
+  --ila_data1(56)                 <= control_debug_full(16); -- dav_inner
+  --ila_data1(59 downto 57)       <= cal_lct & cal_gtrg & cal_mode;
+  --ila_data1(66 downto 61)       <= LCT_L1A_DLY;
+  --ila_data1(72 downto 67)       <= std_logic_vector(to_unsigned(OTMB_PUSH_DLY, 6));
+  --ila_data1(78 downto 73)       <= std_logic_vector(to_unsigned(ALCT_PUSH_DLY, 6));
+  --ila_data1(84 downto 79)       <= std_logic_vector(to_unsigned(PUSH_DLY, 6));
+  --ila_data1(100 downto 85)      <= control_debug_full(69 downto 54); -- dout_inner
+  --ila_data1(104 downto 101)     <= control_debug_full(20 downto 17); -- current_state_svl
+  --ila_data1(109 downto 105)     <= control_debug_full(25 downto 21); -- dev_cnt_svl
+  --ila_data1(110)                <= control_debug_full(32);           -- q_datain_last
+  --ila_data1(113 downto 111)     <= diag_trigctrl(20 downto 18);      -- raw_l1a_q, l1a_in, raw_l1a
 
-  ila_odmb_ctrl_inst1 : ila_1
-    port map(
-      clk => DDUCLK,
-      probe0 => ila_data1
-      );
+  --ila_odmb_ctrl_inst1 : ila_1
+  --  port map(
+  --    clk => DDUCLK,
+  --    probe0 => ila_data1
+  --    );
 
-  ila_data2(119 downto 0) <= control_debug_full(135 downto 16);
+  --ila_data2(119 downto 0) <= control_debug_full(135 downto 16);
 
   -- ila_odmb_ctrl_inst2 : ila_2
   --   port map(

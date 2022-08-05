@@ -5,6 +5,8 @@
 set BOARD odmb7
 set INFILE "../project/odmb7_ucsb_dev.runs/impl_1/odmb7_ucsb_dev.bit" 
 set INFILE5 "../project/odmb5_ucsb_dev.runs/impl_3/odmb5_ucsb_dev.bit" 
+set INLTX "../project/odmb7_ucsb_dev.runs/impl_1/odmb7_ucsb_dev.ltx" 
+set INLTX5 "../project/odmb5_ucsb_dev.runs/impl_3/odmb5_ucsb_dev.ltx" 
 set OUTNAME "ucsb_dev" 
 set OUTDIR "../firmware"
 
@@ -24,6 +26,7 @@ if { $BOARD != "odmb7" && $BOARD != "odmb5" } {
 
 if { $BOARD == "odmb5" } {
     set INFILE $INFILE5
+    set INLTX $INLTX5
 }
 
 if { $argc > 1 } {
@@ -44,7 +47,9 @@ if { ![file exist $INFILE] } {
     exec mkdir -p ${OUTDIR}/${VERSION}
     exec cp $INFILE ${OUTDIR}/${VERSION}/${BOARD}_${OUTNAME}.bit
     # exec cp [string map {.bit .bin} $INFILE] ${OUTDIR}/${VERSION}/${BOARD}_${OUTNAME}.bin
-    exec cp [string map {.bit .ltx} $INFILE] ${OUTDIR}/${VERSION}/${BOARD}_${OUTNAME}.ltx
+    if { [file exist $INLTX] } {
+      exec cp [string map {.bit .ltx} $INFILE] ${OUTDIR}/${VERSION}/${BOARD}_${OUTNAME}.ltx
+    }
 
     write_cfgmem -format mcs -interface SPIx8 -size 32 -loadbit "up 0 $INFILE" -file "$OUTFILE"
     exec rm ${OUTDIR}/${VERSION}/${BOARD}_${OUTNAME}_primary.prm
