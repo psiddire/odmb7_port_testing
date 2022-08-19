@@ -1,7 +1,7 @@
 ; Device Id            : ZL30267
 ; Device Revision      : 2
-; GUI Version          : 1.7
-; File Generation Date : Monday, November 15, 2021 1:37:11 PM
+; GUI Version          : 1.7.2
+; File Generation Date : Tuesday, August 09, 2022 11:51:27 AM
 ;======================================================================
 
 ; NOTE1:
@@ -49,11 +49,19 @@
 ; Register Configuration Start
 
 X , 0x0400 , 0x1A  ;  ACOFF0L
-X , 0x0402 , 0xC5  ;  ACOFF1L
-X , 0x0404 , 0x88  ;  ACOFF2L
+X , 0x0402 , 0xD4  ;  ACOFF1L
+X , 0x0404 , 0x8E  ;  ACOFF2L
 X , 0x0405 , 0x01  ;  ACOFF2U
-X , 0x0406 , 0x4F  ;  ACOFF3L
+X , 0x0406 , 0x48  ;  ACOFF3L
 X , 0x0407 , 0x02  ;  ACOFF3U
+X , 0x0408 , 0x02  ;  ACOFF4L
+X , 0x0409 , 0x03  ;  ACOFF4U
+X , 0x040A , 0xBC  ;  ACOFF5L
+X , 0x040B , 0x03  ;  ACOFF5U
+X , 0x040C , 0x76  ;  ACOFF6L
+X , 0x040D , 0x04  ;  ACOFF6U
+X , 0x040E , 0x30  ;  ACOFF7L
+X , 0x040F , 0x05  ;  ACOFF7U
 X , 0x0423 , 0x08  ;  DTCR7
 X , 0x0424 , 0x08  ;  DTCR8
 X , 0x0003 , 0x03  ;  PLLEN
@@ -114,9 +122,9 @@ X , 0x0230 , 0x83  ;  OC4CR1
 X , 0x0231 , 0x01  ;  OC4CR2
 X , 0x0240 , 0x83  ;  OC5CR1
 X , 0x0241 , 0x01  ;  OC5CR2
-X , 0x0250 , 0x87  ;  OC6CR1
+X , 0x0250 , 0x85  ;  OC6CR1
 X , 0x0251 , 0x01  ;  OC6CR2
-X , 0x0260 , 0x87  ;  OC7CR1
+X , 0x0260 , 0x85  ;  OC7CR1
 X , 0x0261 , 0x01  ;  OC7CR2
 X , 0x0270 , 0x82  ;  OC8CR1
 X , 0x0271 , 0x35  ;  OC8CR2
@@ -139,6 +147,6 @@ X , 0x0180 , 0x44  ;  A2CR1
 X , 0x0180 , 0x04  ;  A2CR1
 
 ; Register Configuration End
-; Register Write Count = 86
+; Register Write Count = 94
 
 ;======================================================================
