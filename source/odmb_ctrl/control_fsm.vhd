@@ -118,7 +118,7 @@ architecture CONTROL_arch of CONTROL_FSM is
   signal wait_dev_cnt_en       : std_logic             := '0';
   signal wait_dev_cnt          : integer range 1 to wait_dev_max := 1;
   signal dev_cnt_en            : std_logic             := '0';
-  signal dev_cnt               : integer range 1 to 9  := 9;
+  signal dev_cnt               : integer range 1 to 9  := NCFEB+2;
   signal tx_cnt_en, tx_cnt_rst : std_logic             := '0';
   signal tx_cnt                : integer range 1 to 4  := 1;
   type tx_cnt_array is array (1 to 9) of integer range 1 to 4;
@@ -200,7 +200,7 @@ begin
       lone_cnt              <= 1;
       wait_cnt              <= 1;
       wait_dev_cnt          <= 1;
-      dev_cnt               <= 9;
+      dev_cnt               <= NCFEB+2;
       tx_cnt                <= 1;
     elsif rising_edge(CLK) then
       if(wait_cnt_en = '1') then
@@ -232,12 +232,12 @@ begin
         end if;
       end if;
       if (dev_cnt_en = '1') then
-        if(dev_cnt = 9) then
-          dev_cnt <= 8;
-        elsif(dev_cnt = 8) then
+        if(dev_cnt = NCFEB+2) then
+          dev_cnt <= NCFEB+1;
+        elsif(dev_cnt = NCFEB+1) then
           dev_cnt <= 1;
-        elsif(dev_cnt = 7) then
-          dev_cnt <= 9;
+        elsif(dev_cnt = NCFEB) then
+          dev_cnt <= NCFEB+2;
         else
           dev_cnt <= dev_cnt + 1;
         end if;
@@ -317,7 +317,7 @@ begin
         if (wait_dev_cnt = wait_dev_max) then
           if (cafifo_l1a_match(dev_cnt) = '0' or cafifo_lost_pckt(dev_cnt) = '1' or KILL(dev_cnt) = '1') then
             dev_cnt_en <= '1';
-            if (dev_cnt = 7) then
+            if (dev_cnt = NCFEB) then
               control_next_state <= TAIL;
             else
               control_next_state <= WAIT_DEV;
@@ -344,7 +344,7 @@ begin
         end if;
         if (q_datain_last = '1' or KILL(dev_cnt) = '1') then
           dev_cnt_en <= '1';
-          if (dev_cnt = 7) then
+          if (dev_cnt = NCFEB) then
             control_next_state <= TAIL;
           else
             control_next_state <= WAIT_DEV;

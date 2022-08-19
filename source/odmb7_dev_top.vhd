@@ -1265,6 +1265,9 @@ begin
   -- The second is "run 3 configuration" where the SPY port is used to send packets to DDU
   generate_spy_pc : if ENABLE_SPY_TO_DDU = '0' generate
     GTH_PC : entity work.mgt_pc
+      generic map (
+        CHANN_IDX       => 11
+      )
       port map (
         mgtrefclk       => mgtrefclk1_226, -- mgtrefclk1_226 is sourced from the 125 MHz crystal for 1.25 Gb/s
         txusrclk        => usrclk_pc,  -- 125 MHz for 1.25 Gb/s with 8b/10b encoding
@@ -1323,6 +1326,9 @@ begin
   end generate generate_spy_pc;
   generate_spy_ddu : if ENABLE_SPY_TO_DDU = '1' generate
     GTH_PC : entity work.mgt_pc
+      generic map (
+        CHANN_IDX       => 13
+      )
       port map (
         mgtrefclk       => mgtrefclk1_226, -- mgtrefclk1_226 is sourced from the 125 MHz crystal for 1.25 Gb/s
         txusrclk        => usrclk_pc,  -- 125 MHz for 1.25 Gb/s with 8b/10b encoding

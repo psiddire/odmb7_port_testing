@@ -72,7 +72,7 @@ entity VMEMON is
     LOOPBACK        : out std_logic_vector(2 downto 0);     --! For internal loopback tests, currently unused.
     TXDIFFCTRL      : out std_logic_vector(3 downto 0);     --! Controls the TX voltage swing, currently unused.
     MUX_DATA_PATH   : out std_logic;                        --! Controls whether data comes from real boards or simulated data.
-    MUX_TRIGGER     : out std_Logic;                        --! Controls whether trigger signals are external or come from TESTCTRL.
+    MUX_TRIGGER     : out std_Logic;                        --! Controls whether trigger signals are external or come from TESTCTRL. (currently unused)
     MUX_LVMB        : out std_logic;                        --! Controls whether LVMB communication is to real board or simulated LVMB.
     ODMB_PED        : out std_logic_vector(1 downto 0);     --! Controls pedestal (genereates L1A MATCH for each L1A)
     TEST_PED        : out std_logic;                        --! Control whether OTMB data is requested for each L1A.
