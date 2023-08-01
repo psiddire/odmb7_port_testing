@@ -275,7 +275,8 @@ begin
         epkt_cnt_en  <= '0';
         ld_out       <= '0';
         -- The total has to be multiple of 4, but word_cnt = total-2
-        if (pcfifo_ld = '1' and word_cnt > 26) or word_cnt = 4002 then
+        -- switched max word_cnt from 4002 to 742 since new ethernet card doesn't like jumbo packets
+        if (pcfifo_ld = '1' and word_cnt > 26) or word_cnt = 742 then
           pcfifo_next_state <= FIFO_TX_EPKT;
           pcfifo_rden       <= '0';
         elsif pcfifo_ld = '1' and word_cnt <= 30 then

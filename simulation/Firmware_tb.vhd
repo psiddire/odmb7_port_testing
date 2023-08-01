@@ -305,6 +305,12 @@ architecture Behavioral of Firmware_tb is
   -- Checker bit
   signal checker  : std_logic := '0';
 
+  --signals for trigger simulation
+  signal sim_otmb_dav : std_logic := '0';
+  signal sim_alct_dav : std_logic := '0';
+  signal sim_lct : std_logic_vector(7 downto 0) := x"00";
+  signal sim_l1a_b : std_logic := '0';
+
 begin
 
   -- Generate clock in simulation
@@ -341,6 +347,15 @@ begin
       DOUT1 => lut_input1_dout_c,
       DOUT2 => lut_input2_dout_c
       );
+
+  trigger_generator_i: entity work.trigger_generator
+    port map(
+      CLK => cmsclk,
+      OTMB_DAV => sim_otmb_dav,
+      ALCT_DAV => sim_alct_dav,
+      LCT => sim_lct,
+      L1A_B => sim_l1a_b
+    );
 
   --in simulation, VIO always outputs 0, even though this output is default 1
   --use_vio_input <= use_vio_input_vector(0);
@@ -525,7 +540,7 @@ begin
       CCB_BX0_B            => '1',
       CCB_BX_RST_B         => '1',
       CCB_L1A_RST_B        => '1',
-      CCB_L1A_B            => '1',
+      CCB_L1A_B            => sim_l1a_b,
       CCB_L1A_RLS          => open,
       CCB_CLKEN            => '0',
       CCB_EVCNTRES_B       => '1',
@@ -543,9 +558,9 @@ begin
       LVMB_SDOUT_N         => lvmb_sdout_n,
 
       OTMB                 => x"F_FFFFFFFF",
-      RAWLCT               => x"00",
-      OTMB_DAV             => '0',
-      LEGACY_ALCT_DAV      => '0',
+      RAWLCT               => sim_lct,
+      OTMB_DAV             => sim_otmb_dav,
+      LEGACY_ALCT_DAV      => sim_alct_dav,
       OTMB_FF_CLK          => '0',
       RSVTD                => "000",
       RSVFD                => open,
