@@ -86,3 +86,11 @@ Currently, the firmware is developed under the assumption that config similar to
 
 - [ ] Develop Run4 DAQ logic
 
+## Using github
+
+After cloning the project, edit the `project/odmb7_ucsb_dev.xpr` and `project/odmb5_ucsb_dev.xpr`
+so that the project path is correct. An example is shown below,
+
+`<Project Version="7" Minor="44" Path="/higgs-data/jbkim/odmb/odmb_daq/odmb7_port_testing/project/odmb7_ucsb_dev.xpr">`
+
+To simulate the project, first `Run Synthesis` to generate the IP files, and then `Run Simulation`.
