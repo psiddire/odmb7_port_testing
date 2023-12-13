@@ -321,7 +321,8 @@ begin
   sysmon_den <= '1' when (r_sys_mon = '1' and q2_strobe = '0' and q_strobe = '1') else '0';
 
   -- DTACK when OUTDATA contains valid data
-  dd_dtack <= device and strobe; -- and drdy;
+  dd_dtack <= device and strobe and sysmon_drdy when (r_sys_mon = '1') else device and strobe ;
+  --dd_dtack <= device and strobe; -- and drdy;
   FD_D_DTACK : FDC port map(Q => d_dtack, C => dd_dtack, CLR=> q_dtack, D => '1');
   FD_Q_DTACK : FD port map(Q => q_dtack, C => SLOWCLK, D => d_dtack);
   DTACK <= q_dtack;
