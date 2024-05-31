@@ -173,6 +173,7 @@ set_property -dict { PACKAGE_PIN D10   IOSTANDARD LVDS }     [get_ports INJPLS_N
 set_property -dict { PACKAGE_PIN B10   IOSTANDARD LVDS }     [get_ports EXTPLS_P]
 set_property -dict { PACKAGE_PIN A10   IOSTANDARD LVDS }     [get_ports EXTPLS_N]
 set_property -dict { PACKAGE_PIN C16   IOSTANDARD LVCMOS18 } [get_ports CFEB_OUT_EN_B]
+set_property -dict { PACKAGE_PIN E16   IOSTANDARD LVCMOS18 } [get_ports CFEB_OUT_EN]
 set_property -dict { PACKAGE_PIN A17   IOSTANDARD LVCMOS18 } [get_ports DCFEB_REPROG_B]
 
 # L1A pins

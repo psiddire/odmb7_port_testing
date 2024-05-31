@@ -90,6 +90,7 @@ entity odmb5_ucsb_dev is
     L1A_MATCH_P    : out std_logic_vector(5 downto 1);     --! L1A match for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
     L1A_MATCH_N    : out std_logic_vector(5 downto 1);     --! L1A match for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
     CFEB_OUT_EN_B  : out std_logic;                        --! CFEB output enable signal. Fixed to '0'. Connected to bank 68.
+    CFEB_OUT_EN    : out std_logic;                        --! CFEB output enable signal. Fixed to '1'. Connected to bank 68.
     DCFEB_REPROG_B : out std_logic;                        --! (x)DCFEB reprogram signal. From ODMBCTRL in ODMB_VME module. Connected to bank 68.
 
     --------------------
@@ -731,7 +732,8 @@ begin
   -- Handle PPIB/DCFEB signals
   -------------------------------------------------------------------------------------------
 
-  CFEB_OUT_EN_B <= '1'; -- always enable
+  CFEB_OUT_EN_B <= '0'; -- always enable
+  CFEB_OUT_EN   <= '1'; -- always enable
   -- Handle DCFEB I/O buffers
   OB_DCFEB_TMS: OBUFDS port map (I => dcfeb_tms, O => DCFEB_TMS_P, OB => DCFEB_TMS_N);
   OB_DCFEB_TDI: OBUFDS port map (I => dcfeb_tdi, O => DCFEB_TDI_P, OB => DCFEB_TDI_N);
