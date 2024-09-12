@@ -12,54 +12,6 @@ entity Firmware_tb is
 end entity Firmware_tb;
 
 architecture Behavioral of Firmware_tb is
-  component clockManager_sim is
-    port (
-      CLK_IN40  : in std_logic := '0';
-      CLK_OUT10  : out std_logic := '0';
-      CLK_OUT80  : out std_logic := '0';
-      CLK_OUT160  : out std_logic := '0';
-      CLK_OUT125  : out std_logic := '0'
-      );
-  end component;
-
-  component DCFEB_DS_WRAPPER is
-    port (
-      clk          : in std_logic;
-      dcfebclk     : in std_logic;
-      rst          : in std_logic;
-      l1a_p        : in std_logic;
-      l1a_n        : in std_logic;
-      l1a_match_p  : in std_logic;
-      l1a_match_n  : in std_logic;
-      tx_ack       : in std_logic;
-      nwords_dummy : in std_logic_vector(15 downto 0);
-      dcfeb_dv      : out std_logic;
-      dcfeb_data    : out std_logic_vector(15 downto 0);
-      adc_mask      : out std_logic_vector(11 downto 0);
-      dcfeb_fsel    : out std_logic_vector(63 downto 0);
-      dcfeb_jtag_ir : out std_logic_vector(9 downto 0);
-      trst          : in  std_logic;
-      tck_p         : in  std_logic;
-      tck_n         : in  std_logic;
-      tms_p         : in  std_logic;
-      tms_n         : in  std_logic;
-      tdi_p         : in  std_logic;
-      tdi_n         : in  std_logic;
-      tdo_p         : out std_logic;
-      tdo_n         : out std_logic;
-      rtn_shft_en   : out std_logic;
-      done          : out std_logic;
-      INJPLS_P      : in std_logic;
-      INJPLS_N      : in std_logic;
-      EXTPLS_P      : in std_logic;
-      EXTPLS_N      : in std_logic;
-      BC0_P         : in std_logic;
-      BC0_N         : in std_logic;
-      RESYNC_P      : in std_logic;
-      RESYNC_N      : in std_logic;
-      DIAGOUT       : out std_logic_vector(17 downto 0)
-      );
-  end component;
 
   component dcfeb_v6 is
     port (
@@ -107,6 +59,7 @@ architecture Behavioral of Firmware_tb is
       PON_OE        : in std_logic
       );
   end component;
+
   component vme_master is
     port (
       CLK         : in  std_logic;
@@ -137,23 +90,47 @@ architecture Behavioral of Firmware_tb is
       );
   end component;
 
+  component CLOCK_CHIP_SIM is
+    port (
+      FPGA_SEL   : in std_logic; 
+      RSTN       : in std_logic;
+      AC0_GPIO0  : in std_logic;
+      AC1_GPIO1  : in std_logic;
+      AC2_GPIO2  : in std_logic;
+      TEST_GPIO3 : in std_logic;
+      IF0_CSN    : in std_logic;
+      IF1_MISO   : inout std_logic;
+      SCL_SCLK   : in std_logic;
+      SDA_MOSI   : in std_logic
+    );
+  end component;
+
   -- LUT constents
   constant bw_addr   : integer := 4;
   constant bw_addr_entries : integer := 16;
   constant bw_input1 : integer := 16;
   constant bw_input2 : integer := 16;
-  component lut_input1 is
+  --component lut_input1 is
+  --  port (
+  --    clka : in std_logic := '0';
+  --    addra : in std_logic_vector(bw_addr-1 downto 0) := (others=> '0');
+  --    douta : out std_logic_vector(bw_input1-1 downto 0) := (others => '0')
+  --    );
+  --end component;
+  --component lut_input2 is
+  --  port (
+  --    clka : in std_logic := '0';
+  --    addra : in std_logic_vector(bw_addr-1 downto 0) := (others=> '0');
+  --    douta : out std_logic_vector(bw_input2-1 downto 0) := (others => '0')
+  --    );
+  --end component;
+  
+  component pseudolut is
     port (
-      clka : in std_logic := '0';
-      addra : in std_logic_vector(bw_addr-1 downto 0) := (others=> '0');
-      douta : out std_logic_vector(bw_input1-1 downto 0) := (others => '0')
-      );
-  end component;
-  component lut_input2 is
-    port (
-      clka : in std_logic := '0';
-      addra : in std_logic_vector(bw_addr-1 downto 0) := (others=> '0');
-      douta : out std_logic_vector(bw_input2-1 downto 0) := (others => '0')
+      CLK   : in std_logic;
+      ADDR  : in std_logic_vector(3 downto 0);
+      DOUT1 : out std_logic_vector(15 downto 0);
+      DOUT2 : out std_logic_vector(15 downto 0)
       );
   end component;
 
@@ -169,19 +146,19 @@ architecture Behavioral of Firmware_tb is
   signal vme_dtack_q : std_logic := '0';
 
   -- Clock signals
-  signal clk_in_buf : std_logic := '0';
-  signal sysclk : std_logic := '0';
-  signal sysclk10 : std_logic := '0';
-  signal sysclk80 : std_logic := '0';
-  signal sysclk80_p : std_logic := '0';
-  signal sysclk80_n : std_logic := '0';
-  signal sysclk125 : std_logic := '0'; -- actually 124.444 from clockManager_sim, to be corrected with dedicated generation
-  signal sysclk125_p : std_logic := '0';
-  signal sysclk125_n : std_logic := '0';
-  signal sysclk160 : std_logic := '0';
-  signal sysclk160_p : std_logic := '0';
-  signal sysclk160_n : std_logic := '0';
-  signal sysclkQuad : std_logic := '0';
+  signal cmsclk   : std_logic := '0';
+  signal cmsclk_p : std_logic := '0';
+  signal cmsclk_n : std_logic := '1';
+  signal cmsclk10 : std_logic := '0';
+  signal cmsclk80 : std_logic := '0';
+  signal cmsclk80_p : std_logic := '0';
+  signal cmsclk80_n : std_logic := '1';
+  signal cmsclk160_p : std_logic := '0';
+  signal cmsclk160_n : std_logic := '1';
+  signal oscclk125_p : std_logic := '0';
+  signal oscclk125_n : std_logic := '1';
+  signal oscclk160_p : std_logic := '0';
+  signal oscclk160_n : std_logic := '1';
   signal init_done: std_logic := '0';
   -- Constants
   constant bw_output : integer := 20;
@@ -297,6 +274,16 @@ architecture Behavioral of Firmware_tb is
   signal cms_clk_fpga_p : std_logic;
   signal cms_clk_fpga_n : std_logic;
 
+  -- signals to clock chip
+  signal zl_fpga_sel : std_logic;
+  signal zl_rstn : std_logic;
+  signal zl_ac : std_logic_vector(2 downto 0);
+  signal zl_test_gpio3 : std_logic;
+  signal zl_if0_csn : std_logic;
+  signal zl_if1_miso : std_logic;
+  signal zl_scl_sclk : std_logic;
+  signal zl_sda_mosi : std_logic;
+
   -- ILA
   signal trig0 : std_logic_vector(255 downto 0) := (others=> '0');
   signal data  : std_logic_vector(4095 downto 0) := (others=> '0');
@@ -318,83 +305,66 @@ architecture Behavioral of Firmware_tb is
   -- Checker bit
   signal checker  : std_logic := '0';
 
+  --signals for trigger simulation
+  signal sim_otmb_dav : std_logic := '0';
+  signal sim_alct_dav : std_logic := '0';
+  signal sim_lct : std_logic_vector(7 downto 0) := x"00";
+  signal sim_l1a_b : std_logic := '0';
+
 begin
 
-  -- generate clock in simulation
-  process
-    -- constant clk_period_by_2 : time := 1.666 ns;
-    constant clk_period_by_2 : time := 12.5 ns;
-  begin
-    while 1=1 loop
-      cms_clk_fpga_p <= '0';
-      cms_clk_fpga_n <= '1';
-      wait for clk_period_by_2;
-      cms_clk_fpga_p <= '1';
-      cms_clk_fpga_n <= '0';
-      wait for clk_period_by_2;
-    end loop;
-  end process;
+  -- Generate clock in simulation
+  cmsclk <= not cmsclk after 12.5 ns;
+  cmsclk_p <= not cmsclk_p after 12.5 ns;
+  cmsclk_n <= not cmsclk_n after 12.5 ns;
+  cmsclk80_p <= not cmsclk80_p after 6.25 ns;
+  cmsclk80_n <= not cmsclk80_n after 6.25 ns;
+  cmsclk160_p <= not cmsclk160_p after 3.125 ns;
+  cmsclk160_n <= not cmsclk160_n after 3.125 ns;
 
-  ibufg_i : IBUFGDS
-    port map (
-      I => cms_clk_fpga_p,
-      IB => cms_clk_fpga_n,
-      O => sysclk --clk_in_buf
-      );
+  oscclk160_p <= not cmsclk160_p after 3.125 ns;
+  oscclk160_n <= not cmsclk160_n after 3.125 ns;
+  oscclk125_p <= not oscclk125_p after 4.0 ns;
+  oscclk125_n <= not oscclk125_n after 4.0 ns;
 
-  ClockManager_i : clockManager_sim
+  -- -- Input LUTs
+  -- lut_input1_i: lut_input1
+  --   port map(
+  --     clka=> cmsclk,
+  --     addra=> std_logic_vector(lut_input_addr1_s),
+  --     douta=> lut_input1_dout_c
+  --     );
+  -- lut_input2_i: lut_input2
+  --   port map(
+  --     clka=> cmsclk,
+  --     addra=> std_logic_vector(lut_input_addr2_s),
+  --     douta=> lut_input2_dout_c
+  --     );
+  pseudolut_i : pseudolut
     port map(
-      --CLK_IN40 => clk_in_buf,
-      CLK_IN40 => sysclk,
-      CLK_OUT10 => sysclk10,
-      CLK_OUT80 => sysclk80,
-      CLK_OUT160 => sysclk160,
-      CLK_OUT125 => sysclk125
+      CLK => cmsclk,
+      ADDR => std_logic_vector(lut_input_addr1_s),
+      DOUT1 => lut_input1_dout_c,
+      DOUT2 => lut_input2_dout_c
       );
 
-  obufds_clk80 : OBUFDS
-    port map (
-      O => sysclk80_p,
-      OB => sysclk80_n,
-      I => sysclk80
-      );
-
-  obufds_clk125 : OBUFDS
-    port map (
-      O => sysclk125_p,
-      OB => sysclk125_n,
-      I => sysclk125
-      );
-
-  obufds_clk160 : OBUFDS
-    port map (
-      O => sysclk160_p,
-      OB => sysclk160_n,
-      I => sysclk160
-      );
-
-  -- Input LUTs
-  lut_input1_i: lut_input1
+  trigger_generator_i: entity work.trigger_generator
     port map(
-      clka=> sysclk,
-      addra=> std_logic_vector(lut_input_addr1_s),
-      douta=> lut_input1_dout_c
-      );
-  lut_input2_i: lut_input2
-    port map(
-      clka=> sysclk,
-      addra=> std_logic_vector(lut_input_addr2_s),
-      douta=> lut_input2_dout_c
-      );
+      CLK => cmsclk,
+      OTMB_DAV => sim_otmb_dav,
+      ALCT_DAV => sim_alct_dav,
+      LCT => sim_lct,
+      L1A_B => sim_l1a_b
+    );
 
   --in simulation, VIO always outputs 0, even though this output is default 1
   --use_vio_input <= use_vio_input_vector(0);
   --vio_issue_vme_cmd <= vio_issue_vme_cmd_vector(0);
 
   -- Process to generate counter and initialization
-  startGenerator_i: process (sysclk) is
+  startGenerator_i: process (cmsclk) is
   begin
-    if rising_edge(sysclk) then
+    if rising_edge(cmsclk) then
       if (init_done = '0') then
         startCounter <= startCounter + 1;
         -- Set the intime to 1 only after 7 clk cycles
@@ -414,19 +384,18 @@ begin
   end process;
 
   -- Process to read input from LUTs or VIO and give to VME
-  inputGenerator_i: process (sysclk) is
+  inputGenerator_i: process (cmsclk) is
     variable init_input1: unsigned(bw_fifo-3 downto 0):= (others => '0');
     variable init_input2: unsigned(bw_fifo-3 downto 0):= (others => '1');
   begin
-    if sysclk'event and sysclk='1' then
+    if cmsclk'event and cmsclk='1' then
       if init_done = '1' then
         --if (use_vio_input = '0') then
         --handle LUT input
         if waitCounter = 0  then
           if cack = '1' then
             inputCounter <= inputCounter + 1;
-            --waitCounter <= "0000001000";
-            waitCounter <= "1100000000";
+            waitCounter <= "0000001000";
             -- Initalize lut_input_addr_s
             if inputCounter = 0 then
               lut_input_addr1_s <= to_unsigned(0,bw_addr);
@@ -450,23 +419,6 @@ begin
           cmddev <= std_logic_vector(init_input1);
           waitCounter <= waitCounter - 1;
         end if;
-      --else
-      --  --handle VIO input
-      --  if (vio_issue_vme_cmd = '1' and vio_issue_vme_cmd_q = '0') then
-      --    --rising vio edge
-      --    cmddev <= vio_vme_addr;
-      --    vme_data_in <= vio_vme_data;
-      --  elsif (vio_issue_vme_cmd_q = '1' and vio_issue_vme_cmd_qq = '0') then
-      --    --next clock cycle, stop sending pulse
-      --    cmddev <= std_logic_vector(init_input1);
-      --    vme_data_in <= vme_data_in;
-      --  else
-      --    cmddev <= cmddev;
-      --    vme_data_in <= vme_data_in;
-      --  end if;
-      --  vio_issue_vme_cmd_q <= vio_issue_vme_cmd;
-      --  vio_issue_vme_cmd_qq <= vio_issue_vme_cmd_q;
-      --end if;
       else
         inputCounter <= to_unsigned(0,bw_count);
       end if;
@@ -474,9 +426,9 @@ begin
   end process;
 
   -- generate vme output for vio
-  --proc_vio_vme_out : process (sysclk) is
+  --proc_vio_vme_out : process (cmsclk) is
   --begin
-  --if rising_edge(sysclk) then
+  --if rising_edge(cmsclk) then
   --  vme_dtack_q <= vme_dtack;
   --  if (vme_dtack='0' and vme_dtack_q='1') then
   --    vio_vme_out <= vme_data_io_out;
@@ -498,7 +450,7 @@ begin
 
   --aVME signal management
   rstn <= not rst_global;
-  vc_cmd <= '1' when (cmddev(15 downto 12) = x"1" or cmddev(15 downto 12) = x"2" or cmddev(15 downto 12) = x"4" or cmddev(15 downto 12) = x"3" or cmddev(15 downto 12) = x"6" or cmddev(15 downto 12) = x"7" or cmddev(15 downto 12) = x"8") else '0';
+  vc_cmd <= '1' when (cmddev(15 downto 12) = x"1" or cmddev(15 downto 12) = x"2" or cmddev(15 downto 12) = x"3" or cmddev(15 downto 12) = x"4" or cmddev(15 downto 12) = x"5" or cmddev(15 downto 12) = x"6" or cmddev(15 downto 12) = x"7" or cmddev(15 downto 12) = x"8") else '0';
   vc_addr <= x"A8" & cmddev(15 downto 1);
   vc_rd <=  '1' when vme_data_in = x"2EAD" else '0';
 
@@ -513,27 +465,27 @@ begin
   odmb_i: entity work.ODMB7_UCSB_DEV
     port map(
       -- Clock
-      CMS_CLK_FPGA_P       => cms_clk_fpga_p,
-      CMS_CLK_FPGA_N       => cms_clk_fpga_n,
-      GP_CLK_6_P           => sysclk80_p,
-      GP_CLK_6_N           => sysclk80_n,
-      GP_CLK_7_P           => sysclk80_p,
-      GP_CLK_7_N           => sysclk80_n,
-      REF_CLK_1_P          => sysclk160_p,
-      REF_CLK_1_N          => sysclk160_n,
-      REF_CLK_2_P          => sysclk160_p,
-      REF_CLK_2_N          => sysclk160_n,
-      REF_CLK_3_P          => sysclk160_p,
-      REF_CLK_3_N          => sysclk160_n,
-      REF_CLK_4_P          => sysclk160_p,
-      REF_CLK_4_N          => sysclk160_n,
-      REF_CLK_5_P          => sysclk160_p,
-      REF_CLK_5_N          => sysclk160_n,
-      CLK_125_REF_P        => sysclk125_p,
-      CLK_125_REF_N        => sysclk125_n,
-      EMCCLK               => sysclk160, -- Low frequency, 133 MHz for SPI programing clock, use 160 for now...
-      LF_CLK               => sysclk10, -- Low frequency, 10 kHz, use clk10 for now
-      --RST                  => rst_global,
+      CMS_CLK_FPGA_P       => cmsclk_p,
+      CMS_CLK_FPGA_N       => cmsclk_n,
+      GP_CLK_6_P           => cmsclk80_p,
+      GP_CLK_6_N           => cmsclk80_n,
+      GP_CLK_7_P           => cmsclk80_p,
+      GP_CLK_7_N           => cmsclk80_n,
+      REF_CLK_1_P          => cmsclk160_p,
+      REF_CLK_1_N          => cmsclk160_n,
+      REF_CLK_2_P          => cmsclk160_p,
+      REF_CLK_2_N          => cmsclk160_n,
+      REF_CLK_3_P          => oscclk160_p,
+      REF_CLK_3_N          => oscclk160_n,
+      REF_CLK_4_P          => cmsclk160_p,
+      REF_CLK_4_N          => cmsclk160_n,
+      REF_CLK_5_P          => cmsclk160_p,
+      REF_CLK_5_N          => cmsclk160_n,
+      CLK_125_REF_P        => oscclk125_p,
+      CLK_125_REF_N        => oscclk125_n,
+      --EMCCLK               => oscclk125_p, -- Low frequency, 133 MHz for SPI programing clock, use 160 for now...
+      LF_CLK               => cmsclk10, -- Low frequency, 10 kHz, use clk10 for now
+
       VME_DATA             => vme_data_io,
       VME_GAP_B            => vme_ga(5),
       VME_GA_B             => vme_ga(4 downto 0),
@@ -547,10 +499,11 @@ begin
       VME_BERR_B           => vme_berr,
       VME_SYSRST_B         => vme_sysrst,
       VME_SYSFAIL_B        => vme_sysfail,
-      VME_DTACK_KUS_B      => vme_dtack,
       VME_CLK_B            => vme_clk_b,
       KUS_VME_OE_B         => kus_vme_oe_b,
       KUS_VME_DIR          => vme_dir,
+      VME_DTACK_KUS_B      => vme_dtack,
+
       DCFEB_TCK_P          => dcfeb_tck_p,
       DCFEB_TCK_N          => dcfeb_tck_n,
       DCFEB_TMS_P          => dcfeb_tms_p,
@@ -573,16 +526,10 @@ begin
       L1A_MATCH_P          => l1a_match_p,
       L1A_MATCH_N          => l1a_match_n,
       PPIB_OUT_EN_B        => open,
-      KUS_TMS              => open,
-      KUS_TCK              => open,
-      KUS_TDI              => open,
-      TDO                  => '0',
-      KUS_DL_SEL           => open,
-      ODMB_DONE            => '1',
-      FPGA_SEL             => open,
-      RST_CLKS_B           => open,
+      DCFEB_REPROG_B       => open,
+
       CCB_CMD              => "011000",
-      CCB_CMD_S            => sysclk80,
+      CCB_CMD_S            => cmsclk80,
       CCB_DATA             => x"00",
       CCB_DATA_S           => '0',
       CCB_CAL              => "000",
@@ -593,12 +540,13 @@ begin
       CCB_BX0_B            => '1',
       CCB_BX_RST_B         => '1',
       CCB_L1A_RST_B        => '1',
-      CCB_L1A_B            => '1',
+      CCB_L1A_B            => sim_l1a_b,
       CCB_L1A_RLS          => open,
       CCB_CLKEN            => '0',
       CCB_EVCNTRES_B       => '1',
       CCB_HARDRST_B        => '0',
       CCB_SOFT_RST_B       => '1',
+
       LVMB_PON             => lvmb_pon,
       PON_LOAD_B           => pon_load,
       PON_OE               => pon_oe,
@@ -608,13 +556,22 @@ begin
       LVMB_SDIN            => lvmb_sdin,
       LVMB_SDOUT_P         => lvmb_sdout_p,
       LVMB_SDOUT_N         => lvmb_sdout_n,
-      OTMB                 => x"000000000",
-      RAWLCT               => "0000000",
-      OTMB_DAV             => '0',
+
+      OTMB                 => x"F_FFFFFFFF",
+      RAWLCT               => sim_lct,
+      OTMB_DAV             => sim_otmb_dav,
+      LEGACY_ALCT_DAV      => sim_alct_dav,
       OTMB_FF_CLK          => '0',
-      RSVTD_IN             => "00000",
-      RSVTD_OUT            => open,
-      LCT_RQST             => open,    --DCFEB_PRBS_FIBER_SEL => dcfeb_prbs_FIBER_SEL,
+      RSVTD                => "000",
+      RSVFD                => open,
+      LCT_RQST             => open,
+
+      KUS_TMS              => open,
+      KUS_TCK              => open,
+      KUS_TDI              => open,
+      KUS_TDO              => '0',
+      KUS_DL_SEL           => open,
+
       DAQ_RX_P             => "00000000000",
       DAQ_RX_N             => "00000000000",
       DAQ_SPY_RX_P         => '0',
@@ -623,8 +580,8 @@ begin
       B04_RX_N             => "000",
       BCK_PRS_P            => '0',
       BCK_PRS_N            => '0',
-      -- SPY_TX_P             => open,
-      -- SPY_TX_N             => open,
+      SPY_TX_P             => open,
+      SPY_TX_N             => open,
       -- DAQ_TX_P             => open,
       -- DAQ_TX_N             => open,
       DAQ_SPY_SEL          => open,
@@ -654,30 +611,40 @@ begin
       SPY_SCL              => open,
       SPY_SD               => '0',
       SPY_TDIS             => open,
-      KUS_DL_SEL           => open,
-      FPGA_SEL             => open,
-      RST_CLKS_B           => open,
+
+      ODMB_DONE            => '1',
+
+      FPGA_SEL             => zl_fpga_sel,
+      RST_CLKS_B           => zl_rstn,
+      FPGA_AC              => zl_ac,
+      FPGA_TEST            => zl_test_gpio3,
+      FPGA_IF0_CSN         => zl_if0_csn,
+      FPGA_IF1_MISO        => zl_if1_miso,
+      FPGA_SCLK            => zl_scl_sclk,
+      FPGA_MOSI            => zl_sda_mosi,
+
       SYSMON_P             => x"0000",
       SYSMON_N             => x"0000",
-      ADC_CS_B           => open,
-      ADC_DIN           => open,
-      ADC_SCK           => open,
-      ADC_DOUT          => '1',
+      ADC_CS_B             => open,
+      ADC_DIN              => open,
+      ADC_SCK              => open,
+      ADC_DOUT             => '1',
+
+      PROM_RST_B           => open,
+      PROM_CS2_B           => open,
+      CNFG_DATA            => open,
+
       LEDS_CFV             => open
-     --VME_DATA_IN          => vme_data_io_in,        --unused/open in real ODMB
-     --VME_DATA_OUT         => vme_data_io_out,       --unused/open in real ODMB
       );
 
   -- DCFEB simulation slot 2
-  dcfeb_i: DCFEB_DS_WRAPPER
+  dcfeb_i: dcfeb_v6
     port map (
-      CLK             => sysclk,
-      DCFEBCLK        => '0', --160 MHz
+      CLK             => cmsclk,
+      DCFEBCLK        => cmsclk160_p,
       RST             => rst_global,
-      L1A_P           => l1a_p,
-      L1A_N           => l1a_n,
-      L1A_MATCH_P     => l1a_match_p(2),
-      L1A_MATCH_N     => l1a_match_n(2),
+      L1A             => l1a_p,
+      L1A_MATCH       => l1a_match_p(2),
       TX_ACK          => '0',
       NWORDS_DUMMY    => x"0000",
       DCFEB_DV        => open,
@@ -686,24 +653,16 @@ begin
       DCFEB_FSEL      => open,
       DCFEB_JTAG_IR   => open,
       TRST            => dcfeb_initjtag,
-      TCK_P           => dcfeb_tck_p(2),  -- between ODMB and DCFEB (through PPIB)
-      TCK_N           => dcfeb_tck_n(2),
-      TMS_P           => dcfeb_tms_p,     -- between ODMB and DCFEB (through PPIB)
-      TMS_N           => dcfeb_tms_n,
-      TDI_P           => dcfeb_tdi_p,     -- between ODMB and DCFEB (through PPIB)
-      TDI_N           => dcfeb_tdi_n,
-      TDO_P           => dcfeb_tdo_p(2),  -- between ODMB and DCFEB (through PPIB)
-      TDO_N           => dcfeb_tdo_n(2),
+      TCK             => dcfeb_tck_p(2),
+      TMS             => dcfeb_tms_p,
+      TDI             => dcfeb_tdi_p,
+      TDO             => dcfeb_tdo_p(2),
       RTN_SHFT_EN     => open,
       DONE            => dcfeb_done(2),
-      INJPLS_P        => injpls_p,
-      INJPLS_N        => injpls_n,
-      EXTPLS_P        => extpls_p,
-      EXTPLS_N        => extpls_n,
-      BC0_P           => bc0_p,
-      BC0_N           => bc0_n,
-      RESYNC_P        => resync_p,
-      RESYNC_N        => resync_n,
+      INJPLS          => injpls_p,
+      EXTPLS          => extpls_p,
+      BC0             => bc0_p,
+      RESYNC          => resync_p,
       DIAGOUT         => dcfeb_diagout
       );
 
@@ -726,7 +685,7 @@ begin
   -- VME simulation
   vme_i : vme_master
     port map (
-      CLK            => sysclk,           -- VME controller
+      CLK            => cmsclk,           -- VME controller
       RSTN           => rstn,             -- VME controller
       SW_RESET       => rst_global,       -- VME controller
       VME_CMD        => vc_cmd,           -- VME controller
@@ -753,5 +712,19 @@ begin
       DATA_OUT       => vme_data_io_in_buf    -- between VME and ODMB
       );
 
+  -- clock chip simulation
+  zl30267_i : CLOCK_CHIP_SIM
+    port map (
+      FPGA_SEL   => zl_fpga_sel,
+      RSTN       => zl_rstn,
+      AC0_GPIO0  => zl_ac(0),
+      AC1_GPIO1  => zl_ac(1),
+      AC2_GPIO2  => zl_ac(2),
+      TEST_GPIO3 => zl_test_gpio3,
+      IF0_CSN    => zl_if0_csn,
+      IF1_MISO   => zl_if1_miso,
+      SCL_SCLK   => zl_scl_sclk,
+      SDA_MOSI   => zl_sda_mosi
+    );
 
 end Behavioral;

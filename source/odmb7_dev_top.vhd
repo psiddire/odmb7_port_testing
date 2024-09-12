@@ -1,3 +1,8 @@
+-------------------------------------------------------
+--! @file
+--! @brief top level file for ODMB7 prototype firmware
+-------------------------------------------------------
+
 library IEEE;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -8,480 +13,247 @@ use unisim.vcomponents.all;
 
 use work.ucsb_types.all;
 
+--! @brief ODMB7 prototype firmware
+--! @details ODMB7 firmware. Currently capable of testing virtually all 
+--! hardware interfaces and performing most slow control functionality, however
+--! data acquisition firmware has not yet been developed
 entity odmb7_ucsb_dev is
+  generic (
+    ENABLE_SPY_TO_DDU : std_logic := '0'
+    );
   port (
     --------------------
     -- Input clocks
     --------------------
-    CMS_CLK_FPGA_P : in std_logic;      -- system clock: 40.07897 MHz
-    CMS_CLK_FPGA_N : in std_logic;      -- system clock: 40.07897 MHz
-    GP_CLK_6_P : in std_logic;          -- clock synthesizer ODIV6: 80 MHz
-    GP_CLK_6_N : in std_logic;          -- clock synthesizer ODIV6: 80 MHz
-    GP_CLK_7_P : in std_logic;          -- clock synthesizer ODIV7: 80 MHz
-    GP_CLK_7_N : in std_logic;          -- clock synthesizer ODIV7: 80 MHz
-    REF_CLK_1_P : in std_logic;         -- refclk0 to 224
-    REF_CLK_1_N : in std_logic;         -- refclk0 to 224
-    REF_CLK_2_P : in std_logic;         -- refclk0 to 227
-    REF_CLK_2_N : in std_logic;         -- refclk0 to 227
-    REF_CLK_3_P : in std_logic;         -- refclk0 to 226
-    REF_CLK_3_N : in std_logic;         -- refclk0 to 226
-    REF_CLK_4_P : in std_logic;         -- refclk0 to 225
-    REF_CLK_4_N : in std_logic;         -- refclk0 to 225
-    REF_CLK_5_P : in std_logic;         -- refclk1 to 227
-    REF_CLK_5_N : in std_logic;         -- refclk1 to 227
-    CLK_125_REF_P : in std_logic;       -- refclk1 to 226
-    CLK_125_REF_N : in std_logic;       -- refclk1 to 226
-    EMCCLK : in std_logic;              -- Low frequency, 133 MHz for SPI programing clock
-    LF_CLK : in std_logic;              -- Low frequency, 10 kHz
+    CMS_CLK_FPGA_P : in std_logic;                         --! CMS/system clock: 40.07897 MHz. Can be from local oscillator or CCB. Used to generate most clocks used in firmware. Connected to bank 45.
+    CMS_CLK_FPGA_N : in std_logic;                         --! CMS/system clock: 40.07897 MHz. Can be from local oscillator or CCB. Used to generate most clocks used in firmware. Connected to bank 45.
+    GP_CLK_6_P     : in std_logic;                         --! From clock synthesizer ODIV6: 80 MHz. Currently unused. Connected to bank 44.
+    GP_CLK_6_N     : in std_logic;                         --! From clock synthesizer ODIV6: 80 MHz. Currently unused. Connected to bank 44.
+    GP_CLK_7_P     : in std_logic;                         --! From clock synthesizer ODIV7: 80 MHz. Currently unused. Connected to bank 68.
+    GP_CLK_7_N     : in std_logic;                         --! From clock synthesizer ODIV7: 80 MHz. Currently unused. Connected to bank 68.
+    REF_CLK_1_P    : in std_logic;                         --! From clock synthesizer, refclk0 to GTH quad 224.
+    REF_CLK_1_N    : in std_logic;                         --! From clock synthesizer, refclk0 to GTH quad 224.
+    REF_CLK_2_P    : in std_logic;                         --! From clock synthesizer, refclk0 to GTH quad 227.
+    REF_CLK_2_N    : in std_logic;                         --! From clock synthesizer, refclk0 to GTH quad 227.
+    REF_CLK_3_P    : in std_logic;                         --! From clock synthesizer, refclk0 to GTH quad 226.
+    REF_CLK_3_N    : in std_logic;                         --! From clock synthesizer, refclk0 to GTH quad 226.
+    REF_CLK_4_P    : in std_logic;                         --! From clock synthesizer, refclk0 to GTH quad 225.
+    REF_CLK_4_N    : in std_logic;                         --! From clock synthesizer, refclk0 to GTH quad 225.
+    REF_CLK_5_P    : in std_logic;                         --! From clock synthesizer, refclk1 to GTH quad 227.
+    REF_CLK_5_N    : in std_logic;                         --! From clock synthesizer, refclk1 to GTH quad 227.
+    CLK_125_REF_P  : in std_logic;                         --! From clock synthesizer, refclk1 to GTH quad 226.
+    CLK_125_REF_N  : in std_logic;                         --! From clock synthesizer, refclk1 to GTH quad 226.
+    LF_CLK         : in std_logic;                         --! From clock synthesizer, 10 kHz. General purpose low frequency clock, currently unused. Connected to bank 45.
 
     --------------------
     -- Signals controlled by ODMB_VME
     --------------------
     -- From/To VME controller to/from MBV
-    VME_DATA        : inout std_logic_vector(15 downto 0); -- Bank 48
-    VME_GAP_B       : in std_logic;                        -- Bank 48
-    VME_GA_B        : in std_logic_vector(4 downto 0);     -- Bank 48
-    VME_ADDR        : in std_logic_vector(23 downto 1);    -- Bank 46
-    VME_AM          : in std_logic_vector(5 downto 0);     -- Bank 46
-    VME_AS_B        : in std_logic;                        -- Bank 46
-    VME_DS_B        : in std_logic_vector(1 downto 0);     -- Bank 46
-    VME_LWORD_B     : in std_logic;                        -- Bank 48
-    VME_WRITE_B     : in std_logic;                        -- Bank 48
-    VME_IACK_B      : in std_logic;                        -- Bank 48
-    VME_BERR_B      : in std_logic;                        -- Bank 48
-    VME_SYSRST_B    : in std_logic;                        -- Bank 48, not used
-    VME_SYSFAIL_B   : in std_logic;                        -- Bank 48
-    VME_CLK_B       : in std_logic;                        -- Bank 48, not used
-    KUS_VME_OE_B    : out std_logic;                       -- Bank 44
-    KUS_VME_DIR     : out std_logic;                       -- Bank 44
-    VME_DTACK_KUS_B : out std_logic;                       -- Bank 44
+    VME_DATA        : inout std_logic_vector(15 downto 0); --! Data to/from VME backplane. Used by ODMB_VME module. Connected to bank 48.
+    VME_GAP_B       : in std_logic;                        --! Geographical address (VME slot) parity. Used by ODMB_VME module. Connected to bank 48.
+    VME_GA_B        : in std_logic_vector(4 downto 0);     --! Geographical address (VME slot). Used by ODMB_VME and ODMB CTRL module. Connected to bank 48.
+    VME_ADDR        : in std_logic_vector(23 downto 1);    --! VME address (command). Used by ODMB_VME module. Conencted to bank 46.
+    VME_AM          : in std_logic_vector(5 downto 0);     --! VME address modifier. Used by ODMB_VME module. Connected to cank 46.
+    VME_AS_B        : in std_logic;                        --! VME address strobe. Used by ODMB_VME module. Connected to bank 46.
+    VME_DS_B        : in std_logic_vector(1 downto 0);     --! VME data strobe. Used by ODMB_VME module. Connected to bank 46.
+    VME_LWORD_B     : in std_logic;                        --! VME data word length. Used by ODMB_VME module. Connected to bank 48.
+    VME_WRITE_B     : in std_logic;                        --! VME write/read indicator. Used by ODMB_VME module. Connected to bank 48.
+    VME_IACK_B      : in std_logic;                        --! VME interrupt acknowledge. Used by ODMB_VME module. Connected to bank 48.
+    VME_BERR_B      : in std_logic;                        --! VME bus error indicator. Used by ODMB_VME module. Connected to bank 48.
+    VME_SYSRST_B    : in std_logic;                        --! VME system reset. Not used. Connected to bank 48.
+    VME_SYSFAIL_B   : in std_logic;                        --! VME system failure indicator. Used by ODMB_VME module. Connected to bank 48.
+    VME_CLK_B       : in std_logic;                        --! VME clock. Not used. Connected to bank 48.
+    KUS_VME_OE_B    : out std_logic;                       --! VME output enable. Controlled by ODMB_VME module. Connected to bank 44.
+    KUS_VME_DIR     : out std_logic;                       --! ODMB board VME input/output direction. Controlled by ODMB_VME module. Connected to bank 44.
+    VME_DTACK_KUS_B : out std_logic;                       --! VME data acknowledge. Controlled by ODMB_VME module. Connected to bank 44.
 
     -- From/To PPIB (connectors J3 and J4)
-    DCFEB_TCK_P    : out std_logic_vector(7 downto 1);     -- Bank 68
-    DCFEB_TCK_N    : out std_logic_vector(7 downto 1);     -- Bank 68
-    DCFEB_TMS_P    : out std_logic;                        -- Bank 68
-    DCFEB_TMS_N    : out std_logic;                        -- Bank 68
-    DCFEB_TDI_P    : out std_logic;                        -- Bank 68
-    DCFEB_TDI_N    : out std_logic;                        -- Bank 68
-    DCFEB_TDO_P    : in  std_logic_vector(7 downto 1);     -- "C_TDO" in Bank 67-68
-    DCFEB_TDO_N    : in  std_logic_vector(7 downto 1);     -- "C_TDO" in Bank 67-68
-    DCFEB_DONE     : in  std_logic_vector(7 downto 1);     -- "DONE_*" in Bank 68
-    RESYNC_P       : out std_logic;                        -- Bank 66
-    RESYNC_N       : out std_logic;                        -- Bank 66
-    BC0_P          : out std_logic;                        -- Bank 68
-    BC0_N          : out std_logic;                        -- Bank 68
-    INJPLS_P       : out std_logic;                        -- Bank 66, ODMB CTRL
-    INJPLS_N       : out std_logic;                        -- Bank 66, ODMB CTRL
-    EXTPLS_P       : out std_logic;                        -- Bank 66, ODMB CTRL
-    EXTPLS_N       : out std_logic;                        -- Bank 66, ODMB CTRL
-    L1A_P          : out std_logic;                        -- Bank 66, ODMB CTRL
-    L1A_N          : out std_logic;                        -- Bank 66, ODMB CTRL
-    L1A_MATCH_P    : out std_logic_vector(7 downto 1);     -- Bank 66, ODMB CTRL
-    L1A_MATCH_N    : out std_logic_vector(7 downto 1);     -- Bank 66, ODMB CTRL
-    PPIB_OUT_EN_B  : out std_logic;                        -- Bank 68
+    DCFEB_TCK_P    : out std_logic_vector(7 downto 1);     --! (x)DCFEB JTAG TCK signal. One per (x)DCFEB. Used by ODMB_VME module. Connected to bank 68.
+    DCFEB_TCK_N    : out std_logic_vector(7 downto 1);     --! (x)DCFEB JTAG TCK signal. One per (x)DCFEB. Used by ODMB_VME module. Connected to bank 68. 
+    DCFEB_TMS_P    : out std_logic;                        --! (x)DCFEB JTAG TMS signal. Used by ODMB_VME module. Connected to bank 68.
+    DCFEB_TMS_N    : out std_logic;                        --! (x)DCFEB JTAG TMS signal. Used by ODMB_VME module. Connected to bank 68.
+    DCFEB_TDI_P    : out std_logic;                        --! (x)DCFEB JTAG TDI signal. Used by ODMB_VME module. Connected to bank 68.
+    DCFEB_TDI_N    : out std_logic;                        --! (x)DCFEB JTAG TDI signal. Used by ODMB_VME module. Connected to bank 68.
+    DCFEB_TDO_P    : in  std_logic_vector(7 downto 1);     --! (x)DCFEB JTAG TDO signal. One per (x)DCFEB. Used by ODMB_VME module. Connected to bank 67-68 as "C_TDO".
+    DCFEB_TDO_N    : in  std_logic_vector(7 downto 1);     --! (x)DCFEB JTAG TDO signal. One per (x)DCFEB. Used by ODMB_VME module. Connected to bank 67-68 as "C_TDO". 
+    DCFEB_DONE     : in  std_logic_vector(7 downto 1);     --! (x)DCFEB programming done signal. Used only by top level DCFEB startup process. Connected to bank 68 as "DONE_*".
+    RESYNC_P       : out std_logic;                        --! (x)DCFEB resync signal. Used by ODMB_VME module. Connected to bank 66.
+    RESYNC_N       : out std_logic;                        --! (x)DCFEB resync signal. Used by ODMB_VME module. Connected to bank 66.
+    BC0_P          : out std_logic;                        --! (x)DCFEB bunch crossing 0 synchronization signal. Initiated by CCB_BX0 signal or from ODMB_VME. Connected to bank 68.
+    BC0_N          : out std_logic;                        --! (x)DCFEB bunch crossing 0 synchronization signal. Initiated by CCB_BX0 signal or from ODMB_VME. Connected to bank 68.
+    INJPLS_P       : out std_logic;                        --! Calibration INJPLS signal for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
+    INJPLS_N       : out std_logic;                        --! Calibration INJPLS signal for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
+    EXTPLS_P       : out std_logic;                        --! Calibration EXTPLS signal for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
+    EXTPLS_N       : out std_logic;                        --! Calibration EXTPLS signal for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
+    L1A_P          : out std_logic;                        --! Trigger L1A signal for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
+    L1A_N          : out std_logic;                        --! Trigger L1A signal for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
+    L1A_MATCH_P    : out std_logic_vector(7 downto 1);     --! L1A match for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
+    L1A_MATCH_N    : out std_logic_vector(7 downto 1);     --! L1A match for (x)DCFEBs. From ODMB CTRL module. Connected to bank 66.
+    PPIB_OUT_EN_B  : out std_logic;                        --! PPIB output enable signal. Should be fixed to '0'. Connected to bank 68.
+    DCFEB_REPROG_B : out std_logic;                        --! (x)DCFEB reprogram signal. From ODMBCTRL in ODMB_VME module. Connected to bank 68.
 
     --------------------
     -- CCB Signals
     --------------------
-    CCB_CMD        : in  std_logic_vector(5 downto 0);     -- Bank 44
-    CCB_CMD_S      : in  std_logic;                        -- Bank 46
-    CCB_DATA       : in  std_logic_vector(7 downto 0);     -- Bank 44
-    CCB_DATA_S     : in  std_logic;                        -- Bank 46
-    CCB_CAL        : in  std_logic_vector(2 downto 0);     -- Bank 44
-    CCB_CRSV       : in  std_logic_vector(3 downto 0);     -- Bank 44
-    CCB_DRSV       : in  std_logic_vector(1 downto 0);     -- Bank 45
-    CCB_RSVO       : in  std_logic_vector(4 downto 0);     -- Bank 45
-    CCB_RSVI       : out std_logic_vector(2 downto 0);     -- Bank 45
-    CCB_BX0_B      : in  std_logic;                        -- "CCB_BX0" in Bank 46
-    CCB_BX_RST_B   : in  std_logic;                        -- "CCB_BX_RST" in Bank 46
-    CCB_L1A_RST_B  : in  std_logic;                        -- "CCB_L1A_RST" in Bank 46
-    CCB_L1A_B      : in  std_logic;                        -- "CCB_L1A" in Bank 46
-    CCB_L1A_RLS    : out std_logic;                        -- Bank 45
-    CCB_CLKEN      : in  std_logic;                        -- Bank 46
-    CCB_EVCNTRES_B : in  std_logic;                        -- "CCB_EVCNTRES" in Bank 46
-    CCB_HARDRST_B  : in  std_logic;                        -- Bank 45 <-- should not be connected
-    CCB_SOFT_RST_B : in  std_logic;                        -- "CCB_SOFT_RST" in Bank 45
+    CCB_CMD        : in  std_logic_vector(5 downto 0);     --! Command from CCB, generates BC0, L1ARST, etc. for ODMB. Used by ODMB CTRL module. Connected to bank 44.
+    CCB_CMD_S      : in  std_logic;                        --! CCB command strobe. Used by ODMB CTRL module. Connected to bank 46.
+    CCB_DATA       : in  std_logic_vector(7 downto 0);     --! CCB data. Only used in CCB communication test. Connected to bank 44.
+    CCB_DATA_S     : in  std_logic;                        --! CCB data strobe. Only used in CCB communication test. Connected to bank 46.
+    CCB_CAL        : in  std_logic_vector(2 downto 0);     --! CCB calibration signals. Only used in CCB communication test. In ODMB2014 fw, connected to ODMB CTRL but unused. Connected to bank 44.
+    CCB_CRSV       : in  std_logic_vector(3 downto 0);     --! CCB CCB-reserved signals. Only used in CCB communication test. In ODMB2014 fw, connected to ODMB CTRL but unused. Connected to bank 44.
+    CCB_DRSV       : in  std_logic_vector(1 downto 0);     --! CCB DMB-reserved signals. Only used in CCB communication test. In ODMB2014 fw, connected to ODMB CTRL but unused. Connected to bank 45.
+    CCB_RSVO       : in  std_logic_vector(4 downto 0);     --! CCB DMB-reserved output. Only used in CCB communication test. In ODMB2014 fw, connected to ODMB CTRL but unused. Connected to bank 45.
+    CCB_RSVI       : out std_logic_vector(2 downto 0);     --! CCB DMB-reserved input. Only used in CCB communication test. In ODMB2014 fw, connected to ODMB CTRL but unused. Connected to bank 45.
+    CCB_BX0_B      : in  std_logic;                        --! CCB bunch-crossing 0 synchronization signal. Used to generate BC0 pulse to (x)DCFEBs. Connected to Bank 46 as "CCB_BX0".
+    CCB_BX_RST_B   : in  std_logic;                        --! CCB bunch-crossing reset signal. Used by ODMB CTRL. Connected to bank 46 as "CCB_BX_RST".
+    CCB_L1A_RST_B  : in  std_logic;                        --! CCB L1A reset signal. Used by simulated FE boards but not ODMB CTRL in ODMB2014 fw. Connected to bank 46 as "CCB_L1A_RST".
+    CCB_L1A_B      : in  std_logic;                        --! CCB L1A signal. Used to generate raw_l1a to ODMB CTRL in ODMB2014 fw. Connected to bank 46 as "CCB_L1A".
+    CCB_L1A_RLS    : out std_logic;                        --! CCB L1A release. Fixed to '0' in ODMB2014 fw. Connected to bank 45.
+    CCB_CLKEN      : in  std_logic;                        --! CCB clock enable signal. Connected to ODMB CTRL in ODMB2014 fw but unused. Connected to bank 46.
+    CCB_EVCNTRES_B : in  std_logic;                        --! CCB event counter reset. Used by simulated FE boards. Connected to bank 64 as "CCB_EVCNTRES".
+    CCB_HARDRST_B  : in  std_logic;                        --! CCB hard reset. Unusable since hard reset resets the FPGA but must be input to avoid self-reset. Connected to bank 45 in error.
+    CCB_SOFT_RST_B : in  std_logic;                        --! CCB soft reset. Triggers reset of elements throughout firmware. Connected to bank 45 as "CCB_SOFT_RST".
 
     --------------------
     -- LVMB Signals
     --------------------
-    LVMB_PON     : out std_logic_vector(7 downto 0);       -- Bank 67
-    PON_LOAD_B   : out std_logic;                          -- Bank 67
-    PON_OE       : out std_logic;                          -- Bank 67
-    MON_LVMB_PON : in  std_logic_vector(7 downto 0);       -- Bank 67
-    LVMB_CSB     : out std_logic_vector(6 downto 0);       -- Bank 67
-    LVMB_SCLK    : out std_logic;                          -- Bank 68
-    LVMB_SDIN    : out std_logic;                          -- Bank 68
-    LVMB_SDOUT_P : in std_logic;                           -- C_LVMB_SDOUT_P in Bank 67
-    LVMB_SDOUT_N : in std_logic;                           -- C_LVMB_SDOUT_N in Bank 67 --meta:uncomment_for_odmb
+    LVMB_PON     : out std_logic_vector(7 downto 0);       --! Signal to LVMB to power on (x)DCFEBs and ALCT. Mapping of bits to boards is chamber dependent. Used by ODMB_VME. Connected to bank 67.
+    PON_LOAD_B   : out std_logic;                          --! Signal to write LVMB_PON to LVMB. Used by ODMB_VME. Connected to bank 67.
+    PON_OE       : out std_logic;                          --! Output enable for LVMB_PON. Fixed to '1'. Used by ODMB_VME. Connected to bank 67.
+    MON_LVMB_PON : in  std_logic_vector(7 downto 0);       --! Signal to check (x)DCFEBs and ALCT power status from LVMB. Mapping of bits to boards is chamber dependent. Used by ODMB_VME. Connected to bank 67.
+    LVMB_CSB     : out std_logic_vector(6 downto 0);       --! LVMB ADC SPI chip select. Used by ODMB_VME. Connected to bank 67.
+    LVMB_SCLK    : out std_logic;                          --! LVMB ADC SPI clock. Used by ODMB_VME. Connected to bank 68.
+    LVMB_SDIN    : out std_logic;                          --! LVMB ADC SPI input. Used by ODMB_VME. Connected to bank 68.
+    LVMB_SDOUT_P : in std_logic;                           --! LVMB ADC SPI output. Used by ODMB_VME. Connected to bank 67 as C_LVMB_SDOUT_P.
+    LVMB_SDOUT_N : in std_logic;                           --! LVMB ADC SPI output. Used by ODMB_VME. Connected to bank 67 as C_LVMB_SDOUT_N.
 
     --------------------------------
     -- OTMB communication signals
     --------------------------------
-    OTMB        : in  std_logic_vector(35 downto 0);      -- "TMB[35:0]" in Bank 44-45
-    RAWLCT      : in  std_logic_vector(6 downto 0);       -- Bank 45 <-- To be updated
-    OTMB_DAV    : in  std_logic;                          -- "TMB_DAV" in Bank 45
-    OTMB_FF_CLK : in  std_logic;                          -- "TMB_FF_CLK" in Bank 45
-    RSVTD_IN    : in  std_logic_vector(7 downto 3);       -- "RSVTD[7:3]" in Bank 44-45  <-- To be updated
-    RSVTD_OUT   : out std_logic_vector(2 downto 0);       -- "RSVTD[2:0]" in Bank 44-45  <-- To be updated
-    LCT_RQST    : out std_logic_vector(2 downto 1);       -- Bank 45
+    OTMB            : in  std_logic_vector(35 downto 0);   --! OTMB data. Used for packet building and PRBS test. Connected to bank 44-45 as "TMB[35:0]".
+    RAWLCT          : in  std_logic_vector(7 downto 0);    --! Local charged track signals, used by TRGCNTRL in ODMB CTRL for timing and for PRBS test. Connected to bank 45 (to be updated).
+    OTMB_DAV        : in  std_logic;                       --! OTMB data available used by TRGCNTRL in ODMB CTRL for timing. Connected to bank 45 as TMB_DAV.
+    LEGACY_ALCT_DAV : in  std_logic;                       --! ALCT data available used by TRGCNTRL in ODMB CTRL for timing. Connected to bank 45 as RSVTD[7] (to be updated).
+    OTMB_FF_CLK     : in  std_logic;                       --! Unused. Connected to bank 45 as TMB_FF_CLK.
+    RSVTD           : in  std_logic_vector(5 downto 3);    --! Reserved to DMB signals used only for OTMB PRBS test. Connected to bank 44-45 as RSVTD[7:3] (to be updated).
+    RSVFD           : out std_logic_vector(3 downto 1);    --! Reserved to DMB signals used to send L1A info to OTMB and for PRBS test. Connected to bank 44-45 as RSVTD[2:0] (to be updated).
+    LCT_RQST        : out std_logic_vector(2 downto 1);    --! Used to send LCT and external trigger requests generated by ODMB_VME and for PRBS test. Connected to bank 45.
+
+    --------------------------------
+    -- ODMB JTAG
+    --------------------------------
+    KUS_TMS       : out std_logic;                         --! JTAG TMS signal to ODMB FPGA, used by ODMBJTAG in ODMB_VME. Connected to bank 47.
+    KUS_TCK       : out std_logic;                         --! JTAG TCK signal to ODMB FPGA, used by ODMBJTAG in ODMB_VME. Connected to bank 47.
+    KUS_TDI       : out std_logic;                         --! JTAG TDI signal to ODMB FPGA, used by ODMBJTAG in ODMB_VME. Connected to bank 47.
+    KUS_TDO       : in std_logic;                          --! JTAG TDO signal from ODMB FPGA, used by ODMBJTAG in ODMB_VME. Connected to bank 47 as TDO (pin U9).
+    KUS_DL_SEL    : out std_logic;                         --! ODMB JTAG path select, connected to ODMBJTAG module in ODMB_VME. Use 1 for DL/red box and 0 for firmware communication. Connected to bank 47.
 
     --------------------------------
     -- ODMB optical ports
     --------------------------------
     -- Acutally connected optical TX/RX signals
-    DAQ_RX_P     : in std_logic_vector(10 downto 0);
-    DAQ_RX_N     : in std_logic_vector(10 downto 0);
-    DAQ_SPY_RX_P : in std_logic;        -- DAQ_RX_P11 or SPY_RX_P
-    DAQ_SPY_RX_N : in std_logic;        -- DAQ_RX_N11 or SPY_RX_N
-    B04_RX_P     : in std_logic_vector(4 downto 2); -- B04 RX, no use yet
-    B04_RX_N     : in std_logic_vector(4 downto 2); -- B04 RX, no use yet
-    BCK_PRS_P    : in std_logic; -- B04_RX1_P
-    BCK_PRS_N    : in std_logic; -- B04_RX1_N
+    DAQ_RX_P     : in std_logic_vector(10 downto 0);       --! R12 optical RX from FE boards.
+    DAQ_RX_N     : in std_logic_vector(10 downto 0);       --! R12 optical RX from FE boards.
+    DAQ_SPY_RX_P : in std_logic;                           --! R12 optical RX from FE boards (DAQ_RX_P11) or finisar RX SPY_RX_P.
+    DAQ_SPY_RX_N : in std_logic;                           --! R12 optical RX from FE boards (DAQ_RX_N11) or finisar RX SPY_RX_N.
+    B04_RX_P     : in std_logic_vector(4 downto 2);        --! B04 optical RX from FED. No use yet.
+    B04_RX_N     : in std_logic_vector(4 downto 2);        --! B04 optical RX from FED. No use yet.
+    BCK_PRS_P    : in std_logic;                           --! B04 optical RX from FED for backpressure (B04_RX1_P).
+    BCK_PRS_N    : in std_logic;                           --! B04 optical RX from FED for backpressure (B04_RX1_N).
 
-    -- SPY_TX_P     : out std_logic;        -- output to PC
-    -- SPY_TX_N     : out std_logic;        -- output to PC
-    -- DAQ_TX_P     : out std_logic_vector(4 downto 1); -- B04 TX, output to FED
-    -- DAQ_TX_N     : out std_logic_vector(4 downto 1); -- B04 TX, output to FED
+    SPY_TX_P     : out std_logic;                          --! Finisar (spy) optical TX output to PC.
+    SPY_TX_N     : out std_logic;                          --! Finisar (spy) optical TX output to PC.
+    DAQ_TX_P     : out std_logic_vector(2 downto 2);       --! B04 optical TX, output to FED.
+    DAQ_TX_N     : out std_logic_vector(2 downto 2);       --! B04 optical TX, output to FED.
+    -- DAQ_TX_P     : out std_logic_vector(4 downto 1);    --! B04 optical TX, output to FED.
+    -- DAQ_TX_N     : out std_logic_vector(4 downto 1);    --! B04 optical TX, output to FED.
 
     --------------------------------
     -- Optical control signals
     --------------------------------
-    DAQ_SPY_SEL    : out std_logic;      -- 0 for DAQ_RX_P/N11, 1 for SPY_RX_P/N
+    DAQ_SPY_SEL    : out std_logic;                        --! Multiplexor control. 0 to select DAQ_RX_P/N11, 1 to select SPY_RX_P/N.
 
-    RX12_I2C_ENA   : out std_logic;
-    RX12_SDA       : inout std_logic;
-    RX12_SCL       : inout std_logic;
-    RX12_CS_B      : out std_logic;
-    RX12_RST_B    : out std_logic;
-    RX12_INT_B     : in std_logic;
-    RX12_PRESENT_B : in std_logic;
+    RX12_I2C_ENA   : out std_logic;                        --! I2C enable for RX12 firefly, currently tied to 0. Connected to bank 66.
+    RX12_SDA       : inout std_logic;                      --! I2C serial data signal to/from RX12 firefly, currently unused. Connected to bank 66.
+    RX12_SCL       : inout std_logic;                      --! I2C serial clock signal to RX12 firefly, currently unused. Connected to bank 66.
+    RX12_CS_B      : out std_logic;                        --! I2C chip select signal to RX12 firefly, tied to '1'. Connected to bank 66.
+    RX12_RST_B     : out std_logic;                        --! Reset signal to RX12 firefly, tied to '1'. Connected to bank 66.
+    RX12_INT_B     : in std_logic;                         --! Interrupt (fault) signal from RX12 firefly, currently unused. Connected to bank 66.
+    RX12_PRESENT_B : in std_logic;                         --! Present signal from RX12 firefly, currently unused. Connected to bank 66.
 
-    TX12_I2C_ENA   : out std_logic;
-    TX12_SDA       : inout std_logic;
-    TX12_SCL       : inout std_logic;
-    TX12_CS_B      : out std_logic;
-    TX12_RST_B     : out std_logic;
-    TX12_INT_B     : in std_logic;
-    TX12_PRESENT_B : in std_logic;
+    TX12_I2C_ENA   : out std_logic;                        --! I2C enable for TX12 firefly, currently tied to 0. Connected to bank 66.
+    TX12_SDA       : inout std_logic;                      --! I2C serial data signal to/from TX12 firefly, currently unused. Connected to 66.
+    TX12_SCL       : inout std_logic;                      --! I2C serial clock signal to TX12 firefly, currently unused. Connected to bank 66.
+    TX12_CS_B      : out std_logic;                        --! I2C chip select signal to TX12 firefly, tied to '1'. Connected to bank 66.
+    TX12_RST_B     : out std_logic;                        --! Reset signal to TX12 firefly, tied to '1'. Connected to bank 66.
+    TX12_INT_B     : in std_logic;                         --! Interrupt (fault) signal from TX12 firefly, currently unused. Connected to bank 66.
+    TX12_PRESENT_B : in std_logic;                         --! Present signal from TX12 firefly, currently unused. Connected to bank 66.
 
-    B04_I2C_ENA   : out std_logic;
-    B04_SDA       : inout std_logic;
-    B04_SCL       : inout std_logic;
-    B04_CS_B      : out std_logic;
-    B04_RST_B     : out std_logic;
-    B04_INT_B     : in std_logic;
-    B04_PRESENT_B : in std_logic;
+    B04_I2C_ENA   : out std_logic;                         --! I2C enable for B04 firefly, currently tied to 0. Connected to bank 66.
+    B04_SDA       : inout std_logic;                       --! I2C serial data signal to/from B04 firefly, currently unused. Connected to bank 66.
+    B04_SCL       : inout std_logic;                       --! I2C serial clock signal to B04 firefly, currently unused. Connected to bank 66.
+    B04_CS_B      : out std_logic;                         --! I2C chip select signal to B04 firefly, tied to '1'. Connected to bank 66.
+    B04_RST_B     : out std_logic;                         --! Reset signal to B04 firefly, tied to '1'. Connected to bank 66.
+    B04_INT_B     : in std_logic;                          --! Interrupt (fault) signal from B04 firefly, currently unused. Connected to bank 66.
+    B04_PRESENT_B : in std_logic;                          --! Present signal from B04 firefly, currently unused. Connected to bank 66.
 
-    SPY_I2C_ENA   : out std_logic;
-    SPY_SDA       : inout std_logic;
-    SPY_SCL       : inout std_logic;
-    SPY_SD        : in std_logic;   -- Signal Detect
-    SPY_TDIS      : out std_logic;  -- Transmitter Disable
+    SPY_I2C_ENA   : out std_logic;                         --! I2C enable for Finisar, currently unused. Connected to bank 66.
+    SPY_SDA       : inout std_logic;                       --! I2C serial data to/from Finisar, currently unused. Connected to bank 66.
+    SPY_SCL       : inout std_logic;                       --! I2C serial clock to Finisar, currently unused. Connected to bank 66.
+    SPY_SD        : in std_logic;                          --! Finisar signal detect signal, currently unused. Connected to bank 66.
+    SPY_TDIS      : out std_logic;                         --! Transmitter disable signal to Finisar, tied to '0'. Connected to bank 66.
 
     --------------------------------
     -- Essential selector/reset signals not classified yet
     --------------------------------
-    KUS_TMS       : out std_logic;                         -- Bank 47
-    KUS_TCK       : out std_logic;                         -- Bank 47
-    KUS_TDI       : out std_logic;                         -- Bank 47
-    TDO           : in std_logic;                          -- Bank 47
-    KUS_DL_SEL    : out std_logic;                         -- Bank 47, ODMB JTAG path select
-    FPGA_SEL      : out std_logic;                         -- Bank 47, clock synthesizaer control input select
-    RST_CLKS_B    : out std_logic;                         -- Bank 47, clock synthesizaer reset
-    ODMB_DONE     : in std_logic;                          -- "DONE" in bank 66 (pin L9), monitor DONE_0 from Bank 0 (pin N7)
+    ODMB_DONE     : in std_logic;                          --! Kintex Ultrascale configuration DONE signal from DONE_0 in bank 0 (N7). Unused but needs to be input. Connected to bank 66 (pin L9).
 
     --------------------------------
     -- System monitoring ports
     --------------------------------
-    SYSMON_P      : in std_logic_vector(15 downto 0);
-    SYSMON_N      : in std_logic_vector(15 downto 0);
+    SYSMON_P      : in std_logic_vector(15 downto 0);      --! Current monitoring analog signals from monitor ICs to SYSTEM_MON in VME module. Connected to bank 64.
+    SYSMON_N      : in std_logic_vector(15 downto 0);      --! Current monitoring analog signals from monitor ICs to SYSTEM_MON in VME module. Connected to bank 64.
+    ADC_CS_B      : out std_logic_vector(4 downto 0);      --! SPI chip select signals to voltage monitor ADCs used by SYSTEM_MON in VME module. Connected to bank 64.
+    ADC_DIN       : out std_logic;                         --! SPI input signal to voltage monitor ADCs used by SYSTEM_MON in VME module. Connected to bank 64.
+    ADC_SCK       : out std_logic;                         --! SPI clock signal to voltage monitor ADCs used by SYSTEM_MON in VME module. Connected to bank 64.
+    ADC_DOUT      : in std_logic;                          --! SPI output signal from voltage monitor ADCs used by SYSTEM_MON in VME module. Connected to bank 64.
 
-    ADC_CS_B      : out std_logic_vector(4 downto 0);      -- Bank 46
-    ADC_DIN       : out std_logic;                         -- Bank 46
-    ADC_SCK       : out std_logic;                         -- Bank 46
-    ADC_DOUT      : in std_logic;                          -- Bank 46
+    --------------------------------
+    -- PROM pins
+    --------------------------------
+    PROM_RST_B    : out std_logic;                         --! Reset signal to both PROM ICs currently tied to 1. Connected to bank 65.
+    PROM_CS2_B    : out std_logic;                         --! Chip select signal to secondary PROM, used by spi_interface in ODMB_VME. Connected to bank 65.
+    CNFG_DATA     : inout std_logic_vector(7 downto 4);    --! Data signals to/from the secondary PROM, used by spi_interface in ODMB_VME. Connected to bank 65.
+
+    --------------------------------
+    -- Clock synthesizer control signals
+    --------------------------------
+    RST_CLKS_B    : out std_logic;                         --! Clock synthesizer reset signal, needs to be tied to '1'. Connected to bank 47.
+    FPGA_SEL      : out std_logic;                         --! Clock synthesizer control input selector. Currently tied to '0'. '0' is control by usb, '1' is control by fpga. Connected to bank 47.
+    FPGA_AC       : out std_logic_vector(2 downto 0);      --! Clock synthesizer auto-configuration number used at reset. Connected to bank 47.
+    FPGA_TEST     : out std_logic;                         --! Clock synthesizer test mode. Nominally 0. Connected to bank 47.
+    FPGA_IF0_CSN  : out std_logic;                         --! Clock synthesizer interface mode to select i2c(00-10) or spi(11) during reset. After reset, spi chip select. Connected to bank 47.
+    FPGA_IF1_MISO : inout std_logic;                       --! Clock synthesizer interface mode to select i2c(00-10) or spi(11) during reset. After reset, spi miso. Connected to bank 47.
+    FPGA_SCLK     : out std_logic;                         --! Clock synthesizer clock. Connected to bank 47.
+    FPGA_MOSI     : inout std_logic;                       --! Clock synthesizer spi mosi or i2c sda. Connected to bank 47.
+
+    --------------------------------
+    -- Test point pins
+    --------------------------------
+    THTP          : out std_logic_vector(15 downto 0);     --! Through hole test point pins. Connected to bank 47.
+    SMTP          : out std_logic_vector(15 downto 0);     --! Surface mount test point pins. Connected to bank 48.
 
     --------------------------------
     -- Others
     --------------------------------
-    LEDS_CFV      : out std_logic_vector(11 downto 0)
+    LEDS_HEART_BEAT : out std_logic;                       --! On-board LED. Connected to bank 65.
+    LEDS_SPARE      : out std_logic;                       --! On-board LED. Connected to bank 65.
+    LEDS_CFV        : out std_logic_vector(11 downto 0)    --! Front panel LEDs, currently unused. Connected to bank 65.
     );
 end odmb7_ucsb_dev;
 
 architecture Behavioral of odmb7_ucsb_dev is
   constant NCFEB  : integer range 1 to 7 := 7;  -- Number of DCFEBS, 7 for ODMB7
-
-  component odmb_clocking is
-    port (
-      -- Input ports
-      CMS_CLK_FPGA_P : in std_logic;    -- system clock: 40.07897 MHz
-      CMS_CLK_FPGA_N : in std_logic;    -- system clock: 40.07897 MHz
-      GP_CLK_6_P     : in std_logic;    -- clock synthesizer ODIV6: 80 MHz
-      GP_CLK_6_N     : in std_logic;    -- clock synthesizer ODIV6: 80 MHz
-      GP_CLK_7_P     : in std_logic;    -- clock synthesizer ODIV7: 80 MHz
-      GP_CLK_7_N     : in std_logic;    -- clock synthesizer ODIV7: 80 MHz
-      REF_CLK_1_P    : in std_logic;    -- refclk0 to 224
-      REF_CLK_1_N    : in std_logic;    -- refclk0 to 224
-      REF_CLK_2_P    : in std_logic;    -- refclk0 to 227
-      REF_CLK_2_N    : in std_logic;    -- refclk0 to 227
-      REF_CLK_3_P    : in std_logic;    -- refclk0 to 226
-      REF_CLK_3_N    : in std_logic;    -- refclk0 to 226
-      REF_CLK_4_P    : in std_logic;    -- refclk0 to 225
-      REF_CLK_4_N    : in std_logic;    -- refclk0 to 225
-      REF_CLK_5_P    : in std_logic;    -- refclk1 to 227
-      REF_CLK_5_N    : in std_logic;    -- refclk1 to 227
-      CLK_125_REF_P  : in std_logic;    -- refclk1 to 226
-      CLK_125_REF_N  : in std_logic;    -- refclk1 to 226
-      EMCCLK         : in std_logic;    -- Low frequency, 133 MHz for SPI programing clock
-      LF_CLK         : in std_logic;    -- Low frequency, 10 kHz
-
-      -- Output clocks
-      mgtrefclk0_224 : out std_logic;   -- MGT refclk for GT wizard
-      mgtrefclk0_225 : out std_logic;   -- MGT refclk for GT wizard
-      mgtrefclk0_226 : out std_logic;   -- MGT refclk for GT wizard
-      mgtrefclk1_226 : out std_logic;   -- MGT refclk for GT wizard
-      mgtrefclk0_227 : out std_logic;   -- MGT refclk for GT wizard
-      mgtrefclk1_227 : out std_logic;   -- MGT refclk for GT wizard
-      clk_sysclk625k : out std_logic;
-      clk_sysclk1p25 : out std_logic;
-      clk_sysclk2p5  : out std_logic;
-      clk_sysclk10   : out std_logic;   -- derived clock from MMCM
-      clk_sysclk20   : out std_logic;   -- derived clock from MMCM
-      clk_sysclk40   : out std_logic;   -- derived clock from MMCM
-      clk_sysclk80   : out std_logic;   -- derived clock from MMCM
-      clk_cmsclk     : out std_logic;   -- buffed CMS clock, 40.07897 MHz
-      clk_emcclk     : out std_logic;   -- buffed EMC clock
-      clk_lfclk      : out std_logic;   -- buffed LF clock
-      clk_gp6        : out std_logic;
-      clk_gp7        : out std_logic;
-      clk_mgtclk1    : out std_logic;   -- buffed ODIV2 port of the refclks, 160 MHz
-      clk_mgtclk2    : out std_logic;   -- buffed ODIV2 port of the refclks, 160 MHz
-      clk_mgtclk3    : out std_logic;   -- buffed ODIV2 port of the refclks, 160 MHz
-      clk_mgtclk4    : out std_logic;   -- buffed ODIV2 port of the refclks, 160 MHz
-      clk_mgtclk5    : out std_logic;   -- buffed ODIV2 port of the refclks, 160 MHz
-      clk_mgtclk125  : out std_logic    -- buffed ODIV2 port of the refclks, 125 MHz
-      );
-  end component;
-
-  component ODMB_VME is
-    generic (
-      NCFEB       : integer range 1 to 7 := 7  -- Number of DCFEBS, 7 for ME1/1, 5
-      );
-    port (
-      --------------------
-      -- Clock
-      --------------------
-      CLK160      : in std_logic;  -- For dcfeb prbs (160MHz)
-      CLK40       : in std_logic;  -- NEW (fastclk -> 40MHz)
-      CLK10       : in std_logic;  -- NEW (midclk -> fastclk/4 -> 10MHz)
-      CLK2P5      : in std_logic;  -- 2.5 MHz clock
-      CLK1P25     : in std_logic;  -- 1.25 MHz clock
-
-      --------------------
-      -- VME signals  <-- relevant ones only
-      --------------------
-      VME_DATA_IN   : in std_logic_vector (15 downto 0);
-      VME_DATA_OUT  : out std_logic_vector (15 downto 0);
-      VME_GAP_B     : in std_logic;     -- Also known as GA(5)
-      VME_GA_B      : in std_logic_vector (4 downto 0);
-      VME_ADDR      : in std_logic_vector (23 downto 1);
-      VME_AM        : in std_logic_vector (5 downto 0);
-      VME_AS_B      : in std_logic;
-      VME_DS_B      : in std_logic_vector (1 downto 0);
-      VME_LWORD_B   : in std_logic;
-      VME_WRITE_B   : in std_logic;
-      VME_IACK_B    : in std_logic;
-      VME_BERR_B    : in std_logic;
-      VME_SYSFAIL_B : in std_logic;
-      VME_DTACK_B   : out std_logic;
-      VME_OE_B      : out std_logic;
-      VME_DIR_B     : out std_logic;
-
-      --------------------
-      -- JTAG Signals To/From DCFEBs
-      --------------------
-      DCFEB_TCK    : out std_logic_vector (NCFEB downto 1);
-      DCFEB_TMS    : out std_logic;
-      DCFEB_TDI    : out std_logic;
-      DCFEB_TDO    : in  std_logic_vector (NCFEB downto 1);
-
-      DCFEB_DONE     : in std_logic_vector (NCFEB downto 1);
-      DCFEB_INITJTAG : in std_logic;   -- TODO: where does this fit in
-
-      --------------------
-      -- JTAG Signals To/From ODMBs
-      --------------------
-      ODMB_TCK    : out std_logic;
-      ODMB_TMS    : out std_logic;
-      ODMB_TDI    : out std_logic;
-      ODMB_TDO    : in  std_logic;
-      ODMB_SEL    : out std_logic;
-      ODMB_INITJTAG : in std_logic;   -- TODO: where does this fit in
-
-      --------------------
-      -- From/To LVMB: ODMB & ODMB7 design, ODMB5 to be seen
-      --------------------
-      LVMB_PON     : out std_logic_vector(7 downto 0);
-      PON_LOAD_B   : out std_logic;
-      PON_OE       : out std_logic;
-      R_LVMB_PON   : in  std_logic_vector(7 downto 0);
-      LVMB_CSB     : out std_logic_vector(6 downto 0);
-      LVMB_SCLK    : out std_logic;
-      LVMB_SDIN    : out std_logic;
-      LVMB_SDOUT   : in  std_logic;
-
-      --------------------
-      -- OTMB signals
-      --------------------
-      OTMB        : in  std_logic_vector(35 downto 0);      -- "TMB[35:0]" in Bank 44-45
-      RAWLCT      : in  std_logic_vector(NCFEB-1 downto 0); -- Bank 45
-      OTMB_DAV    : in  std_logic;                          -- "TMB_DAV" in Bank 45
-      OTMB_FF_CLK : in  std_logic;                          -- "TMB_FF_CLK" in Bank 45
-      RSVTD_IN    : in  std_logic_vector(7 downto 3);       -- "RSVTD[7:3]" in Bank 44-45
-      RSVTD_OUT   : out std_logic_vector(2 downto 0);       -- "RSVTD[2:0]" in Bank 44-45
-      LCT_RQST    : out std_logic_vector(2 downto 1);       -- Bank 45
-
-      --------------------
-      -- VMEMON Configuration signals for top level
-      --------------------
-      FW_RESET             : out std_logic;
-      L1A_RESET_PULSE      : out std_logic;
-      OPT_RESET_PULSE      : out std_logic;
-      TEST_INJ             : out std_logic;
-      TEST_PLS             : out std_logic;
-      TEST_BC0             : out std_logic;
-      TEST_PED             : out std_logic;
-      TEST_LCT             : out std_logic;
-      MASK_L1A             : out std_logic_vector(NCFEB downto 0);
-      MASK_PLS             : out std_logic;
-      ODMB_CAL             : out std_logic;
-      MUX_DATA_PATH        : out std_logic;
-      MUX_TRIGGER          : out std_logic;
-      MUX_LVMB             : out std_logic;
-      ODMB_PED             : out std_logic_vector(1 downto 0);
-      ODMB_DATA            : in std_logic_vector(15 downto 0);
-      ODMB_DATA_SEL        : out std_logic_vector(7 downto 0);
-
-      --------------------
-      -- VMECONFREGS Configuration signals for top level
-      --------------------
-      LCT_L1A_DLY      : out std_logic_vector(5 downto 0);
-      CABLE_DLY        : out integer range 0 to 1;
-      OTMB_PUSH_DLY    : out integer range 0 to 63;
-      ALCT_PUSH_DLY    : out integer range 0 to 63;
-      BX_DLY           : out integer range 0 to 4095;
-      INJ_DLY          : out std_logic_vector(4 downto 0);
-      EXT_DLY          : out std_logic_vector(4 downto 0);
-      CALLCT_DLY       : out std_logic_vector(3 downto 0);
-      ODMB_ID          : out std_logic_vector(15 downto 0);
-      NWORDS_DUMMY     : out std_logic_vector(15 downto 0);
-      KILL             : out std_logic_vector(NCFEB+2 downto 1);
-      CRATEID          : out std_logic_vector(7 downto 0);
-      CHANGE_REG_DATA  : in std_logic_vector(15 downto 0);
-      CHANGE_REG_INDEX : in integer range 0 to NREGS;
-
-      --------------------
-      -- DDU/SPY/DCFEB/ALCT Optical PRBS test signals
-      --------------------
-      MGT_PRBS_TYPE        : out std_logic_vector(3 downto 0); -- DDU/SPY/DCFEB/ALCT Common PRBS type
-      DDU_PRBS_TX_EN       : out std_logic_vector(3 downto 0);
-      DDU_PRBS_RX_EN       : out std_logic_vector(3 downto 0);
-      DDU_PRBS_TST_CNT     : out std_logic_vector(15 downto 0);
-      DDU_PRBS_ERR_CNT     : in  std_logic_vector(15 downto 0);
-      SPY_PRBS_TX_EN       : out std_logic_vector(0 downto 0);
-      SPY_PRBS_RX_EN       : out std_logic_vector(0 downto 0);
-      SPY_PRBS_TST_CNT     : out std_logic_vector(15 downto 0);
-      SPY_PRBS_ERR_CNT     : in  std_logic_vector(15 downto 0);
-      DCFEB_PRBS_FIBER_SEL : out std_logic_vector(3 downto 0);
-      DCFEB_PRBS_EN        : out std_logic;
-      DCFEB_PRBS_RST       : out std_logic;
-      DCFEB_PRBS_RD_EN     : out std_logic;
-      DCFEB_RXPRBSERR      : in  std_logic;
-      DCFEB_PRBS_ERR_CNT   : in  std_logic_vector(15 downto 0);
-
-      --------------------
-      -- System monitoring
-      --------------------
-      -- Current monitoring
-      SYSMON_P      : in std_logic_vector(15 downto 0);
-      SYSMON_N      : in std_logic_vector(15 downto 0);
-      -- Voltage monitoring through MAX127 chips
-      ADC_CS_B      : out std_logic_vector(4 downto 0);
-      ADC_DIN       : out std_logic;
-      ADC_SCK       : out std_logic;
-      ADC_DOUT      : in std_logic;
-
-      --------------------
-      -- Other
-      --------------------
-      DIAGOUT     : out std_logic_vector (17 downto 0); -- for debugging
-      RST         : in std_logic;
-      PON_RESET   : in std_logic
-      );
-  end component;
-
-  component ODMB_CTRL is
-    generic (
-      NCFEB       : integer range 1 to 7 := NCFEB  -- Number of DCFEBS, 7 for ME1/1, 5
-      );
-    port (
-      --------------------
-      -- Clock
-      --------------------
-      CLK80       : in std_logic;
-      CLK40       : in std_logic;
-
-      --------------------
-      -- ODMB VME <-> CALIBTRIG
-      --------------------
-      TEST_CCBINJ   : in std_logic;
-      TEST_CCBPLS   : in std_logic;
-      TEST_CCBPED   : in std_logic;
-
-      --------------------
-      -- Delay registers (from VMECONFREGS)
-      --------------------
-      LCT_L1A_DLY   : in std_logic_vector(5 downto 0);
-      INJ_DLY       : in std_logic_vector(4 downto 0);
-      EXT_DLY       : in std_logic_vector(4 downto 0);
-      CALLCT_DLY    : in std_logic_vector(3 downto 0);
-
-      --------------------
-      -- Configuration
-      --------------------
-      CAL_MODE      : in std_logic;
-      PEDESTAL      : in std_logic;
-
-      --------------------
-      -- Triggers
-      --------------------
-      RAW_L1A       : in std_logic;
-
-      --------------------
-      -- To/From DCFEBs (FF-EMU-MOD)
-      --------------------
-      DCFEB_INJPULSE  : out std_logic;
-      DCFEB_EXTPULSE  : out std_logic;
-      DCFEB_L1A       : out std_logic;
-      DCFEB_L1A_MATCH : out std_logic_vector(NCFEB downto 1);
-
-      --------------------
-      -- Other
-      --------------------
-      DIAGOUT     : out std_logic_vector (17 downto 0); -- for debugging
-      RST         : in std_logic
-      );
-  end component;
-
-  component LCTDLY is  -- Aligns RAW_LCT with L1A by 2.4 us to 4.8 us
-    port (
-      DIN   : in std_logic;
-      CLK   : in std_logic;
-      DELAY : in std_logic_vector(5 downto 0);
-      DOUT : out std_logic
-      );
-  end component;
 
   --------------------------------------
   -- Clock signals
@@ -500,7 +272,6 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal sysclk40 : std_logic;
   signal sysclk80 : std_logic;
   signal cmsclk : std_logic;
-  signal clk_emcclk : std_logic;
   signal clk_lfclk : std_logic;
   signal clk_gp6 : std_logic;
   signal clk_gp7 : std_logic;
@@ -510,12 +281,13 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal mgtclk4 : std_logic;
   signal mgtclk5 : std_logic;
   signal mgtclk125 : std_logic;
+  signal led_clkfreqs : std_logic_vector(7 downto 0);
 
   --------------------------------------
   -- VME signals
   --------------------------------------
   signal vme_dir_b        : std_logic;
-  signal vme_dir          : std_logic;
+  -- signal vme_dir          : std_logic;
   signal vme_oe_b         : std_logic;
   signal vme_data_out_buf : std_logic_vector(15 downto 0) := (others => '0');
   signal vme_data_in_buf  : std_logic_vector(15 downto 0) := (others => '0');
@@ -528,15 +300,12 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal dcfeb_tms    : std_logic := '0';
   signal dcfeb_tdi    : std_logic := '0';
   signal dcfeb_tdo    : std_logic_vector (NCFEB downto 1) := (others => '0');
+  signal gen_dcfeb_tdo : std_logic_vector (NCFEB downto 1) := (others => '0');
+  signal dcfeb_tdo_int : std_logic_vector (NCFEB downto 1) := (others => '0');
 
   --------------------------------------
-  -- ODMB signals
+  -- ODMB JTAG signals
   --------------------------------------
-  signal odmb_tck    : std_logic := '0';
-  signal odmb_tms    : std_logic := '0';
-  signal odmb_tdi    : std_logic := '0';
-  signal odmb_tdo    : std_logic := '0';
-  signal odmb_sel    : std_logic := '0';
   signal odmb_initjtag     : std_logic := '0';
 
   --------------------------------------
@@ -601,16 +370,9 @@ architecture Behavioral of odmb7_ucsb_dev is
   --------------------------------------
   -- CCB production test signals
   --------------------------------------
-
   signal ccb_cmd_bxev    : std_logic_vector(7 downto 0) := (others => '0');
-  signal ccb_cmd_reg     : std_logic_vector(15 downto 0) := (others => '0');
-  signal ccb_data_reg    : std_logic_vector(15 downto 0) := (others => '0');
-  signal ccb_rsv         : std_logic_vector(15 downto 0) := (others => '0');
-  signal ccb_other       : std_logic_vector(15 downto 0) := (others => '0');
-  signal ccb_rsv_reg     : std_logic_vector(15 downto 0) := (others => '0');
-  signal ccb_other_reg   : std_logic_vector(15 downto 0) := (others => '0');
-  signal ccb_rsv_reg_b   : std_logic_vector(15 downto 0) := (others => '0');
-  signal ccb_other_reg_b : std_logic_vector(15 downto 0) := (others => '0');
+  signal ccb_rsv         : std_logic_vector(10 downto 0) := (others => '0');
+  signal ccb_other       : std_logic_vector(10 downto 0) := (others => '0');
 
   --------------------------------------
   -- LVMB signals
@@ -624,6 +386,11 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal test_l1a    : std_logic := '0';
   signal raw_l1a     : std_logic := '0';
   signal raw_lct     : std_logic_vector(NCFEB downto 0);
+  signal int_alct_dav, tc_alct_dav : std_logic;
+  signal int_otmb_dav, tc_otmb_dav : std_logic;
+  signal otmb_push_dly_p1, alct_push_dly_p1        : integer range 0 to 64;
+  signal tc_lct                    : std_logic_vector(NCFEB-1 downto 0);
+  signal alct_dav_sync_out, otmb_dav_sync_out : std_logic;
 
   --------------------------------------
   -- Internal configuration signals
@@ -639,6 +406,8 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal kill             : std_logic_vector(NCFEB+2 downto 1) := (others => '0');
   signal change_reg_data  : std_logic_vector(15 downto 0);
   signal change_reg_index : integer range 0 to NREGS := NREGS;
+  signal bx_dly           : integer range 0 to 4095;
+  signal crateid          : std_logic_vector(7 downto 0);
 
   --------------------------------------
   -- ODMB VME <=> ODMB CTRL signals
@@ -648,15 +417,17 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal test_ped : std_logic := '0';
 
   --------------------------------------
-  -- ODMB status signals
+  -- PROM signals
   --------------------------------------
-  -- Counter arrays
-  signal goodcrc_cnt         : t_twobyte_arr(NCFEB downto 1);
-  signal dcfeb_bad_rx_cnt    : t_twobyte_arr(NCFEB downto 1);
-  signal dcfeb_dvalid_cnt    : t_twobyte_arr(NCFEB downto 1); -- replacement for cafifo dav count
+  signal cnfg_data_in    : std_logic_vector(7 downto 4) := (others => '0');
+  signal cnfg_data_out   : std_logic_vector(7 downto 4) := (others => '0');
+  signal cnfg_data_dir   : std_logic_vector(7 downto 4) := (others => '0');
 
-  signal into_cafifo_dav_cnt : t_twobyte_arr(NCFEB+2 downto 1);
-  signal l1a_match_cnt       : t_twobyte_arr(NCFEB+2 downto 1);
+  --------------------------------------
+  -- Clock synth signals
+  --------------------------------------
+  signal fpga_if1_miso_in, fpga_if1_miso_out, fpga_if1_miso_dir : std_logic := '1';
+  signal fpga_mosi_inner : std_logic := '0';
 
   --------------------------------------
   -- Reset signals
@@ -669,6 +440,10 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal fw_rst_reg      : std_logic_vector(31 downto 0) := (others => '0');
   signal opt_rst_reg     : std_logic_vector(31 downto 0) := (others => '0');
   signal reset           : std_logic := '0';
+  signal lf_counter       : integer := 0;
+  signal done_reset       : std_logic := '0';
+  signal done_reset_pulse : std_logic := '0';
+  signal done_enable      : std_logic := '1';
 
   --------------------------------------
   -- MGT PRBS signals as place holder
@@ -686,74 +461,62 @@ architecture Behavioral of odmb7_ucsb_dev is
   --------------------------------------
   constant SPY_SEL : std_logic := '1';
 
-  --------------------------------------
-  -- MGT signals for SPY channels
-  --------------------------------------
-  constant SPY_NLINK : integer := 1;
-  constant SPYDWIDTH : integer := 16;
-
-  signal usrclk_spy_tx : std_logic; -- USRCLK for TX data preparation
-  signal usrclk_spy_rx : std_logic; -- USRCLK for RX data readout
   signal spy_rx_n : std_logic;
   signal spy_rx_p : std_logic;
   signal spy_txready : std_logic; -- Flag for tx reset done
   signal spy_rxready : std_logic; -- Flag for rx reset done
   signal spy_txdata : std_logic_vector(15 downto 0);  -- Data to be transmitted
-  signal spy_txd_valid : std_logic_vector(SPY_NLINK-1 downto 0);   -- Flag for tx data valid
+  signal spy_txd_valid : std_logic;   -- Flag for tx data valid
   signal spy_txdiffctrl : std_logic_vector(3 downto 0);   -- Controls the TX voltage swing
   signal spy_loopback : std_logic_vector(2 downto 0);   -- For internal loopback tests
   signal spy_rxdata : std_logic_vector(15 downto 0);  -- Data received
-  signal spy_rxd_valid : std_logic_vector(SPY_NLINK-1 downto 0);   -- Flag for valid data;
-  signal spy_bad_rx : std_logic_vector(SPY_NLINK-1 downto 0);   -- Flag for fiber errors;
+  signal spy_rxd_valid : std_logic;   -- Flag for valid data;
+  signal spy_bad_rx : std_logic;   -- Flag for fiber errors;
   signal spy_reset : std_logic;
+  
+  signal usrclk_pc : std_logic;
+  signal usrclk_ddu : std_logic;
 
-  signal spy_prbs_tx_en : std_logic_vector(SPY_NLINK-1 downto 0);
-  signal spy_prbs_rx_en : std_logic_vector(SPY_NLINK-1 downto 0);
+  signal spy_prbs_tx_en : std_logic;
+  signal spy_prbs_rx_en : std_logic;
   signal spy_prbs_tst_cnt : std_logic_vector(15 downto 0);
   signal spy_prbs_err_cnt : std_logic_vector(15 downto 0) := (others => '0');
 
   --------------------------------------
-  -- MGT signals for DDU channels
+  -- MGT signals for FED channels
   --------------------------------------
-  constant DDU_NTXLINK : integer := 4;
-  constant DDU_NRXLINK : integer := 4;
-  constant DDUTXDWIDTH : integer := 16;
-  constant DDURXDWIDTH : integer := 16;
+  constant FED_NTXLINK : integer := 4;
+  constant FED_NRXLINK : integer := 4;
+  constant FEDTXDWIDTH : integer := 16;
+  constant FEDRXDWIDTH : integer := 16;
 
+  signal usrclk_fed_tx : std_logic; -- USRCLK for TX data preparation
+  signal usrclk_fed_rx : std_logic; -- USRCLK for RX data readout
+  signal fed_txdata1 : std_logic_vector(FEDTXDWIDTH-1 downto 0);   -- Data to be transmitted
+  signal fed_txdata2 : std_logic_vector(FEDTXDWIDTH-1 downto 0);   -- Data to be transmitted
+  signal fed_txdata3 : std_logic_vector(FEDTXDWIDTH-1 downto 0);   -- Data to be transmitted
+  signal fed_txdata4 : std_logic_vector(FEDTXDWIDTH-1 downto 0);   -- Data to be transmitted
+  signal fed_txd_valid : std_logic_vector(FED_NTXLINK downto 1);   -- Flag for tx valid data;
+  signal fed_rxdata1 : std_logic_vector(FEDRXDWIDTH-1 downto 0);   -- Data received
+  signal fed_rxdata2 : std_logic_vector(FEDRXDWIDTH-1 downto 0);   -- Data received
+  signal fed_rxdata3 : std_logic_vector(FEDRXDWIDTH-1 downto 0);   -- Data received
+  signal fed_rxdata4 : std_logic_vector(FEDRXDWIDTH-1 downto 0);   -- Data received
+  signal fed_rxd_valid : std_logic_vector(FED_NRXLINK downto 1);   -- Flag for rx valid data;
+  signal fed_bad_rx : std_logic_vector(FED_NRXLINK downto 1);   -- Flag for fiber errors;
+  signal fed_rxready : std_logic; -- Flag for rx reset done
+  signal fed_txready : std_logic; -- Flag for rx reset done
+  signal fed_reset : std_logic;
 
-  signal usrclk_ddu_tx : std_logic; -- USRCLK for TX data preparation
-  signal usrclk_ddu_rx : std_logic; -- USRCLK for RX data readout
-  signal ddu_txdata1 : std_logic_vector(DDUTXDWIDTH-1 downto 0);   -- Data to be transmitted
-  signal ddu_txdata2 : std_logic_vector(DDUTXDWIDTH-1 downto 0);   -- Data to be transmitted
-  signal ddu_txdata3 : std_logic_vector(DDUTXDWIDTH-1 downto 0);   -- Data to be transmitted
-  signal ddu_txdata4 : std_logic_vector(DDUTXDWIDTH-1 downto 0);   -- Data to be transmitted
-  signal ddu_txd_valid : std_logic_vector(DDU_NTXLINK downto 1);   -- Flag for tx valid data;
-  signal ddu_rxdata1 : std_logic_vector(DDURXDWIDTH-1 downto 0);   -- Data received
-  signal ddu_rxdata2 : std_logic_vector(DDURXDWIDTH-1 downto 0);   -- Data received
-  signal ddu_rxdata3 : std_logic_vector(DDURXDWIDTH-1 downto 0);   -- Data received
-  signal ddu_rxdata4 : std_logic_vector(DDURXDWIDTH-1 downto 0);   -- Data received
-  signal ddu_rxd_valid : std_logic_vector(DDU_NRXLINK downto 1);   -- Flag for rx valid data;
-  signal ddu_bad_rx : std_logic_vector(DDU_NRXLINK downto 1);   -- Flag for fiber errors;
-  signal ddu_rxready : std_logic; -- Flag for rx reset done
-  signal ddu_txready : std_logic; -- Flag for rx reset done
-  signal ddu_reset : std_logic;
-
-  signal ddu_prbs_tx_en : std_logic_vector(4 downto 1);
-  signal ddu_prbs_rx_en : std_logic_vector(4 downto 1);
-  signal ddu_prbs_tst_cnt : std_logic_vector(15 downto 0);
-  signal ddu_prbs_err_cnt : std_logic_vector(15 downto 0);
+  signal fed_prbs_tx_en : std_logic_vector(4 downto 1);
+  signal fed_prbs_rx_en : std_logic_vector(4 downto 1);
+  signal fed_prbs_tst_cnt : std_logic_vector(15 downto 0);
+  signal fed_prbs_err_cnt : std_logic_vector(15 downto 0);
 
   --------------------------------------
   -- MGT signals for DCFEB RX channels
   --------------------------------------
   signal usrclk_mgtc : std_logic;
-  signal dcfeb1_data : std_logic_vector(15 downto 0);  -- Data received
-  signal dcfeb2_data : std_logic_vector(15 downto 0);  -- Data received
-  signal dcfeb3_data : std_logic_vector(15 downto 0);  -- Data received
-  signal dcfeb4_data : std_logic_vector(15 downto 0);  -- Data received
-  signal dcfeb5_data : std_logic_vector(15 downto 0);  -- Data received
-  signal dcfeb6_data : std_logic_vector(15 downto 0);  -- Data received
-  signal dcfeb7_data : std_logic_vector(15 downto 0);  -- Data received
+  signal dcfeb_rxdata : t_std16_array(NCFEB downto 1);  -- Data received
   signal dcfeb_rxd_valid : std_logic_vector(NCFEB downto 1);   -- Flag for valid data;
   signal dcfeb_crc_valid : std_logic_vector(NCFEB downto 1);   -- Flag for valid data;
   signal dcfeb_bad_rx : std_logic_vector(NCFEB downto 1);   -- Flag for fiber errors;
@@ -804,24 +567,105 @@ architecture Behavioral of odmb7_ucsb_dev is
   signal diagout_inner : std_logic_vector(17 downto 0) := (others => '0');
 
   --------------------------------------
-  -- Data readout signals
+  -- DAQ related signals
   --------------------------------------
-  signal odmb_data : std_logic_vector(15 downto 0) := (others => '0');
-  signal odmb_data_sel : std_logic_vector(7 downto 0) := (others => '0');
+  signal odmb_status_data : std_logic_vector(15 downto 0) := (others => '0');
+  signal odmb_status_sel  : std_logic_vector(7 downto 0) := (others => '0');
+  signal bxcnt_rst        : std_logic := '0';
+  signal ccb_l1acnt_rst   : std_logic := '0';
+  signal ccb_l1acnt_rst_q : std_logic := '0';
+  signal ccb_bxrst_b_q    : std_logic := '0';
+  signal cafifo_l1a       : std_logic := '0';
+  signal cafifo_l1a_match_in : std_logic_vector(NCFEB+2 downto 1);
+  signal cafifo_l1a_match_out : std_logic_vector(NCFEB+2 downto 1);
+  signal dcfeb_fifo_rst   : std_logic_vector(NCFEB downto 1);
+
+  signal cafifo_l1a_cnt       : std_logic_vector(23 downto 0);
+  signal cafifo_l1a_dav       : std_logic_vector(NCFEB+2 downto 1);
+  signal cafifo_bx_cnt        : std_logic_vector(11 downto 0);
+
+  -- signal data_fifo_out       : t_std18_array(NCFEB+2 downto 1);
+  -- signal data_fifo_dav       : std_logic_vector(NCFEB+2 downto 1);
+
+  signal eof_data       : std_logic_vector(NCFEB+2 downto 1);
+  signal into_fifo_dav  : std_logic_vector(NCFEB+2 downto 1);
+  signal fifo_half_full : std_logic_vector(NCFEB+2 downto 1);
+  signal fifo_empty     : std_logic_vector(NCFEB+2 downto 1);
+
+  signal fifo_dout : std_logic_vector(17 downto 0);
+  signal fifo_oe_b : std_logic_vector(NCFEB+2 downto 1) := (others => '1');
+  signal fifo_re_b : std_logic_vector(NCFEB+2 downto 1) := (others => '1');
+
+  signal ddu_data                : std_logic_vector(15 downto 0);
+  signal ddu_data_valid, ddu_eof : std_logic;
+  signal pc_data                 : std_logic_vector(15 downto 0);
+  signal pc_data_valid           : std_logic;
+
+  signal gl_pc_tx_ack            : std_logic;
+
+  -- for TRGCNTRL
+  constant push_dly    : integer := 63;  -- It needs to be > alct/otmb_push_dly
+  signal alct_push_dly : integer range 0 to 63;
+  signal otmb_push_dly : integer range 0 to 63;
+  signal test_otmb_dav, test_alct_dav              : std_logic := '0';
 
 begin
 
   -------------------------------------------------------------------------------------------
-  -- Constant driver for selector/reset pins for board to work
+  -- Handle clock chip signals
   -------------------------------------------------------------------------------------------
-  -- KUS_DL_SEL <= '1';
-  FPGA_SEL <= '0';
-  RST_CLKS_B <= '1';
+  --FPGA_SEL <= '0';
+  --RST_CLKS_B <= '1';
+  FPGA_MISO_BUF : IOBUF port map(O => fpga_if1_miso_in, IO => FPGA_IF1_MISO, I => fpga_if1_miso_out, T => fpga_if1_miso_dir);
+  FPGA_MOSI_BUF : IOBUF port map(O => open, IO => FPGA_MOSI, I => fpga_mosi_inner, T => '0');
+
+  -------------------------------------------------------------------------------------------
+  -- Handle incoming data from OTMB/ALCT/DCFEBs
+  -------------------------------------------------------------------------------------------
+  MBD : entity work.odmb_data
+    generic map (
+      NCFEB => NCFEB
+      )
+    port map (
+      CMSCLK              => cmsclk,
+      DDUCLK              => usrclk_ddu,
+      DCFEBCLK            => usrclk_mgtc,
+      RESET               => reset,
+      L1ACNT_RST          => l1acnt_rst,
+      KILL                => kill,
+      CAFIFO_L1A          => cafifo_l1a, -- from cafifo.vhd
+      CAFIFO_L1A_MATCH_IN => cafifo_l1a_match_in, -- from cafifo.vhd
+      DCFEB_L1A           => odmbctrl_l1a, -- for dcfeb in simulation
+      DCFEB_L1A_MATCH     => odmbctrl_l1a_match, -- for dcfeb in simulation
+      NWORDS_DUMMY        => nwords_dummy,
+
+      DCFEB_TCK           => dcfeb_tck,
+      DCFEB_TDO           => gen_dcfeb_tdo,
+      DCFEB_TMS           => dcfeb_tms,
+      DCFEB_TDI           => dcfeb_tdi,
+
+      DCFEB_FIFO_RST      => "0000000", -- auto-kill related
+      EOF_DATA            => eof_data,
+      INTO_FIFO_DAV       => into_fifo_dav,
+
+      OTMB_DATA_IN        => OTMB(17 downto 0),
+      ALCT_DATA_IN        => OTMB(35 downto 18),
+      DCFEB_DATA_IN       => dcfeb_rxdata,
+      DCFEB_DAV_IN        => dcfeb_rxd_valid,
+
+      GEN_DCFEB_SEL       => odmb_ctrl_reg(7),
+
+      FIFO_RE_B           => fifo_re_b,
+      FIFO_OE_B           => fifo_oe_b,
+      FIFO_DOUT           => fifo_dout,
+      FIFO_EMPTY          => fifo_empty,
+      FIFO_HALF_FULL      => fifo_half_full
+      );
 
   -------------------------------------------------------------------------------------------
   -- Handle clock synthesizer signals and generate clocks
   -------------------------------------------------------------------------------------------
-  u_clocking : odmb_clocking
+  MBK : entity work.odmb_clocking
     port map (
       CMS_CLK_FPGA_P => CMS_CLK_FPGA_P,
       CMS_CLK_FPGA_N => CMS_CLK_FPGA_N,
@@ -841,8 +685,8 @@ begin
       REF_CLK_5_N    => REF_CLK_5_N,
       CLK_125_REF_P  => CLK_125_REF_P,
       CLK_125_REF_N  => CLK_125_REF_N,
-      EMCCLK         => EMCCLK,
       LF_CLK         => LF_CLK,
+      -- Output clocks
       mgtrefclk0_224 => mgtrefclk0_224,
       mgtrefclk0_225 => mgtrefclk0_225,
       mgtrefclk0_226 => mgtrefclk0_226,
@@ -857,7 +701,6 @@ begin
       clk_sysclk40   => sysclk40,
       clk_sysclk80   => sysclk80,
       clk_cmsclk     => cmsclk,
-      clk_emcclk     => clk_emcclk,
       clk_lfclk      => clk_lfclk,
       clk_gp6        => clk_gp6,
       clk_gp7        => clk_gp7,
@@ -866,28 +709,45 @@ begin
       clk_mgtclk3    => mgtclk3,
       clk_mgtclk4    => mgtclk4,
       clk_mgtclk5    => mgtclk5,
-      clk_mgtclk125  => mgtclk125
+      clk_mgtclk125  => mgtclk125,
+      led_clkfreqs   => led_clkfreqs
       );
+
+  -- Make LED lights blink to reflect clock frequencies
+  LEDS_CFV(0)  <= led_clkfreqs(0);  -- cmsclk   :  40 MHz = led at 40/33.5 ~ 1.2 Hz
+  LEDS_CFV(2)  <= led_clkfreqs(1);  -- mgtclk1  : 160 MHz = led at 160/134 ~ 1.2 Hz
+  LEDS_CFV(4)  <= led_clkfreqs(3);  -- mgtclk3  : 160 MHz = led at 160/134 ~ 1.2 Hz
+  LEDS_CFV(6)  <= led_clkfreqs(4);  -- mgtclk4  : 120 MHz = led at 120/134 ~ 0.9 Hz
+  LEDS_CFV(8)  <= led_clkfreqs(6);  -- mgtclk125: 125 MHz = led at 125/134 ~ 0.9 Hz
+  LEDS_CFV(10) <= led_clkfreqs(7);  -- clk_gp7  : 80 MHz = led at 80/67.1 ~ 1.2 Hz
 
   -------------------------------------------------------------------------------------------
   -- Handle VME signals
   -------------------------------------------------------------------------------------------
 
   -- Handle VME data direction and output enable lines
-  KUS_VME_DIR <= vme_dir;
-  vme_dir <= not vme_dir_b;
+  KUS_VME_DIR <= not vme_dir_b;
   KUS_VME_OE_B <= vme_oe_b;
 
-  GEN_VMEOUT_16 : for I in 0 to 15 generate
+  GEN_VMEIO_16 : for I in 0 to 15 generate
   begin
     VME_BUF : IOBUF port map(O => vme_data_in_buf(I), IO => VME_DATA(I), I => vme_data_out_buf(I), T => vme_dir_b);
-  end generate GEN_VMEOUT_16;
+  end generate GEN_VMEIO_16;
+
+  -------------------------------------------------------------------------------------------
+  -- PROM signals
+  -------------------------------------------------------------------------------------------
+  PROM_RST_B <= '1';
+  GEN_PROM_BUF: for I in 4 to 7 generate
+  begin
+    PROM_DATA_BUF : IOBUF port map(O => cnfg_data_in(I), IO => CNFG_DATA(I), I => cnfg_data_out(I), T => cnfg_data_dir(I));
+  end generate GEN_PROM_BUF;
 
   -------------------------------------------------------------------------------------------
   -- Handle PPIB/DCFEB signals
   -------------------------------------------------------------------------------------------
 
-  PPIB_OUT_EN_B <= '0';
+  PPIB_OUT_EN_B <= '0'; -- always enable
   -- Handle DCFEB I/O buffers
   OB_DCFEB_TMS: OBUFDS port map (I => dcfeb_tms, O => DCFEB_TMS_P, OB => DCFEB_TMS_N);
   OB_DCFEB_TDI: OBUFDS port map (I => dcfeb_tdi, O => DCFEB_TDI_P, OB => DCFEB_TDI_N);
@@ -907,9 +767,14 @@ begin
   dcfeb_injpls <= '0' when mask_pls = '1' else premask_injpls;
   dcfeb_extpls <= '0' when mask_pls = '1' else premask_extpls;
 
+  dcfeb_tdo_int <= dcfeb_tdo when (odmb_ctrl_reg(7) = '0') else gen_dcfeb_tdo;
+
   --generate RESYNC, BC0, L1A, and L1A match signals to DCFEBs
+  --synchronization of CCB signals and push button
   ccb_bx0   <= not CCB_BX0_B;
   FD_CCBBX0 : FD port map(Q => ccb_bx0_q, C => cmsclk, D => ccb_bx0);
+  FD_CCBBX  : FD port map(Q => ccb_bxrst_b_q, C => cmsclk, D => ccb_bx_rst_b);
+  bxcnt_rst <= not ccb_bxrst_b_q;
 
   RESETPULSE      : PULSE2SAME port map(DOUT => reset_pulse, CLK_DOUT => cmsclk, RST => '0', DIN => reset);
   FD_RESETPULSE_Q : FD port map (Q => reset_pulse_q,     C => cmsclk, D => reset_pulse);
@@ -1007,7 +872,7 @@ begin
   dcfeb_initjtag_dd <= or_reduce(dcfeb_done_pulse);
   -- FIXME: currently doesn't do anything because state machine pulses dcfeb_done_pulse for 1 40 MHz clock cycle, 10kHz on real board
   DS_DCFEB_INITJTAG    : DELAY_SIGNAL generic map(10) port map(DOUT => dcfeb_initjtag_d, CLK => sysclk625k, NCYCLES => 10, DIN => dcfeb_initjtag_dd);
-  PULSE_DCFEB_INITJTAG : NPULSE2FAST port map(DOUT => dcfeb_initjtag, CLK_DOUT => sysclk2p5, RST => '0', NPULSE => 5, DIN => dcfeb_initjtag_d);
+  PULSE_DCFEB_INITJTAG : NPULSE2FAST port map(DOUT => dcfeb_initjtag, CLK_DOUT => sysclk1p25, RST => '0', NPULSE => 5, DIN => dcfeb_initjtag_d);
 
   -------------------------------------------------------------------------------------------
   -- Handle LVMB signals
@@ -1016,10 +881,22 @@ begin
   IB_LVMB_SDOUT: IBUFDS port map (O => lvmb_sdout, I => LVMB_SDOUT_P, IB => LVMB_SDOUT_N);
 
   -------------------------------------------------------------------------------------------
-  -- Handle Triggers
+  -- Handle Triggers and DAVs
   -------------------------------------------------------------------------------------------
   LCTDLY_GTRG : LCTDLY port map(DOUT => test_l1a, CLK => cmsclk, DELAY => lct_l1a_dly, DIN => test_lct);
-  raw_l1a <= test_l1a;
+
+  raw_lct <= (others => '1') when (test_lct = '1') else RAWLCT;
+  raw_l1a <= '1' when test_l1a = '1' else not CCB_L1A_B;
+
+  otmb_push_dly_p1 <= otmb_push_dly + 1;
+  alct_push_dly_p1 <= alct_push_dly + 1;
+  DS_OTMB_PUSH : DELAY_SIGNAL generic map (64)port map(DOUT=>test_otmb_dav, CLK=>cmsclk, NCYCLES=>otmb_push_dly_p1, DIN=>test_l1a);
+  DS_ALCT_PUSH : DELAY_SIGNAL generic map (64)port map(DOUT=>test_alct_dav, CLK=>cmsclk, NCYCLES=>alct_push_dly_p1, DIN=>test_l1a);
+
+  int_alct_dav <= '1' when test_alct_dav = '1' else LEGACY_ALCT_DAV;
+                  --tc_alct_dav when (testctrl_sel = '1') else
+  int_otmb_dav <= '1' when test_otmb_dav = '1' else OTMB_DAV;
+                  --tc_otmb_dav when (testctrl_sel = '1') else
 
   -------------------------------------------------------------------------------------------
   -- Handle Internal configuration signals
@@ -1032,27 +909,35 @@ begin
   -------------------------------------------------------------------------------------------
   -- Handle CCB production test
   -------------------------------------------------------------------------------------------
+  -- Unused
+  CCB_L1A_RLS <= '0';
 
   -- From CCB - for production tests
   ccb_cmd_bxev <= CCB_CMD & CCB_EVCNTRES_B & CCB_BX_RST_B;
-  GEN_CCB : for index in 0 to 7 generate
-    FDCMD : FDC port map(Q => ccb_cmd_reg(index), C => CCB_CMD_S, CLR => reset, D => ccb_cmd_bxev(index));
-    FDDAT : FDC port map(Q => ccb_data_reg(index), C => CCB_DATA_S, CLR => reset, D => CCB_DATA(index));
-  end generate GEN_CCB;
-
-  ccb_rsv   <= "00000" & CCB_CRSV(3 downto 0) & CCB_DRSV(1 downto 0) & CCB_RSVO(4 downto 0);
-  ccb_other <= "00000" & CCB_CAL(2 downto 0) & CCB_BX0_B & CCB_BX_RST_B & CCB_L1A_RST_B & CCB_L1A_B
-               & CCB_CLKEN & CCB_EVCNTRES_B & CCB_CMD_S & CCB_DATA_S;
-  GEN_CCB_FD : for index in 0 to 15 generate
-    FDOTHER : FDC port map(Q => ccb_other_reg(index), C => ccb_other(index), CLR => reset, D => ccb_other_reg_b(index));
-    FDRSV   : FDC port map(Q => ccb_rsv_reg(index), C => ccb_rsv(index), CLR => reset, D => ccb_rsv_reg_b(index));
-    ccb_other_reg_b(index) <= not ccb_other_reg(index);
-    ccb_rsv_reg_b(index)   <= not ccb_rsv_reg(index);
-  end generate GEN_CCB_FD;
+  ccb_rsv      <= CCB_CRSV(3 downto 0) & CCB_DRSV(1 downto 0) & CCB_RSVO(4 downto 0);
+  ccb_other    <= CCB_CAL(2 downto 0) & CCB_BX0_B & CCB_BX_RST_B & CCB_L1A_RST_B & CCB_L1A_B
+                  & CCB_CLKEN & CCB_EVCNTRES_B & CCB_CMD_S & CCB_DATA_S;
 
   -------------------------------------------------------------------------------------------
   -- Handle reset signals
   -------------------------------------------------------------------------------------------
+  proc_done_rst : process (clk_lfclk)
+  begin
+    if rising_edge(clk_lfclk) then
+      if done_reset = '1' then
+        done_reset <= '0';
+        done_enable <= '0';
+      end if;
+      if done_enable = '1' then
+        if lf_counter = 1200 then
+          done_reset <= '1';
+          lf_counter <= 0;
+        else
+          lf_counter <= lf_counter + 1;
+        end if;
+      end if;
+    end if;
+  end process;
 
   FD_CCB_SOFTRST : FD generic map(INIT => '1') port map (Q => ccb_softrst_b_q, C => cmsclk, D => CCB_SOFT_RST_B);
 
@@ -1069,78 +954,18 @@ begin
 
   reset <= fw_rst_reg(31) or pon_rst_reg(31);   -- Firmware reset
 
+  PLS_DONERESET : PULSE2FAST port map(DOUT => done_reset_pulse, CLK_DOUT => cmsclk, RST => reset, DIN => done_reset);
   FD_OPT_RESET : FD port map(Q => opt_reset_pulse_q, C => cmsclk, D => opt_reset_pulse);
   opt_rst_reg <= x"3FFFF000" when (opt_reset_pulse_q = '0' and opt_reset_pulse = '1') else
                  opt_rst_reg(30 downto 0) & '0' when rising_edge(cmsclk) else
                  opt_rst_reg;
-  opt_reset <= opt_rst_reg(31) or pon_reset or mgt_reset;  -- Optical reset
-
-
-  -------------------------------------------------------------------------------------------
-  -- ODMB status signal generations
-  -------------------------------------------------------------------------------------------
-
-  -- TODO: unfinished counting to be filled
-  DCFEB_RXSTAT_CNT : for dev in 1 to NCFEB generate
-  begin
-    C_GODDCRC_CNT : COUNT_EDGES port map(COUNT => goodcrc_cnt(dev), CLK => usrclk_mgtc, RST => reset, DIN => dcfeb_crc_valid(dev));
-    C_DVALID_CNT  : COUNT_EDGES port map(COUNT => dcfeb_dvalid_cnt(dev), CLK => usrclk_mgtc, RST => reset, DIN => dcfeb_rxd_valid(dev));
-    C_BAD_RX_CNT  : COUNT_EDGES port map(COUNT => dcfeb_bad_rx_cnt(dev), CLK => usrclk_mgtc, RST => reset, DIN => dcfeb_bad_rx(dev));
-  end generate DCFEB_RXSTAT_CNT;
-
-  -------------------------------------------------------------------------------------------
-  -- Debug
-  -------------------------------------------------------------------------------------------
-
-  --DIAGOUT <= diagout_inner; --meta:comment_for_odmb
-
-  -------------------------------------------------------------------------------------------
-  -- Handle data readout
-  -------------------------------------------------------------------------------------------
-
-  odmb_status_pro : process (odmb_data_sel, VME_GAP_B, VME_GA_B)
-  begin
-
-    case odmb_data_sel is
-
-      --debug register
-      when x"06" => odmb_data <= x"7E57";
-
-      when x"20" => odmb_data <= "0000000000" & VME_GAP_B & VME_GA_B;
-
-      -- FIXME: Use dcfeb_dvalid_cnt in place of into_cafifo_dav_cnt for now
-      when x"41" => odmb_data <= dcfeb_dvalid_cnt(1);
-      when x"42" => odmb_data <= dcfeb_dvalid_cnt(2);
-      when x"43" => odmb_data <= dcfeb_dvalid_cnt(3);
-      when x"44" => odmb_data <= dcfeb_dvalid_cnt(4);
-      when x"45" => odmb_data <= dcfeb_dvalid_cnt(5);
-      when x"46" => odmb_data <= dcfeb_dvalid_cnt(6);
-      when x"47" => odmb_data <= dcfeb_dvalid_cnt(7);
-                    -- when x"48" => odmb_data <= into_cafifo_dav_cnt(8);
-                    -- when x"49" => odmb_data <= into_cafifo_dav_cnt(9);
-
-      when x"5A" => odmb_data <= ccb_cmd_reg;
-      when x"5B" => odmb_data <= ccb_data_reg;
-      when x"5C" => odmb_data <= ccb_other_reg;
-      when x"5D" => odmb_data <= ccb_rsv_reg;
-
-      when x"61" => odmb_data <= goodcrc_cnt(1);
-      when x"62" => odmb_data <= goodcrc_cnt(2);
-      when x"63" => odmb_data <= goodcrc_cnt(3);
-      when x"64" => odmb_data <= goodcrc_cnt(4);
-      when x"65" => odmb_data <= goodcrc_cnt(5);
-      when x"66" => odmb_data <= goodcrc_cnt(6);
-      when x"67" => odmb_data <= goodcrc_cnt(7);
-
-      when others => odmb_data <= (others => '1');
-    end case;
-  end process;
+  opt_reset <= opt_rst_reg(31) or pon_reset or mgt_reset or done_reset_pulse;  -- Optical reset
 
   -------------------------------------------------------------------------------------------
   -- Sub-modules
   -------------------------------------------------------------------------------------------
 
-  MBV : ODMB_VME
+  MBV : entity work.ODMB_VME
     generic map (
       NCFEB => NCFEB
       )
@@ -1174,11 +999,12 @@ begin
       DCFEB_TDO      => dcfeb_tdo,
       DCFEB_DONE     => DCFEB_DONE,
       DCFEB_INITJTAG => dcfeb_initjtag,
+      DCFEB_REPROG_B => DCFEB_REPROG_B,
 
       ODMB_TCK      => KUS_TCK,
       ODMB_TMS      => KUS_TMS,
       ODMB_TDI      => KUS_TDI,
-      ODMB_TDO      => TDO,
+      ODMB_TDO      => KUS_TDO,
       ODMB_SEL      => KUS_DL_SEL,
       ODMB_INITJTAG => odmb_initjtag,
 
@@ -1194,9 +1020,10 @@ begin
       OTMB        => OTMB,
       RAWLCT      => RAWLCT,
       OTMB_DAV    => OTMB_DAV,
+      ALCT_DAV    => LEGACY_ALCT_DAV,
       OTMB_FF_CLK => OTMB_FF_CLK,
-      RSVTD_IN    => RSVTD_IN,
-      RSVTD_OUT   => RSVTD_OUT,
+      RSVTD       => RSVTD,
+      RSVFD       => RSVFD,
       LCT_RQST    => LCT_RQST,
 
       FW_RESET => fw_reset,
@@ -1214,29 +1041,45 @@ begin
       MUX_TRIGGER => odmb_ctrl_reg(9),
       MUX_LVMB => odmb_ctrl_reg(10),
       ODMB_PED => odmb_ctrl_reg(14 downto 13),
-      ODMB_DATA => odmb_data,
-      ODMB_DATA_SEL => odmb_data_sel,
+      ODMB_STAT_DATA => odmb_status_data,
+      ODMB_STAT_SEL => odmb_status_sel,
 
       LCT_L1A_DLY      => lct_l1a_dly,
       CABLE_DLY        => cable_dly,
-      OTMB_PUSH_DLY    => open,
-      ALCT_PUSH_DLY    => open,
-      BX_DLY           => open,
+      OTMB_PUSH_DLY    => otmb_push_dly,
+      ALCT_PUSH_DLY    => alct_push_dly,
+      BX_DLY           => bx_dly,
       INJ_DLY          => inj_dly,
       EXT_DLY          => ext_dly,
       CALLCT_DLY       => callct_dly,
       ODMB_ID          => open,
       NWORDS_DUMMY     => nwords_dummy,
       KILL             => kill,
-      CRATEID          => open,
+      CRATEID          => crateid,
       CHANGE_REG_DATA  => change_reg_data,
       CHANGE_REG_INDEX => change_reg_index,
 
+      RST_CLKS_B        => RST_CLKS_B,
+      FPGA_SEL          => FPGA_SEL,
+      FPGA_AC           => FPGA_AC,
+      FPGA_TEST         => FPGA_TEST,
+      FPGA_IF0_CSN      => FPGA_IF0_CSN,
+      FPGA_IF1_MISO_IN  => fpga_if1_miso_in,
+      FPGA_IF1_MISO_OUT => fpga_if1_miso_out,
+      FPGA_MOSI         => fpga_mosi_inner,
+      FPGA_SCLK         => FPGA_SCLK,
+      FPGA_MISO_DIR     => fpga_if1_miso_dir,
+
+      CNFG_DATA_IN     => cnfg_data_in,
+      CNFG_DATA_OUT    => cnfg_data_out,
+      CNFG_DATA_DIR    => cnfg_data_dir,
+      PROM_CS2_B       => PROM_CS2_B,
+
       MGT_PRBS_TYPE        => mgt_prbs_type,
-      DDU_PRBS_TX_EN       => ddu_prbs_tx_en,
-      DDU_PRBS_RX_EN       => ddu_prbs_rx_en,
-      DDU_PRBS_TST_CNT     => ddu_prbs_tst_cnt,
-      DDU_PRBS_ERR_CNT     => ddu_prbs_err_cnt,
+      FED_PRBS_TX_EN       => fed_prbs_tx_en,
+      FED_PRBS_RX_EN       => fed_prbs_rx_en,
+      FED_PRBS_TST_CNT     => fed_prbs_tst_cnt,
+      FED_PRBS_ERR_CNT     => fed_prbs_err_cnt,
       SPY_PRBS_TX_EN       => spy_prbs_tx_en,
       SPY_PRBS_RX_EN       => spy_prbs_rx_en,
       SPY_PRBS_TST_CNT     => spy_prbs_tst_cnt,
@@ -1260,35 +1103,140 @@ begin
       PON_RESET => pon_reset
       );
 
-  MBC : ODMB_CTRL
+  MBC : entity work.ODMB_CTRL
     generic map (
-      NCFEB => NCFEB
+      NCFEB => NCFEB,
+      CAFIFO_SIZE => 32
       )
     port map (
-      CLK80 => sysclk80,
-      CLK40 => cmsclk,
+      DDUCLK    => usrclk_ddu,
+      CMSCLK    => cmsclk,
+      PCCLK     => usrclk_pc,
+
+      CCB_CMD      => ccb_cmd,
+      CCB_CMD_S    => ccb_cmd_s,
+      CCB_DATA     => ccb_data,
+      CCB_DATA_S   => ccb_data_s,
+      CCB_BX0_B    => ccb_bx0_b,
+      CCB_BXRST_B  => ccb_bx_rst_b,
+      CCB_L1ARST_B => ccb_l1a_rst_b,
+      CCB_CLKEN    => ccb_clken,
 
       TEST_CCBINJ => test_inj,
       TEST_CCBPLS => test_pls,
       TEST_CCBPED => test_ped,
 
-      CAL_MODE => odmb_ctrl_reg(0),
-      PEDESTAL => odmb_ctrl_reg(13),
-
-      RAW_L1A => raw_l1a,
-
       LCT_L1A_DLY => lct_l1a_dly,
       INJ_DLY     => inj_dly,
       EXT_DLY     => ext_dly,
       CALLCT_DLY  => callct_dly,
+      OTMB_PUSH_DLY => otmb_push_dly,
+      ALCT_PUSH_DLY => alct_push_dly,
+      PUSH_DLY      => push_dly,
+
+      CAL_MODE => odmb_ctrl_reg(0),
+      PEDESTAL => odmb_ctrl_reg(13),
+      PEDESTAL_OTMB => odmb_ctrl_reg(14),
+
+      RAW_L1A => raw_l1a,
+      RAWLCT  => raw_lct,
+
+      OTMB_DAV => int_otmb_dav,         -- lctdav1 - from J4
+      ALCT_DAV => int_alct_dav,         -- lctdav2 - from J4
 
       DCFEB_INJPULSE  => premask_injpls,
       DCFEB_EXTPULSE  => premask_extpls,
       DCFEB_L1A       => odmbctrl_l1a,
       DCFEB_L1A_MATCH => odmbctrl_l1a_match,
 
+      ALCT_DAV_SYNC_OUT => open,
+      OTMB_DAV_SYNC_OUT => open,
+
       DIAGOUT => open,
-      RST     => reset
+      KILL    => kill,
+      LCT_ERR => open,            -- To an LED in the original design
+
+      BX_DLY     => bx_dly,
+      L1ACNT_RST => l1acnt_rst,
+      BXCNT_RST  => bxcnt_rst,
+      RST        => reset,
+
+      EOF_DATA   => eof_data,
+
+      CAFIFO_L1A           => cafifo_l1a,
+      CAFIFO_L1A_MATCH_IN  => cafifo_l1a_match_in,
+      CAFIFO_L1A_MATCH_OUT => cafifo_l1a_match_out,
+      CAFIFO_L1A_CNT       => cafifo_l1a_cnt,
+      CAFIFO_L1A_DAV       => cafifo_l1a_dav,
+      CAFIFO_BX_CNT        => cafifo_bx_cnt,
+
+      -- For PCFIFO
+      GL_PC_TX_ACK        => gl_pc_tx_ack,
+
+      -- To GigaLinks
+      DDU_DATA            => ddu_data,
+      DDU_DATA_VALID      => ddu_data_valid,
+      PC_DATA             => pc_data,
+      PC_DATA_VALID       => pc_data_valid,
+
+      -- For headers/trailers
+      GA => vme_ga_b,
+      CRATEID => crateid,
+      AUTOKILLED_DCFEBS  => "0000000",
+
+      -- From/To Data FIFOs
+      FIFO_RE_B  => fifo_re_b,
+      FIFO_OE_B  => fifo_oe_b,
+      FIFO_DOUT  => fifo_dout,
+      -- FIFO_EOF => fifo_eof,
+      FIFO_EMPTY   => fifo_empty,  -- emptyf*(7 DOWNTO 1) - from FIFOs
+      FIFO_HALF_FULL => fifo_half_full
+      );
+
+
+  -------------------------------------------------------------------------------------------
+  -- Constant driver for firefly selector/reset pins
+  -------------------------------------------------------------------------------------------
+
+  MBS : entity work.odmb_status
+    generic map (
+      NCFEB => NCFEB
+      )
+    port map (
+      ODMB_STAT_SEL    => odmb_status_sel,
+      ODMB_STAT_DATA   => odmb_status_data,
+
+      CMSCLK           => cmsclk,
+      DDUCLK           => usrclk_ddu,
+      DCFEBCLK         => usrclk_mgtc,
+
+      DCFEB_CRC_VALID  => dcfeb_crc_valid,
+      DCFEB_RXD_VALID  => dcfeb_rxd_valid,
+      DCFEB_BAD_RX     => dcfeb_bad_rx,
+      RAW_LCT          => raw_lct,
+      OTMB_DAV         => int_otmb_dav,
+      ALCT_DAV         => int_alct_dav,
+      RAW_L1A          => raw_l1a,
+      DCFEB_L1A        => odmbctrl_l1a,
+
+      EOF_DATA         => eof_data,
+      FIFO_RE_B        => fifo_re_b,
+      INTO_FIFO_DAV    => into_fifo_dav,
+      CAFIFO_L1A_MATCH => cafifo_l1a_match_in,
+      CAFIFO_L1A_DAV   => cafifo_l1a_dav,
+      CAFIFO_L1A_CNT   => cafifo_l1a_cnt,
+      CAFIFO_BX_CNT    => cafifo_bx_cnt,
+
+      CCB_CMD_BXEV     => ccb_cmd_bxev,
+      CCB_CMD_S        => CCB_CMD_S,
+      CCB_DATA         => CCB_DATA,
+      CCB_DATA_S       => CCB_DATA_S,
+      CCB_RSV          => ccb_rsv,
+      CCB_OTHER        => ccb_other,
+
+      L1ACNT_RST       => l1acnt_rst,
+      PON_RESET        => pon_reset,
+      RESET            => reset
       );
 
   -------------------------------------------------------------------------------------------
@@ -1304,5 +1252,169 @@ begin
   B04_CS_B <= '1';
   B04_RST_B <= '1';
   SPY_TDIS <= '0';
+
+  -------------------------------------------------------------------------------------------
+  -- Optical communication with the SPY ports
+  -------------------------------------------------------------------------------------------
+  DAQ_SPY_SEL <= SPY_SEL; -- set for constant
+  spy_rx_n <= DAQ_SPY_RX_N when SPY_SEL = '1' else '0';
+  spy_rx_p <= DAQ_SPY_RX_P when SPY_SEL = '1' else '0';
+
+  -- This module can have two configurations
+  -- The first is "SPY configuration" where the SPY port is used to send packets to PC and B04 to DDU
+  -- The second is "run 3 configuration" where the SPY port is used to send packets to DDU
+  generate_spy_pc : if ENABLE_SPY_TO_DDU = '0' generate
+    GTH_PC : entity work.mgt_pc
+      generic map (
+        CHANN_IDX       => 11
+      )
+      port map (
+        mgtrefclk       => mgtrefclk1_226, -- mgtrefclk1_226 is sourced from the 125 MHz crystal for 1.25 Gb/s
+        txusrclk        => usrclk_pc,  -- 125 MHz for 1.25 Gb/s with 8b/10b encoding
+        rxusrclk        => open, --output rx clock
+        sysclk          => cmsclk,    -- maximum DRP clock frequency 62.5 MHz for 1.25 Gb/s line rate
+        spy_rx_n        => spy_rx_n, --to pins
+        spy_rx_p        => spy_rx_p, --to pins
+        spy_tx_n        => SPY_TX_N, --to pins
+        spy_tx_p        => SPY_TX_P, --to pins
+        txready         => open,     --unused
+        rxready         => open,     --unused
+        txdata          => pc_data,  --spy_txdata,
+        txd_valid       => pc_data_valid, --spy_txd_valid,
+        end_of_header   => gl_pc_tx_ack,     --end of header signal to PCFIFO
+        txdiffctrl      => spy_txdiffctrl,   --unused
+        loopback        => spy_loopback,     --unused
+        rxdata          => open,             --unused
+        rxd_valid       => open,             --unused
+        bad_rx          => open,             --unused
+        prbs_type       => mgt_prbs_type,    --from ODMB_VME
+        prbs_tx_en      => spy_prbs_tx_en,   --from ODMB_VME
+        prbs_rx_en      => spy_prbs_rx_en,   --from ODMB_VME
+        prbs_tst_cnt    => spy_prbs_tst_cnt, --from ODMB_VME
+        prbs_err_cnt    => open,             --from ODMB_VME
+        reset           => opt_reset         --reset signal
+        );
+    GTH_DDU : entity work.mgt_ddu
+      generic map (
+        CHANN_IDX       => 13
+      )
+      port map (
+        mgtrefclk       => mgtrefclk0_226, -- 160 MHz for 1.6 Gb/s DDU transmission
+        txusrclk        => usrclk_ddu,  -- 80 MHz for 1.6 Gb/s with 8b/10b encoding
+        rxusrclk        => open, --output rx clock
+        sysclk          => cmsclk,    -- maximum DRP clock frequency 62.5 MHz for 1.25 Gb/s line rate
+        daq_rx_n        => B04_RX_N(2), --to pins
+        daq_rx_p        => B04_RX_P(2), --to pins
+        daq_tx_n        => DAQ_TX_N(2), --to pins
+        daq_tx_p        => DAQ_TX_P(2), --to pins
+        txready         => spy_txready, --unused
+        rxready         => spy_rxready, --unused
+        txdata          => ddu_data,  --spy_txdata,
+        txd_valid       => ddu_data_valid, --spy_txd_valid,
+        txdiffctrl      => spy_txdiffctrl,   --unused
+        loopback        => spy_loopback,     --unused
+        rxdata          => spy_rxdata,       --unused
+        rxd_valid       => spy_rxd_valid,    --unused
+        bad_rx          => spy_bad_rx,       --unused
+        prbs_type       => mgt_prbs_type,    --from ODMB_VME
+        prbs_tx_en      => spy_prbs_tx_en,   --from ODMB_VME
+        prbs_rx_en      => spy_prbs_rx_en,   --from ODMB_VME
+        prbs_tst_cnt    => spy_prbs_tst_cnt, --from ODMB_VME
+        prbs_err_cnt    => spy_prbs_err_cnt, --from ODMB_VME
+        reset           => opt_reset         --reset signal
+        );
+  end generate generate_spy_pc;
+  generate_spy_ddu : if ENABLE_SPY_TO_DDU = '1' generate
+    GTH_PC : entity work.mgt_pc
+      generic map (
+        CHANN_IDX       => 13
+      )
+      port map (
+        mgtrefclk       => mgtrefclk1_226, -- mgtrefclk1_226 is sourced from the 125 MHz crystal for 1.25 Gb/s
+        txusrclk        => usrclk_pc,  -- 125 MHz for 1.25 Gb/s with 8b/10b encoding
+        rxusrclk        => open, --output rx clock
+        sysclk          => cmsclk,    -- maximum DRP clock frequency 62.5 MHz for 1.25 Gb/s line rate
+        spy_rx_n        => B04_RX_N(2), --to pins
+        spy_rx_p        => B04_RX_P(2), --to pins
+        spy_tx_n        => DAQ_TX_N(2), --to pins
+        spy_tx_p        => DAQ_TX_P(2), --to pins
+        txready         => open,     --unused
+        rxready         => open,     --unused
+        txdata          => pc_data,  --spy_txdata,
+        txd_valid       => pc_data_valid, --spy_txd_valid,
+        end_of_header   => gl_pc_tx_ack,     --end of header signal to PCFIFO
+        txdiffctrl      => spy_txdiffctrl,   --unused
+        loopback        => spy_loopback,     --unused
+        rxdata          => open,             --unused
+        rxd_valid       => open,             --unused
+        bad_rx          => open,             --unused
+        prbs_type       => mgt_prbs_type,    --from ODMB_VME
+        prbs_tx_en      => spy_prbs_tx_en,   --from ODMB_VME
+        prbs_rx_en      => spy_prbs_rx_en,   --from ODMB_VME
+        prbs_tst_cnt    => spy_prbs_tst_cnt, --from ODMB_VME
+        prbs_err_cnt    => open,             --from ODMB_VME
+        reset           => opt_reset         --reset signal
+        );
+    GTH_DDU_SPY : entity work.mgt_ddu
+      generic map (
+        CHANN_IDX       => 11
+      )
+      port map (
+        mgtrefclk       => mgtrefclk0_226, -- 160 MHz for 1.6 Gb/s DDU transmission
+        txusrclk        => usrclk_ddu,  -- 80 MHz for 1.6 Gb/s with 8b/10b encoding
+        rxusrclk        => open, --output rx clock
+        sysclk          => cmsclk,    -- maximum DRP clock frequency 62.5 MHz for 1.25 Gb/s line rate
+        daq_rx_n        => spy_rx_n, --to pins
+        daq_rx_p        => spy_rx_p, --to pins
+        daq_tx_n        => SPY_TX_N, --to pins
+        daq_tx_p        => SPY_TX_P, --to pins
+        txready         => spy_txready, --unused
+        rxready         => spy_rxready, --unused
+        txdata          => ddu_data,  --spy_txdata,
+        txd_valid       => ddu_data_valid, --spy_txd_valid,
+        txdiffctrl      => spy_txdiffctrl,   --unused
+        loopback        => spy_loopback,     --unused
+        rxdata          => spy_rxdata,       --unused
+        rxd_valid       => spy_rxd_valid,    --unused
+        bad_rx          => spy_bad_rx,       --unused
+        prbs_type       => mgt_prbs_type,    --from ODMB_VME
+        prbs_tx_en      => spy_prbs_tx_en,   --from ODMB_VME
+        prbs_rx_en      => spy_prbs_rx_en,   --from ODMB_VME
+        prbs_tst_cnt    => spy_prbs_tst_cnt, --from ODMB_VME
+        prbs_err_cnt    => spy_prbs_err_cnt, --from ODMB_VME
+        reset           => opt_reset         --reset signal
+        );
+  end generate generate_spy_ddu;
+
+
+  -------------------------------------------------
+  -- DCFEB receiver for ODMB7
+  -------------------------------------------------
+  GTH_DCFEB : entity work.mgt_cfeb
+    generic map (
+      NLINK        => NCFEB,  -- number of links
+      DATAWIDTH    => 16  -- user data width
+      )
+    port map (
+      mgtrefclk    => mgtrefclk0_224,
+      rxusrclk     => usrclk_mgtc,
+      sysclk       => sysclk80,
+      daq_rx_n     => DAQ_RX_N(6 downto 0),
+      daq_rx_p     => DAQ_RX_P(6 downto 0),
+      rxdata_cfeb  => dcfeb_rxdata,
+      rxd_valid    => dcfeb_rxd_valid,
+      crc_valid    => dcfeb_crc_valid,
+      rxready      => dcfeb_rxready,
+      bad_rx       => dcfeb_bad_rx,
+      kill_rxout   => kill(7 downto 1),
+      kill_rxpd    => (others => '0'),
+      fifo_full    => dcfeb_datafifo_full,
+      fifo_afull   => dcfeb_datafifo_afull,
+      prbs_type    => mgt_prbs_type,
+      prbs_rx_en   => dcfeb_prbs_rx_en,
+      prbs_tst_cnt => dcfeb_prbs_tst_cnt,
+      prbs_err_cnt => dcfeb_prbs_err_cnt,
+      reset        => opt_reset
+      );
 
 end Behavioral;

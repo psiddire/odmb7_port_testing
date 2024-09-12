@@ -8,59 +8,80 @@ use ieee.numeric_std.all;
 use work.ucsb_types.all;
 use unisim.vcomponents.all;
 
+--! @brief module that monitors various registers, sets certain voltaile settings, and sends reset signals
+--! @details Supported VME commands:
+--! * W/R 3000 write or read ODMB calibration mode. 0=nominal mode, 1=calibration mode (L1A with each pulse)
+--! * W   3004 ODMB firmware soft reset
+--! * W   3008 ODMB optical reset
+--! * W   3010 DCFEB reprogram (hard reset)
+--! * W   3014 L1A reset and DCFEB resync
+--! * W/R 3020 write or read test point select 
+--! * W/R 3024 write or read the maximum number of bad words from (x)DCFEB before they are killed
+--! * W/R 3100 write or read loopback setting. 0=no loopback, 1 or 2=internal loopback
+--! * R   3110 read TX voltage swing. 0=minimum (100 mV), F=maximum (1100 mV)
+--! * R   3120 read (x)DCFEB programming done bits
+--! * w   3200 generate pulses. bits: 0=INJPLS, 1=EXTPLS, 2=L1A+L1A_MATCH, 3=LCT request to OTMB, 4=external trigger request to OTMB, 5=BC0
+--! * W/R 3300 write or read data multiplexer. 0=real data, 1=dummy data. 
+--! * W/R 3304 write or read trigger multiplexer. 0=external triggers, 1=internal triggers.
+--! * W/R 3308 write or read LVMB multiplexer. 0=real LVMB, 1=dummy LVMB.
+--! * W/R 3400 write or read pedestal (L1A_MATCH for each L1A). 0=normal, 1=pedestal.
+--! * W/R 3404 write or read. 0=normal, 1=OTMB data requested for each L1A.
+--! * W/R 3408 write or read L1A mask. bit 0=kills L1A, bits 1-7=kills L1A_MATCHes 
+--! * W/R 340C write or read mask_pls. 0=normal, 1=no EXTPLS/INJPLS
+--! * R   3YZC read data registers. YZ determines the data to be read, see top level.
 entity VMEMON is
   generic (
     NCFEB   : integer range 1 to 7 := 7
     );
   port (
 
-    SLOWCLK : in std_logic;
-    CLK40   : in std_logic;
-    RST     : in std_logic;
+    SLOWCLK : in std_logic;                                 --! 2.5 MHz clock.
+    CLK40   : in std_logic;                                 --! 40 MHz clock. Used for resets and pulses.
+    RST     : in std_logic;                                 --! Firmware soft reset signal.
 
-    DEVICE  : in std_logic;
-    STROBE  : in std_logic;
-    COMMAND : in std_logic_vector(9 downto 0);
-    WRITER  : in std_logic;
+    DEVICE  : in std_logic;                                 --! Indicates if this is the selected ODMB VME device.
+    STROBE  : in std_logic;                                 --! Strobe signal indicating VME command is ready.
+    COMMAND : in std_logic_vector(9 downto 0);              --! VME command signal.
+    WRITER  : in std_logic;                                 --! Indicates if VME command is a read or write command.
 
-    INDATA  : in  std_logic_vector(15 downto 0);
-    OUTDATA : out std_logic_vector(15 downto 0);
+    INDATA  : in  std_logic_vector(15 downto 0);            --! Input data accompanying VME command.
+    OUTDATA : out std_logic_vector(15 downto 0);            --! Output data to VME backplane.
 
-    DTACK : out std_logic;
+    DTACK : out std_logic;                                  --! Data acknowledge, indicates the VME command has been received.
 
-    DCFEB_DONE  : in std_logic_vector(NCFEB downto 1);
+    DCFEB_DONE  : in std_logic_vector(NCFEB downto 1);      --! DCFEB done bits.
 
     --reset signals
-    OPT_RESET_PULSE : out std_logic;
-    L1A_RESET_PULSE : out std_logic;
-    FW_RESET        : out std_logic;
-    REPROG_B        : out std_logic;
+    OPT_RESET_PULSE : out std_logic;                        --! Signal to reset optical firmware.
+    L1A_RESET_PULSE : out std_logic;                        --! Signal to reset L1A counter.
+    FW_RESET        : out std_logic;                        --! ODMB firmware soft reset signal
+    REPROG_B        : out std_logic;                        --! REPROGRAM signal to (x)DCFEBs.
 
     --pulses
-    TEST_INJ        : out std_logic;
-    TEST_PLS        : out std_logic;
-    TEST_LCT        : out std_logic;
-    TEST_BC0        : out std_logic;
-    OTMB_LCT_RQST   : out std_logic;
-    OTMB_EXT_TRIG   : out std_logic;
+    TEST_INJ        : out std_logic;                        --! Signal to generate test INJPLS to (x)DCFEBs.
+    TEST_PLS        : out std_logic;                        --! Signal to generate test EXTPLS to (x)DCFEBs.
+    TEST_LCT        : out std_logic;                        --! Signal to generate test LCTs to (x)DCFEBs.
+    TEST_BC0        : out std_logic;                        --! Signal to generate test BC0 to (x)DCFEBs.
+    OTMB_LCT_RQST   : out std_logic;                        --! LCT request signal to OTMB.
+    OTMB_EXT_TRIG   : out std_logic;                        --! External trigger request signal to OTMB.
 
     --internal register outputs
-    ODMB_CAL        : out std_logic;
-    TP_SEL          : out std_logic_vector(15 downto 0);
-    MAX_WORDS_DCFEB : out std_logic_vector(15 downto 0);
-    LOOPBACK        : out std_logic_vector(2 downto 0);  -- For internal loopback tests
-    TXDIFFCTRL      : out std_logic_vector(3 downto 0);  -- Controls the TX voltage swing
-    MUX_DATA_PATH   : out std_logic;
-    MUX_TRIGGER     : out std_Logic;
-    MUX_LVMB        : out std_logic;
-    ODMB_PED        : out std_logic_vector(1 downto 0);
-    TEST_PED        : out std_logic;
-    MASK_L1A        : out std_logic_vector(NCFEB downto 0);
-    MASK_PLS        : out std_logic;
+    ODMB_CAL        : out std_logic;                        --! Sets calibration mode (L1A generated with calibration LCT) in TRGCTRL.
+    TP_SEL          : out std_logic_vector(15 downto 0);    --! Test point select signal.
+    MAX_WORDS_DCFEB : out std_logic_vector(15 downto 0);    --! Maximum number of words before an (x)DCFEB is marked as bad.
+    LOOPBACK        : out std_logic_vector(2 downto 0);     --! For internal loopback tests, currently unused.
+    TXDIFFCTRL      : out std_logic_vector(3 downto 0);     --! Controls the TX voltage swing, currently unused.
+    MUX_DATA_PATH   : out std_logic;                        --! Controls whether data comes from real boards or simulated data.
+    MUX_TRIGGER     : out std_Logic;                        --! Controls whether trigger signals are external or come from TESTCTRL. (currently unused)
+    MUX_LVMB        : out std_logic;                        --! Controls whether LVMB communication is to real board or simulated LVMB.
+    ODMB_PED        : out std_logic_vector(1 downto 0);     --! Controls pedestal (genereates L1A MATCH for each L1A)
+    TEST_PED        : out std_logic;                        --! Control whether OTMB data is requested for each L1A.
+    MASK_L1A        : out std_logic_vector(NCFEB downto 0); --! Suppresses L1A and L1A_MATCHes.
+    MASK_PLS        : out std_logic;                        --! Suppresses INJPLS and EXTPLS signals.
 
     --exernal registers
-    ODMB_DATA_SEL : out std_logic_vector(7 downto 0);
-    ODMB_DATA     : in  std_logic_vector(15 downto 0)
+    ODMB_STAT_SEL   : out std_logic_vector(7 downto 0);     --! Selects top level data signal to read.
+    ODMB_STAT_DATA  : in  std_logic_vector(15 downto 0)     --! Data from top level.
     );
 end VMEMON;
 
@@ -185,7 +206,7 @@ begin
 
   -- R 3XYC "Read external registers XY (where XY /= 40)"
   r_odmb_data       <= '1' when ((CMDDEV and x"100C") = x"100C" and CMDDEV /= x"140C" and WRITER = '1') else '0';
-  ODMB_DATA_SEL     <= COMMAND(9 downto 2) when (r_odmb_data = '1') else x"1F";
+  ODMB_STAT_SEL     <= COMMAND(9 downto 2) when (r_odmb_data = '1') else x"1F";
 
   -- Reset command(0x3004 0x3008 0x3010 0x3014)
   -- DCFEB Reprog is asserted for the 2 clock cycles in SLOWCLK after STROBE, others are asserted for 1 cycle in CLK40 1 cycle after STROBE
@@ -193,7 +214,8 @@ begin
   PLS_OPTRESET : PULSE2FAST port map(DOUT => OPT_RESET_PULSE, CLK_DOUT => CLK40, RST => RST, DIN => w_opt_rst);
   PLS_L1ARESET : PULSE2FAST port map(DOUT => L1A_RESET_PULSE, CLK_DOUT => CLK40, RST => RST, DIN => w_dcfeb_resync);
   PLS_REPROG   : NPULSE2SAME port map(DOUT => reprog, CLK_DOUT => SLOWCLK, RST => RST, NPULSE => 2, DIN => w_dcfeb_reprog);
-  REPROG_B <= not reprog;
+  -- REPROG_B <= not reprog;
+  REPROG_B <= '1';
 
   --Local register (+DCFEB done) write/read commands
 
@@ -237,7 +259,7 @@ begin
   out_txdiffctrl    <= x"000" & txdiffctrl_inner;
 
   --0x3120 read DCFEB done (NOT local register)
-  out_dcfeb_done <= x"00" & '0' & dcfeb_done;
+  out_dcfeb_done(NCFEB-1 downto 0) <= dcfeb_done;
 
   --0x3300 write/read data path MUX selector
   FD_MUXDATAPATHSEL : FDCE port map(Q => mux_data_path_inner, C => SLOWCLK, CE => w_mux_data_path, CLR => RST, D => INDATA(0));
@@ -276,7 +298,7 @@ begin
     FD_W_MASK_L1A : FDCE port map(Q => mask_l1a_inner(I), C => SLOWCLK, CE => w_mask_l1a, CLR => RST, D => INDATA(I));
   end generate GEN_MASK_L1A;
   MASK_L1A <= mask_l1a_inner;
-  out_mask_l1a(15 downto 0) <= x"00" & mask_l1a_inner;
+  out_mask_l1a(NCFEB downto 0) <= mask_l1a_inner;
 
   -- DCFEB pulses
   GEN_dcfeb_pulse : for K in 0 to 5 generate
@@ -304,7 +326,7 @@ begin
              out_test_ped        when (r_test_ped = '1')        else
              out_mask_pls        when (r_mask_pls = '1')        else
              out_mask_l1a        when (r_mask_l1a = '1')        else
-             ODMB_DATA           when (r_odmb_data = '1')       else
+             ODMB_STAT_DATA      when (r_odmb_data = '1')       else
              (others => 'L');
 
   -- DTACK: always just issue on second SLOWCLK edge after STROBE

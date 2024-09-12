@@ -1,4 +1,3 @@
--- SYSTEM_TEST: Provides utilities for testing components of ODMB
 
 library ieee;
 library work;
@@ -10,47 +9,68 @@ use ieee.std_logic_unsigned.all;
 use work.ucsb_types.all;
 use unisim.vcomponents.all;
 
+--! @brief SYSTEM_TEST: VME module that provides utilities for testing components of ODMB
+--! @details Supported VME commands:
+--! * W 9000 Start transmitting for backend optical PRBS test 
+--! * W 9004 Read VMEDATA sequences from backend optical PRBS
+--! * R 900C Read number of errors in last backend optical PRBS readback
+--! * W 9100 Start transmitting for PC optical PRBS test
+--! * W 9104 Read VMEDATA sequences from PC optical PRBS
+--! * R 910C Read number of errors in last PC optical PRBS readback
+--! * W 9200 Read VMEDATA*10000 bits from optical PRBS from DCFEB
+--! * W/R 9204 Select or read DCFEB fiber for test
+--! * R 9208 Read number of error edges in last DCFEB optical PRBS test
+--! * R 920C Read number of bit flips in last DCFEB optical PRBS test
+--! * W/R 9300 Select or read PRBS type for all optical tests: 1 PRBS7 2 PRBS15 3 PRBS23 4 PRBS31
+--! * W 9400 Initiate N*10000 bit copper OTMB PRBS test (RX to OTMB and TX from OTMB)
+--! * R 9404 Read number of TX enable PRBS enables sent by OTMB
+--! * R 9408 Read number of good 10000 bits sent by OTMB
+--! * R 940C Read number of bit errors in last OTMB PRBS test
+--! * W 9410 Reset OTMB PRBS error counter
 entity SYSTEM_TEST is
   port (
-    DEVICE  : in std_logic;
-    COMMAND : in std_logic_vector(9 downto 0);
-    INDATA  : in std_logic_vector(15 downto 0);
-    STROBE  : in std_logic;
-    WRITER  : in std_logic;
-    SLOWCLK : in std_logic;
-    CLK     : in std_logic;
-    CLK160  : in std_logic;
-    RST     : in std_logic;
+    DEVICE  : in std_logic;                                   --! Indicates if this is the selected VME device
+    COMMAND : in std_logic_vector(9 downto 0);                --! VME command signal
+    INDATA  : in std_logic_vector(15 downto 0);               --! VME data from backplane
+    STROBE  : in std_logic;                                   --! Indicates VME command ready
+    WRITER  : in std_logic;                                   --! Indicates read (1) or write (0)
+    SLOWCLK : in std_logic;                                   --! 2.5MHz clock
+    CLK     : in std_logic;                                   --! 40MHz clock
+    CLK160  : in std_logic;                                   --! 160MHz clock for PRBS test
+    RST     : in std_logic;                                   --! Soft reset signal
 
-    OUTDATA : out std_logic_vector(15 downto 0);
-    DTACK   : out std_logic;
+    OUTDATA : out std_logic_vector(15 downto 0);              --! VME output data to backplane
+    DTACK   : out std_logic;                                  --! VME data acknowledge to backplane
 
     -- DDU/PC/DCFEB COMMON PRBS
-    MGT_PRBS_TYPE : out std_logic_vector(3 downto 0);
+    MGT_PRBS_TYPE : out std_logic_vector(3 downto 0);         --! DDU/SPY/FE common PRBS type select
 
-    -- DDU PRBS signals
-    DDU_PRBS_TX_EN   : out std_logic;
-    DDU_PRBS_RX_EN   : out std_logic;
-    DDU_PRBS_TST_CNT : out std_logic_vector(15 downto 0);
-    DDU_PRBS_ERR_CNT : in  std_logic_vector(15 downto 0);
+    -- FED PRBS signals
+    FED_PRBS_TX_EN   : out std_logic;                         --! DDU PRBS transmitter enable to MGT_DDU
+    FED_PRBS_RX_EN   : out std_logic;                         --! DDU PRBS receiver enable to MGT_DDU
+    FED_PRBS_TST_CNT : out std_logic_vector(15 downto 0);     --! DDU PRBS length to MGT_DDU
+    FED_PRBS_ERR_CNT : in  std_logic_vector(15 downto 0);     --! DDU PRBS error count from MGT_DDU
 
     -- PC PRBS signals
-    PC_PRBS_TX_EN   : out std_logic_vector(0 downto 0);
-    PC_PRBS_RX_EN   : out std_logic_vector(0 downto 0);
-    PC_PRBS_TST_CNT : out std_logic_vector(15 downto 0);
-    PC_PRBS_ERR_CNT : in  std_logic_vector(15 downto 0);
+    SPY_PRBS_TX_EN   : out std_logic;                         --! PC PRBS transmitter enable to MGT_SPY
+    SPY_PRBS_RX_EN   : out std_logic;                         --! PC PRBS receiver enable to MGT_SPY
+    SPY_PRBS_TST_CNT : out std_logic_vector(15 downto 0);     --! PC PRBS length to MGT_SPY
+    SPY_PRBS_ERR_CNT : in  std_logic_vector(15 downto 0);     --! PC PRBS error count from MGT_SPY
 
     -- DCFEB PRBS signals
-    DCFEB_PRBS_FIBER_SEL : out std_logic_vector(3 downto 0);
-    DCFEB_PRBS_EN        : out std_logic;
-    DCFEB_PRBS_RST       : out std_logic;
-    DCFEB_PRBS_RD_EN     : out std_logic;
-    DCFEB_RXPRBSERR      : in  std_logic;
-    DCFEB_PRBS_ERR_CNT   : in  std_logic_vector(15 downto 0);
+    DCFEB_PRBS_FIBER_SEL : out std_logic_vector(3 downto 0);  --! DCFEB PRBS fiber select
+    DCFEB_PRBS_EN        : out std_logic;                     --! DCFEB PRBS enable
+    DCFEB_PRBS_RST       : out std_logic;                     --! DCFEB PRBS reset
+    DCFEB_PRBS_RD_EN     : out std_logic;                     --! DCFEB PRBS read enable
+    DCFEB_RXPRBSERR      : in  std_logic;                     --! DCFEB PRBS error
+    DCFEB_PRBS_ERR_CNT   : in  std_logic_vector(15 downto 0); --! DCFEB PRBS error count
 
     -- OTMB PRBS signals
-    OTMB_TX : in  std_logic_vector(48 downto 0);
-    OTMB_RX : out std_logic_vector(5 downto 0)
+    OTMB_TX : in  std_logic_vector(48 downto 0);              --! backplane PRBS signals from OTMB
+    OTMB_RX : out std_logic_vector(5 downto 0);               --! backplane PRBS signals to OTMB
+
+    -- Debug signals
+    DIAGOUT : out std_logic_vector(17 downto 0)               --! Debug signal
     );
 end SYSTEM_TEST;
 
@@ -66,22 +86,13 @@ architecture SYSTEM_TEST_Arch of SYSTEM_TEST is
       );
   end component;
 
-  -- Temporary debugging
-  component ila_2 is
-    port (
-      clk : in std_logic := '0';
-      probe0 : in std_logic_vector(383 downto 0) := (others=> '0')
-      );
-  end component;
-
-  signal ila_data : std_logic_vector(383 downto 0) := (others => '0');
   signal outdata_inner : std_logic_vector(15 downto 0);
   signal dtack_inner : std_logic;
 
   signal cmddev                                : std_logic_vector (15 downto 0);
-  signal w_ddu_prbs_tx_en, w_pc_prbs_tx_en     : std_logic;
-  signal w_ddu_prbs_rx_en, w_pc_prbs_rx_en     : std_logic;
-  signal r_ddu_prbs_err_cnt, r_pc_prbs_err_cnt : std_logic;
+  signal w_ddu_prbs_tx_en, w_spy_prbs_tx_en     : std_logic;
+  signal w_ddu_prbs_rx_en, w_spy_prbs_rx_en     : std_logic;
+  signal r_ddu_prbs_err_cnt, r_spy_prbs_err_cnt : std_logic;
   signal strobe_pulse                          : std_logic;
 
   -- GLOBAL PRBS
@@ -115,6 +126,7 @@ architecture SYSTEM_TEST_Arch of SYSTEM_TEST is
   signal pulse_otmb_prbs_rx_end                 : std_logic;
   signal otmb_prbs_tx_xor                       : std_logic_vector(48 downto 0);
   signal otmb_prbs_tx                           : std_logic;
+  signal q_otmb_prbs_tx                         : std_logic;
   signal otmb_prbs_tx_err                       : std_logic;
   signal w_otmb_prbs_en, r_otmb_prbs_err_cnt    : std_logic;
   signal r_otmb_prbs_good_cnt                   : std_logic;
@@ -145,9 +157,9 @@ begin
   w_ddu_prbs_rx_en   <= '1' when (cmddev = x"1004" and STROBE = '1' and WRITER = '0') else '0';
   r_ddu_prbs_err_cnt <= '1' when (cmddev = x"100C" and WRITER = '1')                  else '0';
 
-  w_pc_prbs_tx_en   <= '1' when (cmddev = x"1100" and STROBE = '1' and WRITER = '0') else '0';
-  w_pc_prbs_rx_en   <= '1' when (cmddev = x"1104" and STROBE = '1' and WRITER = '0') else '0';
-  r_pc_prbs_err_cnt <= '1' when (cmddev = x"110C" and WRITER = '1')                  else '0';
+  w_spy_prbs_tx_en   <= '1' when (cmddev = x"1100" and STROBE = '1' and WRITER = '0') else '0';
+  w_spy_prbs_rx_en   <= '1' when (cmddev = x"1104" and STROBE = '1' and WRITER = '0') else '0';
+  r_spy_prbs_err_cnt <= '1' when (cmddev = x"110C" and WRITER = '1')                  else '0';
 
   w_dcfeb_prbs_en      <= '1' when (cmddev = x"1200" and STROBE = '1' and WRITER = '0') else '0';
   w_dcfeb_prbs_fiber   <= '1' when (cmddev = x"1204" and STROBE = '1' and WRITER = '0') else '0';
@@ -166,16 +178,16 @@ begin
 
   STROBE_PE : PULSE_EDGE port map (DOUT => strobe_pulse, PULSE1 => open, CLK => SLOWCLK, RST => RST, NPULSE => 1, DIN => STROBE);
 
-  DDU_PRBS_RX_EN <= w_ddu_prbs_rx_en;
-  PC_PRBS_RX_EN(0)  <= w_pc_prbs_rx_en;
+  FED_PRBS_RX_EN <= w_ddu_prbs_rx_en;
+  SPY_PRBS_RX_EN <= w_spy_prbs_rx_en;
 
-  FDC_DDU_TX_PRBS : FDC port map(Q => DDU_PRBS_TX_EN, C => w_ddu_prbs_tx_en, CLR => RST, D => or_reduce(INDATA));
-  FDC_PC_TX_PRBS  : FDC port map(Q => PC_PRBS_TX_EN(0), C => w_pc_prbs_tx_en, CLR => RST, D => or_reduce(INDATA));
+  FDC_FED_TX_PRBS : FDC port map(Q => FED_PRBS_TX_EN, C => w_ddu_prbs_tx_en, CLR => RST, D => or_reduce(INDATA));
+  FDC_SPY_TX_PRBS : FDC port map(Q => SPY_PRBS_TX_EN, C => w_spy_prbs_tx_en, CLR => RST, D => or_reduce(INDATA));
 
   GEN_PRBS : for i in 15 downto 0 generate
   begin
-    FDC_DDU_PRBS   : FDC port map(Q => DDU_PRBS_TST_CNT(i), C => w_ddu_prbs_rx_en, CLR => RST, D => INDATA(i));
-    FDC_PC_PRBS    : FDC port map(Q => PC_PRBS_TST_CNT(i), C => w_pc_prbs_rx_en, CLR => RST, D => INDATA(i));
+    FDC_FED_PRBS   : FDC port map(Q => FED_PRBS_TST_CNT(i), C => w_ddu_prbs_rx_en, CLR => RST, D => INDATA(i));
+    FDC_SPY_PRBS   : FDC port map(Q => SPY_PRBS_TST_CNT(i), C => w_spy_prbs_rx_en, CLR => RST, D => INDATA(i));
     FDC_DCFEB_PRBS : FDC port map(Q => dcfeb_prbs_seq_cnt(i), C => w_dcfeb_prbs_en, CLR => RST, D => INDATA(i));
     FDC_OTMB_PRBS  : FDC port map(Q => otmb_prbs_rx_sequences(i), C => w_otmb_prbs_en, CLR => RST, D => INDATA(i));
   end generate GEN_PRBS;
@@ -192,8 +204,8 @@ begin
   end generate GEN_PRBS_SEL;
   MGT_PRBS_TYPE <= prbs_type_inner;
 
-  OUTDATA <= DDU_PRBS_ERR_CNT                    when (r_ddu_prbs_err_cnt = '1')   else
-             PC_PRBS_ERR_CNT                     when (r_pc_prbs_err_cnt = '1')    else
+  OUTDATA <= FED_PRBS_ERR_CNT                    when (r_ddu_prbs_err_cnt = '1')   else
+             SPY_PRBS_ERR_CNT                    when (r_spy_prbs_err_cnt = '1')    else
              DCFEB_PRBS_ERR_CNT                  when (r_dcfeb_prbs_err_cnt = '1') else
              x"000" & dcfeb_prbs_fiber_sel_inner when (r_dcfeb_prbs_fiber = '1')   else
              dcfeb_prbserr_edge_cnt              when (r_dcfeb_prbs_edge = '1')    else
@@ -207,7 +219,7 @@ begin
   otmb_tx_err_cnt <= std_logic_vector(to_unsigned(otmb_tx_err_cntr, 16));
 
   DTACK <= strobe_pulse and (w_ddu_prbs_tx_en or w_ddu_prbs_rx_en or r_ddu_prbs_err_cnt or
-                             w_pc_prbs_tx_en or w_pc_prbs_rx_en or r_pc_prbs_err_cnt or
+                             w_spy_prbs_tx_en or w_spy_prbs_rx_en or r_spy_prbs_err_cnt or
                              w_otmb_prbs_en or r_otmb_prbs_en_cnt or w_dcfeb_prbs_en or
                              r_dcfeb_prbs_err_cnt or r_dcfeb_prbs_edge or
                              w_dcfeb_prbs_fiber or r_dcfeb_prbs_fiber or w_prbs_type or
@@ -256,9 +268,18 @@ begin
 
   PRBS_GEN_TX_PM   : PRBS_GEN port map (DOUT => otmb_prbs_tx, CLK => CLK, RST => otmb_prbs_tx_rst, ENABLE => otmb_prbs_tx_en);
   GEN_OTMB_PRBS_TX : for index in 48 downto 0 generate
-    FD_OTMB_TX : FD port map (Q => q_otmb_tx(index), C => CLK, D => OTMB_TX(index));
-    otmb_prbs_tx_xor(index) <= mux_otmb_tx(index) xor otmb_prbs_tx;
+    --FD_OTMB_TX : FD port map (Q => q_otmb_tx(index), C => CLK, D => OTMB_TX(index));
+    --otmb_prbs_tx_xor(index) <= q_otmb_otmb_tx(index) xor otmb_prbs_tx;
+    otmb_prbs_tx_xor(index) <= mux_otmb_tx(index) xor q_otmb_prbs_tx;
   end generate GEN_OTMB_PRBS_TX;
+  clock_otmb_tx : process (CLK)
+  begin
+    if falling_edge(CLK) then
+      q_otmb_tx <= OTMB_TX;
+      q_otmb_prbs_tx <= otmb_prbs_tx;
+    end if;
+  end process clock_otmb_tx;
+  
   otmb_prbs_tx_err <= or_reduce(otmb_prbs_tx_xor(47 downto 0));
 
   CNT_RST : PULSE_EDGE port map (DOUT => otmb_prbs_cnt_rst, PULSE1 => open, CLK => CLK, RST => RST, NPULSE => 2, DIN => w_otmb_prbs_cnt_rst);
@@ -271,7 +292,7 @@ begin
       otmb_tx_err_cntr      <= 0;
       otmb_tx_good_cntr_int <= 0;
       otmb_tx_good_cntr     <= 0;
-    elsif (falling_edge(CLK) and otmb_prbs_tx_en = '1') then
+    elsif (rising_edge(CLK) and otmb_prbs_tx_en = '1') then
       if otmb_prbs_tx_err = '1' then
         otmb_tx_err_cntr <= otmb_tx_err_cntr + 1;
       else
@@ -288,37 +309,17 @@ begin
     end if;
   end process;
 
-  -- OTMB TX test signals
-  ila_data(48 downto 0)    <= otmb_tx;
-  ila_data(64 downto 49)   <= otmb_prbs_tx_en_cnt;
-  ila_data(80 downto 65)   <= otmb_tx_good_cnt;
-  ila_data(96 downto 81)   <= otmb_tx_err_cnt;
-  ila_data(97)             <= w_otmb_prbs_en;       -- VME command
-  ila_data(98)             <= r_otmb_prbs_en_cnt;   -- VME command
-  ila_data(99)             <= r_otmb_prbs_good_cnt; -- VME command
-  ila_data(100)            <= r_otmb_prbs_err_cnt;  -- VME command
-  ila_data(101)            <= w_otmb_prbs_cnt_rst;  -- VME command
-  ila_data(102)            <= otmb_prbs_tx_en;      -- from delayed otmb_tx
-  ila_data(103)            <= otmb_prbs_tx_rst;
-  ila_data(104)            <= q_otmb_prbs_tx_en;
-  ila_data(105)            <= qq_otmb_prbs_tx_en;
-  ila_data(106)            <= otmb_prbs_tx;
-  ila_data(107)            <= otmb_prbs_tx_err;
-  ila_data(156 downto 108) <= mux_otmb_tx;
-  -- Output results
-  ila_data(172 downto 157) <= outdata_inner;
-  ila_data(173)            <= dtack_inner;
-  -- OTMB RX test signals
-  ila_data(174)            <= start_otmb_prbs_rx;
-  ila_data(175)            <= otmb_prbs_rx_en;
-  ila_data(176)            <= otmb_prbs_rx;
-  ila_data(177)            <= CLK;
-
-  ila_systest_inst : ila_2
-    port map (
-      clk    => CLK160,
-      probe0 => ila_data
-      );
-
+   DIAGOUT(0) <= CLK;
+   DIAGOUT(1) <= q_otmb_prbs_tx;
+   DIAGOUT(2) <= otmb_tx(43); --ALCT dav
+   DIAGOUT(3) <= q_otmb_tx(43);
+   DIAGOUT(4) <= q_otmb_tx(43) xor q_otmb_prbs_tx;
+   DIAGOUT(5) <= otmb_tx(40);
+   DIAGOUT(6) <= q_otmb_tx(40);
+   DIAGOUT(7) <= q_otmb_tx(40) xor q_otmb_prbs_tx;
+   DIAGOUT(8) <= otmb_tx(47);
+   DIAGOUT(9) <= q_otmb_tx(47);
+   DIAGOUT(10) <= q_otmb_tx(47) xor q_otmb_prbs_tx;
+   DIAGOUT(17 downto 11) <= (others => '0');
 
 end SYSTEM_TEST_Arch;

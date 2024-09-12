@@ -81,15 +81,16 @@ begin
   am      <= "111010";         -- mode 3A: A24 non previlege 
 
   proc_dtack_timeout : process (clk)
-    variable dtack_timeout_counter  : unsigned(9 downto 0) := (others=> '0');
+    variable dtack_timeout_counter  : unsigned(10 downto 0) := (others=> '0');
   begin
     if (rising_edge(clk)) then
       if (dtack_waiting = '0') then
         dtack_timeout_counter := (others=> '0');
         dtack_timeout <= '0';
       else
-        if (dtack_timeout_counter = 1023) then
-          --1023 cycles = 12.8 us
+        if (dtack_timeout_counter = 2047) then
+          --1024 cycles = 12.8 us
+          --2048 cycles = 25.3 us
           dtack_timeout <= '1';
         end if;
         dtack_timeout_counter := dtack_timeout_counter + 1;
